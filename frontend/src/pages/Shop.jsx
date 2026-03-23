@@ -70,7 +70,7 @@ export default function Shop() {
   useEffect(() => {
     const fetchPcs = async () => {
       try {
-        const res = await apiFetch("/api/products");
+        const res = await apiFetch("/products");
         if (res.ok) {
           const data = await res.json();
           // Filtrare de siguranță: eliminăm categoriile de service și produsele marcate isVisible: false
