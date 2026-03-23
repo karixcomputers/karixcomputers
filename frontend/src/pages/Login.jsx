@@ -29,36 +29,37 @@ export default function Login() {
   }
 
   // 2. Autentificare Google
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      setError("");
-      try {
-        // Trimitem access_token-ul la backend-ul tău (Port 4000)
-        const res = await axios.post(`${API_URL}/auth/google`, {
-          token: tokenResponse.access_token,
-        });
+const handleGoogleLogin = useGoogleLogin({
+  onSuccess: async (tokenResponse) => {
+    setLoading(true);
+    setError("");
 
-        // Verificăm dacă primim datele corect
-        if (res.data && res.data.accessToken) {
-          // SALVĂM DATELE ÎN CONTEXT (Asta te loghează vizual peste tot)
-          loginWithGoogle(res.data);
-          
-          // Navigăm către cont
-          nav("/account");
-        }
-      } catch (err) {
-        console.error("Google Login Error:", err);
-        setError(err.response?.data?.error || "Eroare la sincronizarea cu contul Google.");
-      } finally {
-        setLoading(false);
+    // 1. DEFINIM ADRESA API-ULUI (Folosim variabila din .env)
+    const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
+
+    try {
+      // 2. Trimitem la /api/auth/google (am adăugat /api/ la început)
+      const res = await axios.post(`${API_URL}/auth/google`, {
+        token: tokenResponse.access_token,
+      });
+
+      if (res.data && res.data.accessToken) {
+        // Logica de login existentă
+        loginWithGoogle(res.data);
+        nav("/account");
       }
-    },
-    onError: (error) => {
-      console.error("Google Auth Failure:", error);
-      setError("Conectarea cu Google a eșuat sau a fost anulată.");
-    },
-  });
+    } catch (err) {
+      console.error("Google Login Error:", err);
+      setError(err.response?.data?.error || "Eroare la sincronizarea cu contul Google.");
+    } finally {
+      setLoading(false);
+    }
+  },
+  onError: (error) => {
+    console.error("Google Auth Failure:", error);
+    setError("Conectarea cu Google a eșuat sau a fost anulată.");
+  },
+});
 
   return (
     <div className="min-h-screen pt-12 pb-24 px-4 relative overflow-hidden flex justify-center">
