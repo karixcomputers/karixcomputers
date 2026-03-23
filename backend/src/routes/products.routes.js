@@ -58,7 +58,8 @@ router.post("/upload", requireAuth, (req, res) => {
     }
 
     // Returnăm URL-ul complet care va fi salvat în baza de date
-    const imageUrl = `https://karixcomputers.ro/uploads/${req.file.filename}`;
+    // MODIFICAT: am adăugat /api în link
+const imageUrl = `https://karixcomputers.ro/api/uploads/${req.file.filename}`;
     res.json({ url: imageUrl });
   });
 });
