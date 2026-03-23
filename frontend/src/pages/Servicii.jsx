@@ -13,7 +13,7 @@ export default function Servicii() {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const res = await apiFetch("/api/products");
+        const res = await apiFetch("/products");
         
         if (res.ok) {
           const data = await res.json();
