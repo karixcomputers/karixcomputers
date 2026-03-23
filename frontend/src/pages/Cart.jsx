@@ -186,6 +186,7 @@ export default function Cart() {
                 const imgUrl = item.images?.[0] || item.imageUrl || null;
 
                 return (
+                  // NOU: Am schimbat flex flex-col sm:flex-row pentru a fi 100% responsive pe mobil
                   <div key={item.id} className="group p-5 sm:p-6 rounded-[25px] sm:rounded-[35px] bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 hover:bg-white/[0.08] hover:border-indigo-500/30 transition-all duration-300 shadow-xl relative">
                     
                     <button onClick={() => removeFromCart(item.id)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-500 hover:text-pink-500 transition-colors h-8 w-8 flex items-center justify-center rounded-full hover:bg-pink-500/10 z-20">✕</button>
@@ -223,7 +224,7 @@ export default function Cart() {
                         </h3>
                       </div>
 
-                      {/* SPECIFICAȚII */}
+                      {/* SPECIFICAȚII (Complet responsive, text integral) */}
                       {isPC && item.specs && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-3 sm:mt-4 opacity-90 w-full">
                           {[
@@ -239,6 +240,7 @@ export default function Cart() {
                             <div key={idx} className="flex items-start gap-2 bg-white/5 px-3 py-2 rounded-lg border border-white/5 w-full">
                               <span className="text-[11px] grayscale brightness-200 shrink-0 pt-[2px]">{spec.icon}</span>
                               <span className="text-[9px] text-indigo-400 font-black uppercase tracking-tighter shrink-0 pt-[3px]">{spec.label}:</span>
+                              {/* NOU: Am folosit whitespace-normal și break-words pentru ca textul lung să curgă perfect în interiorul cardului */}
                               <span className="text-[10px] text-gray-300 font-medium italic flex-1 whitespace-normal break-words leading-snug">
                                 {spec.val}
                               </span>
