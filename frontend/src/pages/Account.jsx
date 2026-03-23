@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { Link, useNavigate } from "react-router-dom";
+// Importăm apiFetch pentru a folosi URL-ul corect de pe server
+import { apiFetch } from "../api/client";
 
-// MenuLink primește acum badge-ul din starea locală actualizată
 const MenuLink = ({ to, icon, label, badge }) => (
   <Link 
     to={to} 
@@ -24,30 +25,23 @@ export default function Account() {
   const { user, logout, accessToken } = useAuth();
   const navigate = useNavigate();
 
-  // Inițializăm cu 0 sau cu ce există deja în user (din cache)
   const [stats, setStats] = useState({
     ordersCount: user?.ordersCount || 0,
     wishlistCount: user?.wishlistCount || 0,
     ticketsCount: user?.ticketsCount || 0
   });
 
-  // --- FUNCȚIE PENTRU ACTUALIZARE AUTOMATĂ ---
   const fetchFreshStats = async () => {
     if (!accessToken) return;
     
     try {
-      // Apelăm endpoint-ul corect /api/auth/me
-      const response = await fetch("http://192.168.0.162:4000/api/auth/me", {
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
-        },
-      });
+      // MODIFICARE: Folosim apiFetch cu ruta relativă "/auth/me"
+      // apiFetch adaugă automat VITE_API_URL-ul corect și Token-ul de autorizare
+      const response = await apiFetch("/auth/me");
 
       if (response.ok) {
         const data = await response.json();
         
-        // Backend-ul tău returnează { user: { ordersCount, wishlistCount, ticketsCount } }
         if (data.user) {
           setStats({
             ordersCount: data.user.ordersCount || 0,
@@ -61,7 +55,6 @@ export default function Account() {
     }
   };
 
-  // Se execută automat când intri pe pagină
   useEffect(() => {
     fetchFreshStats();
   }, [accessToken]); 
@@ -73,7 +66,6 @@ export default function Account() {
 
   return (
     <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden">
-      {/* Background Glows */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-gradient-to-b from-indigo-500/10 to-transparent blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-pink-500/5 blur-[120px] pointer-events-none" />
 
@@ -89,7 +81,6 @@ export default function Account() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* SIDEBAR */}
           <div className="lg:col-span-4 space-y-4">
             <div className="p-8 rounded-[40px] bg-white/[0.02] border border-white/10 backdrop-blur-md mb-6 transition-all hover:bg-white/[0.04]">
               <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-pink-500 mx-auto mb-4 flex items-center justify-center text-3xl font-black text-white shadow-2xl shadow-indigo-500/30 rotate-3">
@@ -100,9 +91,9 @@ export default function Account() {
             </div>
 
             <nav className="flex flex-col gap-3">
-              <MenuLink to="/orders" icon="📦" label="Comenzile Mele"  />
+              <MenuLink to="/orders" icon="📦" label="Comenzile Mele" badge={stats.ordersCount} />
               <MenuLink to="/account/warranties" icon="🛠️" label="Garanții" />
-              <MenuLink to="/tickets" icon="🔄" label="Tichete Suport"  />
+              <MenuLink to="/tickets" icon="🔄" label="Tichete Suport" badge={stats.ticketsCount} />
               
               <button 
                 onClick={handleLogout}
@@ -114,7 +105,6 @@ export default function Account() {
             </nav>
           </div>
 
-          {/* MAIN CONTENT */}
           <div className="lg:col-span-8 space-y-8">
             <div className="p-10 rounded-[40px] bg-white/[0.02] border border-white/10 backdrop-blur-md relative overflow-hidden transition-all hover:bg-white/[0.04]">
               <h3 className="text-sm font-black text-indigo-400 uppercase tracking-[0.3em] mb-10 flex items-center gap-3">
@@ -153,7 +143,6 @@ export default function Account() {
               </div>
             </div>
 
-            {/* STATS CARDS - Folosesc acum state-ul sincronizat 'stats' */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { val: stats.ordersCount, label: "Comenzi Totale", icon: "📦", color: "indigo" },
@@ -173,6 +162,6 @@ export default function Account() {
 
         </div>
       </div>
-    </div>
+    </div> 
   );
 }

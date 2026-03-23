@@ -12,7 +12,8 @@ export default function AdminTickets() {
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ["admin-tickets"],
     queryFn: async () => {
-      const res = await apiFetch("/api/tickets/admin/all");
+      // MODIFICAT: din "/api/tickets/admin/all" în "/tickets/admin/all"
+      const res = await apiFetch("/tickets/admin/all");
       if (!res.ok) throw new Error("Nu s-au putut încărca tichetele.");
       return res.json();
     },
@@ -22,7 +23,8 @@ export default function AdminTickets() {
   // 2. Mutație pentru schimbare status rapidă
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }) => {
-      const res = await apiFetch(`/api/tickets/${id}/status`, {
+      // MODIFICAT: din "/api/tickets/${id}/status" în "/tickets/${id}/status"
+      const res = await apiFetch(`/tickets/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status }),
       });
@@ -64,7 +66,6 @@ export default function AdminTickets() {
             <p className="text-gray-400 mt-4 font-medium italic">Gestionează solicitările de suport de la clienții Karix.</p>
           </div>
 
-          {/* FILTRE */}
           <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-md">
             {["toate", "deschis", "in_lucru", "inchis"].map((f) => (
               <button
@@ -81,7 +82,7 @@ export default function AdminTickets() {
         </header>
 
         {isLoading ? (
-          <div className="py-20 text-center text-white">Se încarcă tichetele...</div>
+          <div className="py-20 text-center text-white italic animate-pulse">Se încarcă tichetele...</div>
         ) : filteredTickets.length === 0 ? (
           <div className="p-20 border border-white/5 rounded-[40px] bg-white/5 backdrop-blur-md text-center">
              <p className="text-gray-500 font-black uppercase tracking-widest text-sm italic">Nu există tichete în categoria "{filter}".</p>
@@ -113,7 +114,6 @@ export default function AdminTickets() {
                   </div>
 
                   <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 w-full lg:w-auto">
-                    {/* STATUS SELECTOR BUTTONS */}
                     <div className="flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/5">
                       <button
                         onClick={() => updateStatusMutation.mutate({ id: t.id, status: "deschis" })}

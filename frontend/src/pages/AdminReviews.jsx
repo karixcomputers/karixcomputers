@@ -15,7 +15,8 @@ export default function AdminReviews() {
 
   const fetchReviews = async () => {
     try {
-      const res = await apiFetch("/api/reviews");
+      // MODIFICAT: din "/api/reviews" în "/reviews"
+      const res = await apiFetch("/reviews");
       if (res.ok) setReviews(await res.json());
     } catch (err) {
       console.error(err);
@@ -30,7 +31,8 @@ export default function AdminReviews() {
     const id = deleteConfirm.id;
     setDeleteConfirm({ show: false, id: null });
     try {
-      const res = await apiFetch(`/api/reviews/${id}`, { method: "DELETE" });
+      // MODIFICAT: din "/api/reviews/${id}" în "/reviews/${id}"
+      const res = await apiFetch(`/reviews/${id}`, { method: "DELETE" });
       if (res.ok) {
         setReviews(prev => prev.map(r => r.id === id ? { ...r, isDeleted: true } : r));
         setStatusModal({ show: true, message: "Review mutat în istoric." });
@@ -40,7 +42,8 @@ export default function AdminReviews() {
 
   const handleRestore = async (id) => {
     try {
-      const res = await apiFetch(`/api/reviews/${id}/restore`, { method: "PATCH" });
+      // MODIFICAT: din "/api/reviews/${id}/restore" în "/reviews/${id}/restore"
+      const res = await apiFetch(`/reviews/${id}/restore`, { method: "PATCH" });
       if (res.ok) {
         setReviews(prev => prev.map(r => r.id === id ? { ...r, isDeleted: false } : r));
         setStatusModal({ show: true, message: "Review restaurat pe site!" });
@@ -85,9 +88,9 @@ export default function AdminReviews() {
               <div className="flex-1 space-y-4 w-full">
                 <div className="flex flex-wrap items-center gap-4">
                    <div className="flex gap-1 bg-black/20 px-3 py-1.5 rounded-full border border-white/5">
-                      {[...Array(5)].map((_, star) => (
-                        <span key={star} className={`text-[10px] ${star < r.rating ? "text-yellow-500" : "text-white/10"}`}>★</span>
-                      ))}
+                     {[...Array(5)].map((_, star) => (
+                       <span key={star} className={`text-[10px] ${star < r.rating ? "text-yellow-500" : "text-white/10"}`}>★</span>
+                     ))}
                    </div>
                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest italic">{r.user?.name}</span>
                    <span className="text-[10px] text-gray-500 font-bold uppercase">Produs: {r.product?.name}</span>
@@ -96,7 +99,6 @@ export default function AdminReviews() {
                 
                 <p className={`italic text-sm leading-relaxed ${r.isDeleted ? 'text-gray-500' : 'text-gray-300'}`}>"{r.comment}"</p>
                 
-                {/* NOU: Afișare poze încărcate de client în panoul de Admin */}
                 {r.images && r.images.length > 0 && (
                   <div className="flex gap-3 pt-2 overflow-x-auto no-scrollbar">
                     {r.images.map((imgUrl, imgIdx) => (
@@ -170,7 +172,7 @@ export default function AdminReviews() {
         </div>
       )}
 
-      {/* NOU: MODAL FULLSCREEN POZE REVIEW (Similar cu cel de pe ProductDetails) */}
+      {/* MODAL FULLSCREEN POZE REVIEW */}
       {fullscreenImage && (
         <div 
           className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300"

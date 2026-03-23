@@ -18,7 +18,8 @@ export default function AdminCoupons() {
 
   const fetchCoupons = async () => {
     try {
-      const res = await apiFetch("/api/coupons");
+      // MODIFICAT: din "/api/coupons" în "/coupons"
+      const res = await apiFetch("/coupons");
       if (res.ok) setCoupons(await res.json());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -28,7 +29,6 @@ export default function AdminCoupons() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Convertim valoarea în cenți dacă tipul este "fixed"
     const payload = {
       ...form,
       discountValue: form.discountType === 'fixed' ? Math.round(parseFloat(form.discountValue) * 100) : form.discountValue,
@@ -36,7 +36,8 @@ export default function AdminCoupons() {
     };
 
     try {
-      const res = await apiFetch("/api/coupons", {
+      // MODIFICAT: din "/api/coupons" în "/coupons"
+      const res = await apiFetch("/coupons", {
         method: "POST",
         body: JSON.stringify(payload)
       });
@@ -52,7 +53,8 @@ export default function AdminCoupons() {
 
   const deleteCoupon = async (id) => {
     if (!window.confirm("Ștergi acest cod?")) return;
-    await apiFetch(`/api/coupons/${id}`, { method: "DELETE" });
+    // MODIFICAT: din "/api/coupons/${id}" în "/coupons/${id}"
+    await apiFetch(`/coupons/${id}`, { method: "DELETE" });
     fetchCoupons();
   };
 

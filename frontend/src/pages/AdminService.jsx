@@ -20,7 +20,8 @@ export default function AdminService() {
   const { data: allOrders, isLoading } = useQuery({
     queryKey: ["adminServiceOrders"],
     queryFn: async () => {
-      const res = await apiFetch("/api/service-orders/admin/all");
+      // MODIFICAT: din "/api/service-orders/admin/all" în "/service-orders/admin/all"
+      const res = await apiFetch("/service-orders/admin/all");
       if (!res.ok) throw new Error("Eroare la încărcarea datelor.");
       return res.json();
     },
@@ -30,7 +31,8 @@ export default function AdminService() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status, awb }) => {
-      const res = await apiFetch(`/api/service-orders/${id}/status`, {
+      // MODIFICAT: din "/api/service-orders/${id}/status" în "/service-orders/${id}/status"
+      const res = await apiFetch(`/service-orders/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status, awb }),
       });
@@ -78,7 +80,6 @@ export default function AdminService() {
           </button>
         </header>
 
-        {/* TABEL ADMIN */}
         <div className="overflow-x-auto rounded-[35px] border border-white/5 bg-[#0b1020]/50 backdrop-blur-3xl shadow-2xl">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -127,32 +128,25 @@ export default function AdminService() {
         </div>
       </div>
 
-      {/* MODAL PENTRU INTRODUCERE AWB */}
       {showAwbModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-black/60 animate-in fade-in duration-300">
           <div className="bg-[#0f172a] border border-white/10 p-8 md:p-10 rounded-[40px] max-w-md w-full shadow-2xl text-center relative overflow-hidden">
-            {/* Decoratiune fundal */}
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/10 blur-3xl rounded-full" />
-            
             <div className="text-4xl mb-6">🚚</div>
             <h2 className="text-2xl font-black text-white uppercase italic mb-2">Confirmă Expedierea</h2>
             <p className="text-gray-400 text-xs mb-8 font-medium leading-relaxed">
               Introdu numărul de urmărire (AWB) pentru produsele destinate lui <br/>
               <span className="text-purple-400 font-bold">{selectedOrder?.customerName}</span>.
             </p>
-
             <div className="space-y-4">
-              <div className="relative group">
-                <input 
-                  autoFocus
-                  type="text"
-                  placeholder="Introdu AWB-ul aici..."
-                  value={awbValue}
-                  onChange={(e) => setAwbValue(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white outline-none focus:border-purple-500/50 transition-all font-mono text-sm tracking-widest placeholder:text-gray-600"
-                />
-              </div>
-
+              <input 
+                autoFocus
+                type="text"
+                placeholder="Introdu AWB-ul aici..."
+                value={awbValue}
+                onChange={(e) => setAwbValue(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white outline-none focus:border-purple-500/50 transition-all font-mono text-sm tracking-widest placeholder:text-gray-600"
+              />
               <div className="flex gap-3">
                 <button 
                   onClick={closeModal}

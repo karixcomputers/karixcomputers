@@ -12,7 +12,8 @@ export default function AdminWarranties() {
   useEffect(() => {
     const fetchAllOrders = async () => {
       try {
-        const res = await apiFetch("/api/orders/admin/history");
+        // MODIFICAT: din "/api/orders/admin/history" în "/orders/admin/history"
+        const res = await apiFetch("/orders/admin/history");
         if (res.ok) {
           const data = await res.json();
           setOrders(Array.isArray(data) ? data : data.orders || []);
@@ -34,7 +35,6 @@ export default function AdminWarranties() {
 
     orders.forEach(order => {
       if (order.status === 'livrat') {
-        // Identificăm produsele cu retur finalizat în această comandă
         const finalizedReturnedProducts = (order.returnRequests || [])
           .filter(req => req.status === 'completat')
           .flatMap(req => req.returnedItems || []);
@@ -65,7 +65,6 @@ export default function AdminWarranties() {
               status: isReturned ? "Anulată (Retur)" : (isExpired ? "Expirată" : "Activă")
             };
 
-            // Clasificăm în Active sau Istoric
             if (isReturned || isExpired) {
               historyArr.push(warrantyObj);
             } else {
@@ -79,7 +78,6 @@ export default function AdminWarranties() {
     return { activeWarranties: activeArr, historyWarranties: historyArr };
   }, [orders]);
 
-  // 2. FILTRARE BAZATĂ PE SEARCH PENTRU TAB-UL ACTIV
   const currentList = activeTab === "active" ? activeWarranties : historyWarranties;
   
   const filteredData = useMemo(() => {
@@ -106,7 +104,6 @@ export default function AdminWarranties() {
               Control <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Garanții</span>
             </h1>
             
-            {/* TAB SELECTOR */}
             <div className="flex gap-4 mt-8 bg-white/5 p-1.5 rounded-[20px] border border-white/10 w-fit backdrop-blur-xl">
               <button 
                 onClick={() => setActiveTab("active")}
@@ -156,7 +153,6 @@ export default function AdminWarranties() {
               >
                 <div className="p-8 md:p-10 rounded-[34px] bg-[#0b1020]/70 backdrop-blur-3xl flex flex-col lg:flex-row justify-between items-center gap-8 text-white">
                   
-                  {/* Info Client & Produs */}
                   <div className="flex items-center gap-8 w-full lg:w-1/2">
                     <div className={`h-20 w-20 rounded-3xl flex items-center justify-center text-3xl border shadow-inner transition-transform group-hover:scale-110 ${
                       activeTab === 'active' 
@@ -184,7 +180,6 @@ export default function AdminWarranties() {
                     </div>
                   </div>
 
-                  {/* Calendar & Status */}
                   <div className="flex items-center justify-between lg:justify-end gap-12 w-full lg:w-1/2 border-t lg:border-t-0 border-white/5 pt-6 lg:pt-0">
                     <div className="text-left md:text-right">
                       <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Data Achiziției</p>

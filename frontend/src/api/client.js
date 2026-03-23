@@ -38,9 +38,9 @@ export async function apiFetch(path, options = {}) {
     });
 
     // 1. Dacă primim 401 și nu suntem deja pe ruta de refresh
-    if (res.status === 401 && path !== "/api/auth/refresh") {
+    if (res.status === 401 && path !== "/auth/refresh") {
       
-      const r = await fetch(`${API_URL}/api/auth/refresh`, {
+      const r = await fetch(`${API_URL}/auth/refresh`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

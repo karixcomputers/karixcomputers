@@ -15,7 +15,8 @@ export default function AdminConfigurator() {
 
   const fetchItems = async () => {
     try {
-      const res = await apiFetch("/api/adminconfigurator/all");
+      // MODIFICAT: din "/api/adminconfigurator/all" în "/adminconfigurator/all"
+      const res = await apiFetch("/adminconfigurator/all");
       if (res.ok) setItems(await res.json());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -23,14 +24,12 @@ export default function AdminConfigurator() {
 
   useEffect(() => { fetchItems(); }, []);
 
-  // Setăm brand-ul automat doar pentru CPU și GPU
   useEffect(() => {
     if (formData.category === "cpu") {
       setFormData(prev => ({ ...prev, brand: "Intel" }));
     } else if (formData.category === "gpu") {
       setFormData(prev => ({ ...prev, brand: "Nvidia" }));
     } else {
-      // Pentru Placă de bază, RAM, SSD, Sursă, Cooler - câmpul brand rămâne gol
       setFormData(prev => ({ ...prev, brand: "" }));
     }
   }, [formData.category]);
@@ -38,7 +37,8 @@ export default function AdminConfigurator() {
   const handleAdd = async (e) => {
     e.preventDefault();
     try {
-      const res = await apiFetch("/api/adminconfigurator", {
+      // MODIFICAT: din "/api/adminconfigurator" în "/adminconfigurator"
+      const res = await apiFetch("/adminconfigurator", {
         method: "POST",
         body: JSON.stringify({
           ...formData,
@@ -56,7 +56,8 @@ export default function AdminConfigurator() {
   const handleDelete = async (id) => {
     if (!window.confirm("Sigur ștergi această componentă?")) return;
     try {
-      const res = await apiFetch(`/api/adminconfigurator/${id}`, { method: "DELETE" });
+      // MODIFICAT: din "/api/adminconfigurator/${id}" în "/adminconfigurator/${id}"
+      const res = await apiFetch(`/adminconfigurator/${id}`, { method: "DELETE" });
       if (res.ok) setItems(prev => prev.filter(i => i.id !== id));
     } catch (err) { alert("Eroare la ștergere"); }
   };
@@ -101,7 +102,6 @@ export default function AdminConfigurator() {
               </select>
             </div>
 
-            {/* APARE DOAR PENTRU CPU */}
             {formData.category === "cpu" && (
               <div>
                 <label className="text-[10px] uppercase font-bold text-gray-500">Brand Procesor</label>
@@ -116,7 +116,6 @@ export default function AdminConfigurator() {
               </div>
             )}
 
-            {/* APARE DOAR PENTRU GPU */}
             {formData.category === "gpu" && (
               <div>
                 <label className="text-[10px] uppercase font-bold text-gray-500">Arhitectură Video</label>

@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+// Importăm apiFetch pentru a folosi rutele corecte de producție
+import { apiFetch } from "../api/client";
 import { Link } from "react-router-dom";
-
-const API_URL = "http://localhost:4000/api/orders/admin/all";
-const STATUS_UPDATE_URL = "http://localhost:4000/api/orders"; 
-const ITEM_STATUS_URL = "http://localhost:4000/api/orders/item"; 
 
 export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
@@ -16,11 +13,12 @@ export default function AdminDashboard() {
 
   const fetchOrders = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      const res = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setOrders(Array.isArray(res.data) ? res.data : res.data.orders || []);
+      // MODIFICAT: folosim apiFetch cu ruta scurtă
+      const res = await apiFetch("/orders/admin/all");
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(Array.isArray(data) ? data : data.orders || []);
+      }
     } catch (err) {
       setError("Eroare la sincronizare.");
     } finally {
@@ -31,22 +29,22 @@ export default function AdminDashboard() {
   useEffect(() => { fetchOrders(); }, []);
 
   const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
-    // Dacă am selectat un status care cere AWB, deschidem modalul
     if (newStatus === "predat_curier") {
       setAwbModal({ open: true, itemId, orderId });
       return;
     }
-    // Altfel facem update direct
     await executeItemUpdate(orderId, itemId, newStatus, null);
   };
 
   const executeItemUpdate = async (orderId, itemId, status, awb) => {
     try {
-      const token = localStorage.getItem("accessToken");
-      await axios.patch(`${ITEM_STATUS_URL}/${itemId}/status`, 
-        { status, awb },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // MODIFICAT: am trecut de la axios la apiFetch pentru update-ul item-ului
+      const res = await apiFetch(`/orders/item/${itemId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, awb })
+      });
+
+      if (!res.ok) throw new Error("Eroare la server");
 
       setOrders(prev => {
         const updatedOrders = prev.map(order => {
@@ -58,10 +56,12 @@ export default function AdminDashboard() {
             const allDelivered = updatedItems.every(i => i.status === "livrat");
             
             if (allDelivered) {
-              axios.patch(`${STATUS_UPDATE_URL}/${orderId}/status`, { status: "livrat" }, {
-                headers: { Authorization: `Bearer ${token}` }
+              // MODIFICAT: folosim apiFetch și aici pentru statusul general al comenzii
+              apiFetch(`/orders/${orderId}/status`, {
+                method: "PATCH",
+                body: JSON.stringify({ status: "livrat" })
               });
-              return null; // Scoatem comanda din dashboard-ul activ
+              return null;
             }
             return { ...order, items: updatedItems };
           }
@@ -73,7 +73,7 @@ export default function AdminDashboard() {
       setAwbModal({ open: false, itemId: null, orderId: null });
       setTempAwb("");
     } catch (err) {
-      alert("Eroare la update: " + (err.response?.data?.error || "Eroare server."));
+      alert("Eroare la update: " + err.message);
     }
   };
 
@@ -87,7 +87,6 @@ export default function AdminDashboard() {
     const isOradea = order.shippingAddress?.toLowerCase().includes('oradea');
 
     if (isService) {
-      // OPȚIUNI PENTRU SERVICE
       if (isOradea) {
         return (
           <>
@@ -114,7 +113,6 @@ export default function AdminDashboard() {
         );
       }
     } else {
-      // OPȚIUNI PENTRU PC / PRODUSE HARDWARE
       if (isOradea) {
         return (
           <>
@@ -165,14 +163,11 @@ export default function AdminDashboard() {
             </div>
           ) : (
             orders.map((order) => {
-              // Verificăm dacă e comandă din Oradea pentru a afișa eticheta
               const isOrderOradea = order.shippingAddress?.toLowerCase().includes('oradea');
 
               return (
                 <div key={order.id} className="p-8 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl transition-all hover:bg-white/[0.08]">
                   <div className="flex flex-col lg:flex-row gap-10">
-                    
-                    {/* INFO CLIENT */}
                     <div className="lg:w-1/3 lg:border-r border-white/5 lg:pr-10">
                       <div className="flex items-center gap-3 mb-4">
                         <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20">
@@ -187,7 +182,6 @@ export default function AdminDashboard() {
                       
                       <h3 className="text-3xl font-black text-white uppercase italic leading-tight drop-shadow-md">{order.shippingName}</h3>
                       
-                      {/* Afișare Date Firmă dacă e cazul */}
                       {order.isCompany && (
                         <div className="mt-3 bg-black/20 p-3 rounded-xl border border-indigo-500/20">
                            <p className="text-[9px] text-indigo-400 font-black uppercase tracking-widest mb-1">Date Facturare B2B</p>
@@ -203,7 +197,6 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* MANAGEMENT PRODUSE */}
                     <div className="lg:w-2/3 space-y-6">
                       <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 text-center lg:text-left">Status Produse</h4>
                       {order.items?.map((item) => {
@@ -249,7 +242,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* MODAL AWB TRANSPARENT */}
       {awbModal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setAwbModal({ open: false, itemId: null, orderId: null })}></div>

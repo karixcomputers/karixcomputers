@@ -11,7 +11,8 @@ export default function AdminHistory() {
   const fetchHistory = async () => {
     try {
       setLoading(true);
-      const res = await apiFetch("/api/orders/admin/history");
+      // MODIFICAT: din "/api/orders/admin/history" în "/orders/admin/history"
+      const res = await apiFetch("/orders/admin/history");
       if (!res.ok) {
         throw new Error("Nu s-a putut accesa baza de date a arhivei.");
       }
@@ -100,7 +101,6 @@ export default function AdminHistory() {
                   
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                     
-                    {/* INFO CLIENT */}
                     <div className="lg:col-span-7">
                       <div className="flex flex-wrap items-center gap-4 mb-6">
                         <span className="text-[10px] font-black px-3 py-1 bg-white/10 text-gray-400 rounded-lg border border-white/10 uppercase">
@@ -125,7 +125,6 @@ export default function AdminHistory() {
                       </div>
                     </div>
 
-                    {/* FINANCIAR */}
                     <div className="lg:col-span-5 flex flex-col justify-center items-start lg:items-end border-t lg:border-t-0 lg:border-l border-white/5 pt-8 lg:pt-0 lg:pl-10">
                       <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Valoare Tranzacție</p>
                       <p className="text-5xl font-black italic tracking-tighter text-white drop-shadow-xl">
@@ -137,8 +136,7 @@ export default function AdminHistory() {
                     </div>
 
                   </div>
-
-                  {/* MINI SUMAR PRODUSE */}
+                            
                   <div className="mt-8 pt-6 border-t border-white/10 flex flex-wrap gap-2">
                     {order.items?.map((item, idx) => (
                       <span key={idx} className="text-[10px] bg-white/5 px-3 py-1.5 rounded-full text-gray-300 border border-white/5 backdrop-blur-sm">

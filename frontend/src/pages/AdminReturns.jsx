@@ -13,14 +13,13 @@ export default function AdminReturns() {
   const [reportingIssuesFor, setReportingIssuesFor] = useState(null);
   const [issueDescription, setIssueDescription] = useState("");
   const [selectedImages, setSelectedImages] = useState([]);
-
-  // State pentru Modal-ul de confirmare respingere
   const [confirmRejectId, setConfirmRejectId] = useState(null);
 
   const { data: returns, isLoading } = useQuery({
     queryKey: ["adminReturns"],
     queryFn: async () => {
-      const res = await apiFetch("/api/returns/admin/all");
+      // MODIFICAT: din "/api/returns/admin/all" în "/returns/admin/all"
+      const res = await apiFetch("/returns/admin/all");
       return res.json();
     },
   });
@@ -31,7 +30,8 @@ export default function AdminReturns() {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }) => {
-      const res = await apiFetch(`/api/returns/admin/${id}/status`, {
+      // MODIFICAT: din "/api/returns/admin/${id}/status" în "/returns/admin/${id}/status"
+      const res = await apiFetch(`/returns/admin/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status }),
       });
@@ -52,11 +52,10 @@ export default function AdminReturns() {
       formData.append("description", description);
       images.forEach((img) => formData.append("images", img));
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/returns/admin/${id}/report-issues`, {
+      // MODIFICAT: Folosim apiFetch direct. 
+      // apiFetch din client.js este configurat să detecteze FormData și să nu pună header JSON.
+      const res = await apiFetch(`/returns/admin/${id}/report-issues`, {
         method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("accessToken")}`,
-        },
         body: formData,
       });
 
@@ -75,7 +74,8 @@ export default function AdminReturns() {
 
   const sendAwbMutation = useMutation({
     mutationFn: async ({ id, awb }) => {
-      const res = await apiFetch(`/api/returns/admin/${id}/send-awb`, {
+      // MODIFICAT: din "/api/returns/admin/${id}/send-awb" în "/returns/admin/${id}/send-awb"
+      const res = await apiFetch(`/returns/admin/${id}/send-awb`, {
         method: "PATCH",
         body: JSON.stringify({ awb }),
       });
@@ -113,7 +113,6 @@ export default function AdminReturns() {
     <div className="min-h-screen pt-20 pb-20 px-4 bg-transparent text-left relative z-10">
       <div className="max-w-7xl mx-auto">
         
-        {/* MODALELE RĂMÂN NESCHIMBATE */}
         {confirmRejectId && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setConfirmRejectId(null)}></div>
@@ -197,7 +196,6 @@ export default function AdminReturns() {
                 <div className="bg-white/5 p-5 rounded-[25px] border border-white/5 flex-1 w-full xl:w-auto">
                   <div className="text-[9px] font-black text-gray-500 uppercase mb-2 tracking-widest italic">Date Restituire</div>
                   <div className="flex items-center justify-between gap-4">
-                    {/* ADAUGAT OPTIONAL CHAINING AICI PENTRU IBAN */}
                     <div className="text-sm font-mono text-indigo-400 font-black tracking-wider">{req.iban?.replace(/(.{4})/g, '$1 ') || "IBAN LIPSA"}</div>
                     <button type="button" onClick={() => { navigator.clipboard.writeText(req.iban || ""); toast.success("IBAN Copiat!"); }} className="p-3 bg-indigo-500/10 text-indigo-400 rounded-2xl hover:bg-indigo-500/20 transition-all">📋</button>
                   </div>

@@ -6,14 +6,16 @@ export async function fetchProducts(params = {}) {
     if (v !== undefined && v !== null && String(v).trim() !== "") qs.set(k, v);
   });
 
-  const res = await apiFetch(`/api/products?${qs.toString()}`);
+  // MODIFICAT: din "/api/products..." în "/products..."
+  const res = await apiFetch(`/products?${qs.toString()}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to load products");
   return data;
 }
 
 export async function fetchProduct(id) {
-  const res = await apiFetch(`/api/products/${id}`);
+  // MODIFICAT: din "/api/products/${id}" în "/products/${id}"
+  const res = await apiFetch(`/products/${id}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to load product");
   return data;

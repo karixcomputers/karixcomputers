@@ -49,7 +49,7 @@ export default function KarixAI() {
       options: ["🔙 Înapoi la meniu"]
     },
     "📋 Cum fac un retur?": {
-      message: "Returul se poate iniția din fereastra Comenzile Mele pe butonul 'Inițiază retur nou'. \n\nAccesează secțiunea aici: http://localhost:5173/orders",
+      message: "Returul se poate iniția din fereastra Comenzile Mele pe butonul 'Inițiază retur nou'. \n\nAccesează secțiunea aici: https://karixcomputers.ro/orders",
       options: ["🔙 Înapoi la meniu"]
     },
     "🛠️ Garanții & Service": {
@@ -108,7 +108,7 @@ export default function KarixAI() {
 
   const getAIResponse = async (text) => {
     try {
-      const res = await apiFetch("/api/ai/chat", {
+      const res = await apiFetch("/ai/chat", {
         method: "POST",
         body: JSON.stringify({ 
           message: text, 

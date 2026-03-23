@@ -22,7 +22,8 @@ export default function AdminInventory() {
 
   const fetchProducts = async () => {
     try {
-      const res = await apiFetch("/api/products/admin-all");
+      // MODIFICAT: din "/api/products/admin-all" în "/products/admin-all"
+      const res = await apiFetch("/products/admin-all");
       if (res.ok) setProducts(await res.json());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -30,33 +31,27 @@ export default function AdminInventory() {
 
   useEffect(() => { fetchProducts(); }, []);
 
-  // --- FUNCȚIE COPIERE LINK (REPARATĂ) ---
   const copyProductLink = async (e, id) => {
-    e.preventDefault(); // Prevenim orice comportament default
-    e.stopPropagation(); // Oprim propagarea catre elementele parinte
+    e.preventDefault(); 
+    e.stopPropagation(); 
 
-    // Generăm link-ul complet bazat pe URL-ul curent al site-ului
     const productUrl = `${window.location.origin}/product/${id}`;
 
     try {
-      // Metoda modernă de copiere
       await navigator.clipboard.writeText(productUrl);
       
-      // Afișăm confirmarea în modal
       setStatusModal({ 
         show: true, 
         message: `LINK COPIAT: ${productUrl}`, 
         type: "success" 
       });
 
-      // Închidem automat mesajul după 2 secunde pentru a nu bloca adminul
       setTimeout(() => {
         setStatusModal(prev => ({ ...prev, show: false }));
       }, 2000);
       
     } catch (err) {
       console.error("Eroare la copiere:", err);
-      // Fallback dacă clipboard-ul e blocat
       alert(`Nu s-a putut copia automat. Link-ul este: ${productUrl}`);
     }
   };
@@ -100,7 +95,8 @@ export default function AdminInventory() {
       };
 
       const method = editingId ? "PUT" : "POST";
-      const url = editingId ? `/api/products/${editingId}` : "/api/products";
+      // MODIFICAT: Eliminat prefixul /api din rutele de mai jos
+      const url = editingId ? `/products/${editingId}` : "/products";
 
       const res = await apiFetch(url, { method, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error("Eroare la procesare.");
@@ -152,7 +148,8 @@ export default function AdminInventory() {
     const id = deleteConfirm.id;
     setDeleteConfirm({ show: false, id: null });
     try {
-      const res = await apiFetch(`/api/products/${id}`, { method: "DELETE" });
+      // MODIFICAT: din "/api/products/${id}" în "/products/${id}"
+      const res = await apiFetch(`/products/${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchProducts();
         setStatusModal({ show: true, message: "Produs eliminat definitiv.", type: "success" });
@@ -175,7 +172,6 @@ export default function AdminInventory() {
           <Link to="/admin" className="text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10 px-6 py-3 rounded-2xl hover:bg-white/10 transition-all backdrop-blur-md">← Panou Control</Link>
         </header>
 
-        {/* FORMULAR ADAUGARE / EDITARE */}
         <form onSubmit={handleSubmit} className={`transition-all duration-500 p-10 rounded-[40px] border mb-16 shadow-2xl backdrop-blur-xl ${editingId ? 'bg-indigo-500/10 border-indigo-500/40' : 'bg-white/5 border-white/10'}`}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
@@ -253,7 +249,6 @@ export default function AdminInventory() {
           </div>
         </form>
 
-        {/* LISTA DE PRODUSE */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {products.map(p => (
             <div key={p.id} className={`group flex items-center gap-6 p-6 rounded-[35px] border backdrop-blur-md transition-all ${editingId === p.id ? 'bg-indigo-500/20 border-indigo-500/50' : 'bg-white/5 border-white/5 hover:border-white/20'}`}>
@@ -272,7 +267,6 @@ export default function AdminInventory() {
               </div>
 
               <div className="flex gap-2">
-                {/* BUTON COPY LINK REPARAT */}
                 {!p.isVisible && (
                   <button 
                     onClick={(e) => copyProductLink(e, p.id)} 
@@ -290,7 +284,6 @@ export default function AdminInventory() {
         </div>
       </div>
 
-      {/* MODALELE DE STATUS ȘI ȘTERGERE */}
       {deleteConfirm.show && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-xl bg-black/60">
           <div className="relative w-full max-w-sm bg-[#161e31]/95 border border-pink-500/30 p-10 rounded-[40px] text-center shadow-2xl animate-in zoom-in">
