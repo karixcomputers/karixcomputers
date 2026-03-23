@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { useGoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 
 export default function Login() {
@@ -12,9 +11,10 @@ export default function Login() {
   const [error, setError] = useState("");
 
   const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
+  // AVEM NEVOIE DE CLIENT ID-UL TĂU AICI PENTRU REDIRECT MANUAL
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  // --- 1. LOGICA DE "CATCH" DUPĂ REDIRECT ---
-  // Când Google te trimite înapoi, token-ul este în URL după simbolul # (Implicit Flow)
+  // --- 1. CAPTURĂM TOKEN-UL CÂND NE ÎNTOARCEM DE LA GOOGLE ---
   useEffect(() => {
     const hash = window.location.hash;
     if (hash) {
@@ -23,7 +23,6 @@ export default function Login() {
 
       if (accessToken) {
         handleBackendLogin(accessToken);
-        // Curățăm URL-ul pentru un aspect profi
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
@@ -45,12 +44,21 @@ export default function Login() {
     }
   };
 
-  // --- 2. FORȚĂM REDIRECT-UL (FĂRĂ POPUP) ---
-  const handleGoogleLogin = useGoogleLogin({
-    flow: "implicit",
-    ux_mode: "redirect", // Forțează deschiderea în același tab
-    redirect_uri: "https://karixcomputers.ro/auth/login",
-  });
+  // --- 2. FORȚĂM REDIRECT-UL ABSOLUT (ZERO POPUP) ---
+  const handleGoogleLogin = () => {
+    if (!GOOGLE_CLIENT_ID) {
+      setError("Eroare critică: VITE_GOOGLE_CLIENT_ID nu este setat în .env");
+      return;
+    }
+
+    const redirectUri = "https://karixcomputers.ro/auth/login";
+    const scope = "email profile";
+    
+    // Construim link-ul oficial și mutăm pagina curentă
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}`;
+    
+    window.location.href = authUrl;
+  };
 
   async function submit(e) {
     e.preventDefault();
@@ -66,13 +74,9 @@ export default function Login() {
   }
 
   return (
-    /* Modificat: bg-transparent și overflow-hidden eliminat pentru a lăsa animația globală să respire */
     <div className="min-h-screen pt-32 pb-24 px-4 relative flex justify-center bg-transparent">
       
-      {/* --- GLOW-URI DE FUNDAL ELIMINATE --- */}
-
       <div className="max-w-md w-full relative z-10">
-        {/* Card cu efect de sticlă (Glassmorphism) ca în pagina de Servicii */}
         <div className="rounded-[40px] border border-white/10 bg-white/5 backdrop-blur-md p-8 sm:p-10 shadow-2xl">
           
           <header className="mb-8 text-center">
@@ -126,10 +130,9 @@ export default function Login() {
               </div>
             </div>
 
-            {/* BUTON GOOGLE - ACUM FĂRĂ POPUP */}
             <button
               type="button"
-              onClick={() => handleGoogleLogin()}
+              onClick={handleGoogleLogin}
               disabled={loading}
               className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-black font-black py-4 rounded-2xl transition-all active:scale-[0.98] shadow-2xl disabled:opacity-50 uppercase text-xs tracking-tighter"
             >
