@@ -34,7 +34,6 @@ const INDICATOR_OPTIONS = {
   maxAge: COOKIE_OPTIONS.maxAge,
 };
 
-// Helper pentru a extrage user-ul cu toate numărătorile necesare (DRY)
 const getFullUser = async (userId) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -60,52 +59,101 @@ const getFullUser = async (userId) => {
   };
 };
 
-// --- RUTA GOOGLE LOGIN ---
+// --- 1. RUTA GOOGLE LOGIN (MODIFICATĂ PENTRU CLIENȚI NOI) ---
 router.post("/google", async (req, res, next) => {
   try {
-    const { token } = req.body; // access_token de la frontend
+    const { token } = req.body; 
 
     if (!token) return res.status(400).json({ error: "Token Google lipsă" });
 
-    // 1. Validăm token-ul cu Google API pentru a lua datele de profil
     const googleRes = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
     const { email, name, sub: googleId, picture: avatar } = googleRes.data;
 
     if (!email) return res.status(400).json({ error: "Nu s-au putut obține datele de la Google" });
 
-    // 2. Căutăm userul în DB după email
     let user = await prisma.user.findUnique({ where: { email } });
 
     if (user) {
-      // LOGICĂ: Dacă are deja cont (manual sau Google), îi facem update/link
+      // UTILIZATOR EXISTENT: Îl logăm direct
       user = await prisma.user.update({
         where: { email },
         data: { 
           googleId, 
           avatar, 
-          isEmailVerified: true, // Google confirmă identitatea
+          isEmailVerified: true,
           name: user.name || name 
         }
       });
-    } else {
-      // LOGICĂ: Dacă nu are cont, îl creăm pe loc (FĂRĂ parolă)
-      user = await prisma.user.create({
-        data: {
-          email,
-          name,
-          googleId,
-          avatar,
-          isEmailVerified: true,
-          termsAccepted: true,
-          termsAcceptedAt: new Date()
-        }
+
+      const accessToken = signAccessToken(user);
+      const refreshToken = signRefreshToken(user);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { refreshTokenHash: hashToken(refreshToken) },
       });
+
+      const userWithStats = await getFullUser(user.id);
+
+      res.cookie("refresh_token", refreshToken, COOKIE_OPTIONS);
+      res.cookie("is_logged_in", "true", INDICATOR_OPTIONS);
       
-      // Trimitem email de bun venit pentru cont nou
-      try { await sendWelcomeEmail(email, name); } catch (e) { console.error("Welcome Email Error:", e); }
+      return res.json({ accessToken, user: userWithStats });
+
+    } else {
+      // UTILIZATOR NOU: Oprim procesul și cerem date suplimentare
+      // Generăm un token temporar (valid 15 minute) ca să fim siguri că doar el își poate crea contul
+      const tempToken = jwt.sign({ email, name, googleId, avatar }, env.JWT_ACCESS_SECRET, { expiresIn: "15m" });
+
+      return res.status(202).json({ 
+        require_profile_completion: true, 
+        tempToken, 
+        profileData: { email, name, avatar } 
+      });
+    }
+  } catch (e) {
+    console.error("Google Auth Error:", e.response?.data || e.message);
+    res.status(401).json({ error: "Autentificare Google eșuată" });
+  }
+});
+
+// --- 2. RUTA NOUĂ: FINALIZARE CONT GOOGLE ---
+router.post("/google-complete", async (req, res, next) => {
+  try {
+    const { tempToken, phone, name } = req.body;
+
+    if (!tempToken || !phone || !name) {
+      return res.status(400).json({ error: "Date incomplete. Te rugăm să completezi toate câmpurile." });
     }
 
-    // 3. Generăm token-urile Karix
+    // Decodăm token-ul temporar pentru a lua datele sigure de la Google
+    let decoded;
+    try {
+      decoded = jwt.verify(tempToken, env.JWT_ACCESS_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: "Sesiunea a expirat. Te rugăm să te loghezi din nou cu Google." });
+    }
+
+    const { email, googleId, avatar } = decoded;
+
+    // Creăm utilizatorul cu toate datele
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name,      // Numele pe care l-a confirmat/modificat în formular
+        phone,     // Telefonul nou introdus
+        googleId,
+        avatar,
+        isEmailVerified: true,
+        termsAccepted: true,
+        termsAcceptedAt: new Date()
+      }
+    });
+    
+    // Trimitem emailul de bun venit
+    try { await sendWelcomeEmail(email, name); } catch (e) { console.error("Welcome Email Error:", e); }
+
+    // Generăm token-urile finale pentru logare
     const accessToken = signAccessToken(user);
     const refreshToken = signRefreshToken(user);
 
@@ -116,14 +164,13 @@ router.post("/google", async (req, res, next) => {
 
     const userWithStats = await getFullUser(user.id);
 
-    // 4. Setăm cookie-urile și răspundem
     res.cookie("refresh_token", refreshToken, COOKIE_OPTIONS);
     res.cookie("is_logged_in", "true", INDICATOR_OPTIONS);
     
     res.json({ accessToken, user: userWithStats });
+
   } catch (e) {
-    console.error("Google Auth Error:", e.response?.data || e.message);
-    res.status(401).json({ error: "Autentificare Google eșuată" });
+    next(e);
   }
 });
 
@@ -140,7 +187,6 @@ router.post("/register", async (req, res, next) => {
 
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) {
-      // LOGICĂ: Mesaj personalizat dacă email-ul există deja (ex: creat via Google)
       return res.status(409).json({ 
         error: "Email deja folosit. Dacă te-ai logat anterior cu Google, folosește Reset Password pentru a seta o parolă locală." 
       });
