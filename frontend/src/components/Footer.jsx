@@ -30,7 +30,7 @@ export default function Footer() {
           <Link className="text-gray-500 hover:text-gray-300 transition-colors" to="/confidentialitate">Politica de confidențialitate (GDPR)</Link>
         </nav>
 
-        {/* Secțiune Plăți & Autorități (ANPC/SOL MODIFICAT) */}
+        {/* Secțiune Plăți & Autorități */}
         <div className="flex flex-col items-center gap-8 mb-10 w-full">
           {/* Plăți */}
           <div className="flex flex-col items-center gap-4">
@@ -44,43 +44,48 @@ export default function Footer() {
                <img 
                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png" 
                  alt="Mastercard" 
-                 className="h-6 md:h-7 opacity-70 hover:opacity-100 transition-opacity" 
+                 className="h-6 md:h-7 opacity-70 hover:opacity-100 transition-opacity object-contain" 
                />
                 <img 
-                 src="https://karixcomputers.ro/netopia.png" 
-                 alt="Netopia" 
-                 className="h-6 md:h-7 opacity-70 hover:opacity-100 transition-opacity" 
-               />
+                  src="/netopia.png" 
+                  alt="Netopia Payments" 
+                  className="h-6 md:h-7 opacity-70 hover:opacity-100 transition-opacity object-contain" 
+                />
             </div>
           </div>
 
           {/* Autorități cu poze PNG */}
-          <div className="flex flex-wrap justify-center gap-6 items-center"> {/* Am mărit puțin gap-ul la 6 pentru un aspect mai aerisit */}
-  <a
-    href="https://anpc.ro/"
-    target="_blank"
-    rel="noreferrer"
-    className="block transition-all group"
-  >
-    <img
-      src="https://grecupartners.ro/wp-content/uploads/2023/04/anpc-sal.png"
-      alt="ANPC"
-      className="h-8 md:h-14 w-auto object-contain transition-opacity" 
-    />
-  </a>
-  <a
-    href="https://ec.europa.eu/consumers/odr"
-    target="_blank"
-    rel="noreferrer"
-    className="block transition-all group"
-  >
-    <img
-      src="https://www.davaldi.ro/wp-content/uploads/2025/06/solutionarea_online_a_litigiilor.png"
-      alt="SOL"
-      className="h-14 md:h-16 w-auto object-contain transition-opacity"
-    />
-  </a>
-</div>
+          {/* Modificat: Folosim flex-row și un gap mai mic pentru mobil pentru a forța alinierea stânga-dreapta */}
+          <div className="flex flex-row justify-center gap-3 md:gap-6 items-center w-full max-w-[400px]">
+            <a
+              href="https://anpc.ro/"
+              target="_blank"
+              rel="noreferrer"
+              /* Modificat: w-1/2 pe mobil pentru a ocupa jumătate din spațiu */
+              className="block w-1/2 md:w-auto transition-transform hover:scale-105"
+            >
+              <img
+                src="https://grecupartners.ro/wp-content/uploads/2023/04/anpc-sal.png"
+                alt="ANPC"
+                /* Modificat: lățime 100% din containerul părintelui (w-full) pe mobil, și fixă pe desktop */
+                className="w-full h-auto md:w-[168px] md:h-[42px] object-contain rounded-md" 
+              />
+            </a>
+            <a
+              href="https://ec.europa.eu/consumers/odr"
+              target="_blank"
+              rel="noreferrer"
+              /* Modificat: w-1/2 pe mobil */
+              className="block w-1/2 md:w-auto transition-transform hover:scale-105"
+            >
+              <img
+                src="https://www.davaldi.ro/wp-content/uploads/2025/06/solutionarea_online_a_litigiilor.png"
+                alt="SOL"
+                /* Modificat: la fel ca mai sus */
+                className="w-full h-auto md:w-[168px] md:h-[42px] object-contain rounded-md"
+              />
+            </a>
+          </div>
         </div>
 
         {/* Date Fiscale Firma */}

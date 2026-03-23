@@ -243,7 +243,7 @@ export default function Login() {
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-black font-black py-4 rounded-2xl transition-all active:scale-[0.98] shadow-2xl disabled:opacity-50 uppercase text-xs tracking-tighter"
+                  className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-black font-medium py-4 rounded-2xl transition-all active:scale-[0.98] shadow-2xl disabled:opacity-50 uppercase text-xs tracking-tighter"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -254,13 +254,13 @@ export default function Login() {
                   <span>Continuă cu Google</span>
                 </button>
 
-                <div className="pt-6 border-t border-white/5 flex flex-col items-center gap-4">
-                  <Link to="/auth/forgot" className="text-xs font-bold text-white hover:text-indigo-400 uppercase tracking-wider transition-colors italic">
-                    Ai uitat parola?
-                  </Link>
+                <div className="pt-6 border-t border-white/5 flex flex-row items-center justify-between w-full">
                   <p className="text-xs text-gray-500 font-bold uppercase tracking-wider italic">
                     Nu ai cont? <Link to="/auth/register" className="text-white hover:text-indigo-400 ml-1">Înregistrează-te</Link>
                   </p>
+                  <Link to="/auth/forgot" className="text-xs font-bold text-white hover:text-indigo-400 uppercase tracking-wider transition-colors italic">
+                    Ai uitat parola?
+                  </Link>
                 </div>
               </form>
             </div>
