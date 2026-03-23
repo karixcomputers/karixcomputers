@@ -1,19 +1,65 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-// --- IMPORTUL NOU PENTRU HOOK-UL GOOGLE ---
-import { useGoogleLogin } from "@react-oauth/google";
-import axios from "axios"; // Import obligatoriu pentru comunicarea cu backend-ul
+// --- IMPORTURILE PENTRU GOOGLE ---
+import { useGoogleLogin, useGoogleOneTapLogin } from "@react-oauth/google";
+import axios from "axios";
 
 export default function Login() {
-  // Am adăugat loginWithGoogle aici
   const { login, loginWithGoogle } = useAuth();
   const nav = useNavigate();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
 
-  // 1. Autentificare clasică (Email/Parolă)
+  const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
+
+  // FUNCȚIE REUTILIZABILĂ PENTRU LOGARE BACKEND
+  const sendTokenToBackend = async (googleToken) => {
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/auth/google`, {
+        token: googleToken,
+      });
+
+      if (res.data && res.data.accessToken) {
+        loginWithGoogle(res.data);
+        nav("/account");
+      }
+    } catch (err) {
+      console.error("Google Login Error:", err);
+      setError(err.response?.data?.error || "Eroare la sincronizarea cu contul Google.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 1. VARIANTA "ONE TAP" (Cea mai elegantă, apare singură în colț)
+  useGoogleOneTapLogin({
+    onSuccess: (credentialResponse) => {
+      // One Tap trimite un ID Token (credential), backend-ul tău e pregătit pentru Access Token
+      // Dacă vrei One Tap, backend-ul trebuie să verifice "credentialResponse.credential"
+      console.log("One Tap Success");
+    },
+    onError: () => console.log("One Tap skipped/error"),
+  });
+
+  // 2. VARIANTA REDIRECT (Pentru butonul mare, deschide în același tab)
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      await sendTokenToBackend(tokenResponse.access_token);
+    },
+    onError: (error) => {
+      console.error("Google Auth Failure:", error);
+      setError("Conectarea cu Google a eșuat.");
+    },
+    // ACEASTA ESTE MODIFICAREA: Nu mai deschide popup, folosește tab-ul curent
+    ux_mode: "redirect", 
+    // Google are nevoie de o adresă unde să se întoarcă
+    redirect_uri: window.location.origin + "/auth/login", 
+  });
+
+  // 3. Autentificare clasică
   async function submit(e) {
     e.preventDefault();
     setError("");
@@ -27,39 +73,6 @@ export default function Login() {
       setLoading(false);
     }
   }
-
-  // 2. Autentificare Google
-const handleGoogleLogin = useGoogleLogin({
-  onSuccess: async (tokenResponse) => {
-    setLoading(true);
-    setError("");
-
-    // 1. DEFINIM ADRESA API-ULUI (Folosim variabila din .env)
-    const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
-
-    try {
-      // 2. Trimitem la /api/auth/google (am adăugat /api/ la început)
-      const res = await axios.post(`${API_URL}/auth/google`, {
-        token: tokenResponse.access_token,
-      });
-
-      if (res.data && res.data.accessToken) {
-        // Logica de login existentă
-        loginWithGoogle(res.data);
-        nav("/account");
-      }
-    } catch (err) {
-      console.error("Google Login Error:", err);
-      setError(err.response?.data?.error || "Eroare la sincronizarea cu contul Google.");
-    } finally {
-      setLoading(false);
-    }
-  },
-  onError: (error) => {
-    console.error("Google Auth Failure:", error);
-    setError("Conectarea cu Google a eșuat sau a fost anulată.");
-  },
-});
 
   return (
     <div className="min-h-screen pt-12 pb-24 px-4 relative overflow-hidden flex justify-center">
@@ -82,22 +95,9 @@ const handleGoogleLogin = useGoogleLogin({
 
           {error && (
             <div className="mb-6 rounded-2xl border border-pink-500/30 bg-pink-500/10 p-5 animate-in fade-in slide-in-from-top-2">
-              <div className="flex flex-col gap-3">
-                <p className="text-sm text-pink-200 font-medium">
-                  {error === "EMAIL_NOT_VERIFIED" 
-                    ? "Contul tău nu este activat. Te rugăm să confirmi adresa de email." 
-                    : error}
-                </p>
-                {error === "EMAIL_NOT_VERIFIED" && (
-                  <button 
-                    type="button"
-                    onClick={() => nav(`/auth/verify?email=${form.email}`)}
-                    className="w-full py-2 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest transition-all border border-white/5"
-                  >
-                    Confirmă emailul acum →
-                  </button>
-                )}
-              </div>
+              <p className="text-sm text-pink-200 font-medium">
+                {error === "EMAIL_NOT_VERIFIED" ? "Contul tău nu este activat." : error}
+              </p>
             </div>
           )}
 
@@ -112,7 +112,6 @@ const handleGoogleLogin = useGoogleLogin({
                   placeholder="email@exemplu.ro"
                   value={form.email}
                   onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
-                  autoComplete="email"
                 />
               </div>
 
@@ -125,7 +124,6 @@ const handleGoogleLogin = useGoogleLogin({
                   placeholder="••••••••"
                   value={form.password}
                   onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))}
-                  autoComplete="current-password"
                 />
               </div>
             </div>
@@ -146,7 +144,6 @@ const handleGoogleLogin = useGoogleLogin({
               </div>
             </div>
 
-            {/* BUTON GOOGLE - ACUM COMPLET FUNCȚIONAL */}
             <button
               type="button"
               onClick={() => handleGoogleLogin()}
