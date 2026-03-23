@@ -8,6 +8,7 @@ import { formatRON } from "../utils/money";
 export default function Shop() {
   const { addItem } = useCart(); 
   const { toggleWishlist, isFavorite } = useWishlist(); 
+  
   const [pcs, setPcs] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
@@ -28,6 +29,15 @@ export default function Shop() {
   
   // Refs pentru scroll sincronizat în modalul de comparare
   const specRefs = useRef([]);
+
+  // --- FUNCȚIE HELPER PENTRU IMAGINI (ESENȚIALĂ PENTRU UPLOADS) ---
+  const getImageUrl = (img) => {
+    if (!img) return "https://placehold.co/600x400/0b1020/ffffff?text=Karix+PC";
+    // Dacă imaginea este deja un link complet, o returnăm ca atare
+    if (img.startsWith("http")) return img;
+    // Dacă este doar un nume de fișier urcat pe serverul nostru, adăugăm prefixul de folder
+    return `https://karixcomputers.ro/uploads/${img}`;
+  };
 
   // Blocăm scroll-ul paginii principale când modalul de comparare este deschis
   useEffect(() => {
@@ -60,13 +70,13 @@ export default function Shop() {
   useEffect(() => {
     const fetchPcs = async () => {
       try {
-        const res = await apiFetch("/products");
+        const res = await apiFetch("/api/products");
         if (res.ok) {
           const data = await res.json();
-          // Filtrare de siguranță: eliminăm categoriile de service și produsele marcate isVisible: false (dacă vin de la backend)
+          // Filtrare de siguranță: eliminăm categoriile de service și produsele marcate isVisible: false
           const onlyPcs = data.filter(p => 
             p.category !== "service" &&
-            p.isVisible !== false && // Siguranță extra pentru PC-urile private
+            p.isVisible !== false && 
             !p.name.toLowerCase().includes("mentenanta") && 
             !p.name.toLowerCase().includes("diagnosticare") &&
             !p.name.toLowerCase().includes("service")
@@ -82,7 +92,7 @@ export default function Shop() {
     fetchPcs();
   }, []);
 
-  // LOGICA DE FILTRARE ȘI SORTARE (USEMEMO PENTRU PERFORMANȚĂ)
+  // LOGICA DE FILTRARE ȘI SORTARE
   const filteredAndSortedPcs = useMemo(() => {
     let result = [...pcs];
 
@@ -99,11 +109,9 @@ export default function Shop() {
         if (filterCpu === "Intel i5") return cpuText.includes("i5");
         if (filterCpu === "Intel i7") return cpuText.includes("i7");
         if (filterCpu === "Intel i9") return cpuText.includes("i9");
-        
         if (filterCpu === "Ryzen 5") return cpuText.includes("ryzen 5") || cpuText.includes("r5") || cpuText.includes("ryzen5");
         if (filterCpu === "Ryzen 7") return cpuText.includes("ryzen 7") || cpuText.includes("r7") || cpuText.includes("ryzen7");
         if (filterCpu === "Ryzen 9") return cpuText.includes("ryzen 9") || cpuText.includes("r9") || cpuText.includes("ryzen9");
-
         return cpuText.includes(filterCpu.toLowerCase());
       });
     }
@@ -112,24 +120,13 @@ export default function Shop() {
     if (filterGpu !== "Toate") {
       result = result.filter(pc => {
         const gpuText = (pc.gpuBrand || "").toLowerCase();
-
         if (filterGpu === "NVIDIA") {
-          const nvidiaModels = [
-            "nvidia", "rtx", "gtx",
-            "4050", "4060", "4060ti", "4060 ti", 
-            "4070", "4070ti", "4070 ti", "4070 super", 
-            "4080", "4080 super", "4090", 
-            "5060", "5060ti", "5060 ti", 
-            "5070", "5070ti", "5070 ti", 
-            "5080", "5090"
-          ];
+          const nvidiaModels = ["nvidia", "rtx", "gtx", "4050", "4060", "4070", "4080", "4090", "5060", "5070", "5080", "5090"];
           return nvidiaModels.some(model => gpuText.includes(model));
         }
-
         if (filterGpu === "AMD") {
           return gpuText.includes("amd") || gpuText.includes("radeon") || gpuText.includes("rx");
         }
-
         return gpuText.includes(filterGpu.toLowerCase());
       });
     }
@@ -154,7 +151,7 @@ export default function Shop() {
       category: pc.category,
       priceCents: pc.priceCents, 
       warrantyMonths: pc.warrantyMonths || 24,
-      image: pc.images?.[0] || "https://placehold.co/600x400/0b1020/ffffff?text=Karix+PC",
+      image: getImageUrl(pc.images?.[0]), // Folosim helper-ul aici
       specs: {
         cpu: pc.cpuBrand,
         gpu: pc.gpuBrand,
@@ -193,7 +190,6 @@ export default function Shop() {
     }
   };
 
-  // Funcția pentru sincronizarea scroll-ului între coloanele de specificații
   const handleSyncScroll = (e) => {
     const top = e.currentTarget.scrollTop;
     specRefs.current.forEach(ref => {
@@ -418,7 +414,7 @@ export default function Shop() {
                   </button>
 
                   <img 
-                    src={pc.images?.[0] || "https://placehold.co/600x400/0b1020/ffffff?text=Karix+PC"} 
+                    src={getImageUrl(pc.images?.[0])} 
                     alt={pc.name} 
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
                   />
@@ -529,7 +525,7 @@ export default function Shop() {
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-6 bg-[#0b1020]/95 backdrop-blur-2xl border border-indigo-500/30 p-4 rounded-[28px] shadow-[0_0_40px_rgba(99,102,241,0.2)] animate-in slide-in-from-bottom-10">
           <div className="flex -space-x-4 pl-2">
             {compareList.map(c => (
-              <img key={c.id} src={c.images?.[0] || "https://placehold.co/100"} alt="" className="w-12 h-12 rounded-full border-2 border-[#0b1020] object-cover bg-white/10" />
+              <img key={c.id} src={getImageUrl(c.images?.[0])} alt="" className="w-12 h-12 rounded-full border-2 border-[#0b1020] object-cover bg-white/10" />
             ))}
           </div>
           <div className="hidden sm:block text-white pr-4">
@@ -581,7 +577,7 @@ export default function Shop() {
                     ✕
                   </button>
 
-                  <img src={pc.images?.[0] || "https://placehold.co/400"} alt="" className="w-full h-40 object-contain rounded-2xl mb-4 drop-shadow-2xl shrink-0" />
+                  <img src={getImageUrl(pc.images?.[0])} alt="" className="w-full h-40 object-contain rounded-2xl mb-4 drop-shadow-2xl shrink-0" />
                   
                   <div className="shrink-0 mb-4">
                     <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] mb-1">{pc.cpuBrand?.split(' ')[0] || 'Custom'}</p>

@@ -10,12 +10,19 @@ export default function ProductCard({ p, product }) {
 
   const data = p || product;
 
+  // --- FUNCȚIE HELPER PENTRU IMAGINI (ADĂUGATĂ) ---
+  const getImageUrl = (img) => {
+    if (!img) return "https://placehold.co/800x500/0b1020/ffffff?text=Karix+PC";
+    if (img.startsWith("http")) return img;
+    return `https://karixcomputers.ro/uploads/${img}`;
+  };
+
   if (!data) return null;
 
   const inStock = (data.stock || 0) > 0;
 
   const handleAddToCart = (e) => {
-    e.preventDefault(); // Prevenim navigarea Link-ului dacă se apasă pe buton
+    e.preventDefault(); 
     
     const nameLower = (data.name || "").toLowerCase();
     const isService = ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => nameLower.includes(kw));
@@ -29,14 +36,15 @@ export default function ProductCard({ p, product }) {
       ...data,
       productName: data.name,
       warrantyMonths: Number(finalWarranty),
-      // Trimitem specificațiile complete către Cart Context
+      // REPARAT: Ne asigurăm că și în coș ajunge link-ul corect al imaginii
+      image: getImageUrl(data.images?.[0]),
       specs: {
         cpu: data.cpuBrand,
         gpu: data.gpuBrand,
-        motherboard: data.motherboard, // NOU
+        motherboard: data.motherboard,
         ram: data.ramGb,
         storage: data.storageGb,
-        case: data.case,              // NOU
+        case: data.case,
         cooler: data.cooler,
         psu: data.psu
       }
@@ -71,14 +79,14 @@ export default function ProductCard({ p, product }) {
           <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl border ${
             inStock 
               ? 'bg-indigo-500 border-indigo-400 text-white' 
-              : 'bg-white/5 border-white/10 text-gray-400'
+              : 'bg-white/5 border border-white/10 text-gray-400'
           }`}>
             {inStock ? 'În Stoc' : 'La Comandă'}
           </span>
         </div>
 
         <img
-          src={data.images?.[0] || "https://placehold.co/800x500/0b1020/ffffff?text=Karix+PC"}
+          src={getImageUrl(data.images?.[0])} // REPARAT AICI
           alt={data.name}
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
           loading="lazy"
