@@ -161,7 +161,7 @@ export default function ProductDetails() {
     setSubmittingReview(true);
     try {
       const token = localStorage.getItem("accessToken") || localStorage.getItem("token");
-      const res = await fetch(`/products/${id}/reviews`, {
+      const res = await fetch(`/api/products/${id}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ 
