@@ -91,7 +91,7 @@ app.use("/api/reviews", reviewsRoutes);
 app.use("/api/adminconfigurator", adminConfiguratorRoutes);
 
 // 8. SERVIRE DOSAR STATIC (Imagini/Uploads)
-app.use('/uploads', (req, res, next) => {
+app.use('/api/uploads', (req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
