@@ -173,7 +173,7 @@ export default function Home() {
               </h2>
               
               <p className="text-gray-400 text-base md:text-lg font-medium leading-relaxed mb-8 max-w-xl">
-                Ai o firmă în Oradea și angajații tăi folosesc numeroase PC-uri sau laptopuri? Productivitatea lor depinde de sănătatea sistemelor. <span className="text-white">Nu lăsa praful sau erorile să îți încetinească afacerea.</span> Ne ocupăm noi de mentenanța completă a parcului tău informatic, direct la sediul tău.
+                Ai o firmă în Oradea și angajații tăi folosesc numeroase PC-uri sau laptopuri? Productivitatea lor depinde de sănătatea sistemelor. <span className="text-white">Nu lăsa praful sau erorile să îți încetinească afacerea.</span> Ne ocupăm noi de mentenanța completă a tuturor echipamentelor, direct la sediul tău.
               </p>
               
               <Link to="/contact" className="inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[13px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20 group/btn">
