@@ -15,7 +15,7 @@ const shouldAttemptRefresh = () => {
 };
 
 export async function loginApi(email, password) {
-  const res = await apiFetch("/api/auth/login", {
+  const res = await apiFetch("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
@@ -32,7 +32,7 @@ export async function loginApi(email, password) {
 }
 
 export async function registerApi(payload) {
-  const res = await apiFetch("/api/auth/register", {
+  const res = await apiFetch("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -42,7 +42,7 @@ export async function registerApi(payload) {
 }
 
 export async function verifyEmailApi(email, code) {
-  const res = await apiFetch("/api/auth/verify-email", {
+  const res = await apiFetch("/auth/verify-email", {
     method: "POST",
     body: JSON.stringify({ email, code }),
   });
@@ -62,7 +62,7 @@ export async function verifyEmailApi(email, code) {
 export const verifyWithCodeApi = verifyEmailApi; 
 
 export async function resendVerificationApi(email) {
-  const res = await apiFetch("/api/auth/resend-verification", {
+  const res = await apiFetch("/auth/resend-verification", {
     method: "POST",
     body: JSON.stringify({ email }),
   });
@@ -70,7 +70,7 @@ export async function resendVerificationApi(email) {
 }
 
 export async function forgotPasswordApi(email) {
-  const res = await apiFetch("/api/auth/forgot-password", {
+  const res = await apiFetch("/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify({ email }),
   });
@@ -78,7 +78,7 @@ export async function forgotPasswordApi(email) {
 }
 
 export async function resetPasswordApi(token, newPassword) {
-  const res = await apiFetch("/api/auth/reset-password", {
+  const res = await apiFetch("/auth/reset-password", {
     method: "POST",
     body: JSON.stringify({ token, newPassword }),
   });
@@ -89,7 +89,7 @@ export async function resetPasswordApi(token, newPassword) {
 
 export async function logoutApi() {
   try {
-    await apiFetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/auth/logout", { method: "POST" });
   } finally {
     // Curățăm TOT la logout pentru a preveni încercări inutile de refresh
     setAccessToken(null);
@@ -109,7 +109,7 @@ export async function refreshApi() {
   }
 
   try {
-    const res = await apiFetch("/api/auth/refresh", { method: "POST" });
+    const res = await apiFetch("/auth/refresh", { method: "POST" });
     
     if (!res.ok) {
       // Dacă serverul respinge refresh-ul, curățăm indicatorii locali
@@ -138,7 +138,7 @@ export async function refreshApi() {
  * Trage datele proaspete ale utilizatorului (inclusiv counts)
  */
 export async function getMeApi() {
-  const res = await apiFetch("/api/auth/me", {
+  const res = await apiFetch("/auth/me", {
     method: "GET",
   });
   
