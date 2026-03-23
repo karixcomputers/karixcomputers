@@ -138,6 +138,9 @@ export default function Checkout() {
 
   const [pickupByKarix, setPickupByKarix] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("ramburs"); // NOU: Starea pentru metoda de plată
+  
+  // NOU: State pentru acceptarea Termenilor și Condițiilor
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const appliedCoupon = location.state?.coupon || null;
 
@@ -301,6 +304,12 @@ export default function Checkout() {
       }
     }
 
+    // NOU: Verificare Bifa de Termeni și Condiții
+    if (!termsAccepted) {
+      triggerError("Trebuie să accepți Termenii și Condițiile pentru a plasa comanda.");
+      return;
+    }
+
     if (!accessToken) {
       triggerError("Sesiune expirată. Te rugăm să te reloghezi.");
       return;
@@ -437,7 +446,7 @@ export default function Checkout() {
                         placeholder="Introduceți CUI / CIF" 
                       />
                       <span className="absolute right-4 top-11 text-[9px] text-indigo-400 font-black uppercase tracking-widest italic pointer-events-none">
-                        (Auto-Fill ANAF)
+                        
                       </span>
                     </div>
                     
@@ -519,7 +528,7 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* 3. Metodă de Plată (NOU) */}
+            {/* 3. Metodă de Plată */}
             <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
               <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">3. Metodă de Plată</h2>
               <div className="flex flex-col gap-4">
@@ -597,6 +606,25 @@ export default function Checkout() {
                 </div>
               </div>
 
+              {/* NOU: Bifa de Termeni și Condiții obligatorie */}
+              <div className="mb-6">
+                <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors">
+                  <div className="relative flex items-center mt-0.5">
+                    <input 
+                      type="checkbox" 
+                      required 
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="peer h-5 w-5 shrink-0 appearance-none rounded-md border-2 border-white/20 bg-transparent checked:border-indigo-500 checked:bg-indigo-500 focus:outline-none transition-all"
+                    />
+                    <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-medium leading-relaxed italic uppercase tracking-wider">
+                    Am citit și sunt de acord cu <Link to="/terms" target="_blank" className="text-white hover:text-indigo-300 font-black underline">Termenii și Condițiile</Link> și <Link to="/confidentialitate" target="_blank" className="text-white hover:text-indigo-300 font-black underline">Politica GDPR</Link>. Înțeleg că plasarea comenzii implică o obligație de plată.
+                  </span>
+                </label>
+              </div>
+
               <button 
                 onClick={handlePlaceOrder} 
                 disabled={loading || items.length === 0} 
@@ -604,13 +632,9 @@ export default function Checkout() {
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 group-hover:scale-105 transition-transform duration-500" />
                 <span className="relative z-10 text-lg uppercase tracking-widest italic drop-shadow-md">
-                  {loading ? "Se procesează..." : "Finalizează Comanda →"}
+                  {loading ? "Se procesează..." : "Plasează Comanda →"}
                 </span>
               </button>
-
-              <p className="mt-6 text-[9px] text-gray-600 text-center uppercase tracking-widest leading-relaxed">
-                Prin finalizarea comenzii, ești de acord cu <Link to="/terms" className="text-gray-400 hover:text-white underline">Termenii și Condițiile</Link> Karix Computers.
-              </p>
             </div>
           </div>
         </div>

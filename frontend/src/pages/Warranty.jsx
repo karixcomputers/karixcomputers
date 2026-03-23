@@ -34,7 +34,7 @@ export default function Warranty() {
         
         <header className="mb-20 text-center">
           <h1 className="text-6xl font-black text-white tracking-tighter mb-6 italic">
-            Politică de <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Garanție</span>
+            Politica de <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Garanție</span>
           </h1>
           <div className="h-1.5 w-24 bg-gradient-to-r from-indigo-500 to-pink-500 mx-auto rounded-full opacity-40 mb-6" />
           <p className="text-gray-500 uppercase tracking-[0.4em] text-[10px] font-bold">
@@ -112,18 +112,18 @@ export default function Warranty() {
             </ul>
           </WarrantySection>
 
-          <WarrantySection number="04" title="Procedura de Service">
+<WarrantySection number="04" title="Procedura de Service">
             <p>
               Pentru a beneficia de garanție, trebuie să deschideți un tichet de suport din Panoul de Control.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 mt-4">
-               <div className="flex-1 p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-center">
-                  <span className="block font-black text-white mb-1 uppercase tracking-tighter text-[10px]">Expediere</span>
-                  Utilizăm curieratul rapid pentru colectare națională. Pentru firme (PJ), costul transportului pentru produsele trimise în garanție este suportat de client, dacă nu s-a stabilit altfel prin contract.
+               <div className="flex-1 p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-center leading-relaxed">
+                  <span className="block font-black text-white mb-2 uppercase tracking-tighter text-[10px]">Expediere</span>
+                  Utilizăm curieratul rapid pentru colectare națională. Pentru <strong>persoanele fizice</strong>, costul transportului în garanție (tur-retur) este suportat integral de Karix Computers. Pentru <strong>firme (PJ)</strong>, costul este suportat de client, dacă nu s-a stabilit altfel prin contract.
                </div>
-               <div className="flex-1 p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-center">
-                  <span className="block font-black text-indigo-400 mb-1 uppercase tracking-tighter text-[10px]">Service Oradea</span>
-                  Clieții din Oradea beneficiază de ridicare și livrare personală <strong>gratuită</strong>, serviciu exclusiv oferit de Karix Computers.
+               <div className="flex-1 p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-center leading-relaxed">
+                  <span className="block font-black text-indigo-400 mb-2 uppercase tracking-tighter text-[10px]">Service Oradea</span>
+                  Clienții din Oradea beneficiază de ridicare și livrare personală <strong>gratuită</strong>, serviciu exclusiv oferit de Karix Computers.
                </div>
             </div>
           </WarrantySection>

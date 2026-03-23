@@ -16,6 +16,9 @@ export default function Login() {
   const [isCompletingProfile, setIsCompletingProfile] = useState(false);
   const [tempToken, setTempToken] = useState("");
   const [profileData, setProfileData] = useState({ name: "", email: "", avatar: "", phone: "" });
+  
+  // NOU: State pentru bifa de Termeni și Condiții
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -71,6 +74,13 @@ export default function Login() {
     setLoading(true);
     setError("");
 
+    // NOU: Verificare suplimentară de siguranță pentru Termeni
+    if (!acceptedTerms) {
+      setError("Trebuie să accepți Termenii și Condițiile.");
+      setLoading(false);
+      return;
+    }
+
     if (!profileData.phone || profileData.phone.length < 9) {
       setError("Te rugăm să introduci un număr de telefon valid.");
       setLoading(false);
@@ -78,10 +88,12 @@ export default function Login() {
     }
 
     try {
+      // NOU: Trimitem și 'termsAccepted: true' către backend (dacă backendul tău îl așteaptă, altfel e ignorat)
       const res = await axios.post(`${API_URL}/auth/google-complete`, {
         tempToken,
         name: profileData.name,
-        phone: profileData.phone
+        phone: profileData.phone,
+        termsAccepted: true
       });
 
       if (res.data && res.data.accessToken) {
@@ -178,10 +190,27 @@ export default function Login() {
                       onChange={(e) => setProfileData(p => ({ ...p, phone: e.target.value }))}
                     />
                   </div>
+
+                  {/* NOU: Bifa de acceptare T&C pentru cont nou Google */}
+                  <label className="flex items-start gap-3 mt-4 cursor-pointer group p-2 rounded-xl hover:bg-white/5 transition-colors">
+                    <div className="relative flex items-center mt-0.5">
+                      <input 
+                        type="checkbox" 
+                        required 
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        className="peer h-4 w-4 shrink-0 appearance-none rounded border border-white/20 bg-white/5 checked:border-indigo-500 checked:bg-indigo-500 focus:outline-none transition-all"
+                      />
+                      <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-2.5 w-2.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </div>
+                    <span className="text-xs text-gray-400 font-medium leading-relaxed italic">
+                      Am citit și sunt de acord cu <Link to="/terms" target="_blank" className="text-indigo-400 hover:text-indigo-300 font-bold underline">Termenii și Condițiile</Link> și <Link to="/confidentialitate" target="_blank" className="text-indigo-400 hover:text-indigo-300 font-bold underline">Politica de Confidențialitate</Link>.
+                    </span>
+                  </label>
                 </div>
 
                 <button
-                  disabled={loading}
+                  disabled={loading || !acceptedTerms}
                   className="w-full rounded-2xl py-5 text-sm font-black text-white bg-indigo-500 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-1 transition-all disabled:opacity-50 uppercase tracking-widest"
                 >
                   {loading ? "Se salvează..." : "Finalizează Contul"}

@@ -391,7 +391,7 @@ export default function Cart() {
             <button onClick={() => setShowLoginModal(false)} className="absolute top-10 right-10 text-gray-500 hover:text-white transition-colors">✕</button>
             <div className="h-20 w-20 rounded-[28px] bg-gradient-to-br from-indigo-500 to-pink-500 mx-auto mb-6 flex items-center justify-center text-3xl shadow-2xl">🔑</div>
             <h2 className="text-3xl font-black text-white uppercase italic drop-shadow-lg">Login Securizat</h2>
-            <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-2 mb-10 italic">Karix HQ Secure Gateway</p>
+            <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-2 mb-10 italic">Karix Computers Secure Gateway</p>
             <form onSubmit={handleInlineLogin} className="space-y-4">
               <input required type="email" className="w-full bg-white/5 border border-white/10 rounded-[22px] p-6 text-white outline-none focus:border-indigo-500/50 transition-all text-sm font-bold uppercase" placeholder="EMAIL" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} />
               <input required type="password" className="w-full bg-white/5 border border-white/10 rounded-[22px] p-6 text-white outline-none focus:border-indigo-500/50 transition-all text-sm font-bold uppercase" placeholder="PAROLĂ" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} />

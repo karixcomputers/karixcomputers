@@ -40,7 +40,7 @@ export default function Retur() {
         
         <header className="mb-20 text-center">
           <h1 className="text-6xl font-black text-white tracking-tighter mb-6 italic">
-            Politică de <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Retur</span>
+            Politica de <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Retur</span>
           </h1>
           <div className="h-1.5 w-24 bg-gradient-to-r from-indigo-500 to-pink-500 mx-auto rounded-full opacity-40 mb-6" />
           <p className="text-gray-500 uppercase tracking-[0.4em] text-[10px] font-bold">
