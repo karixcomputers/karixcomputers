@@ -24,6 +24,7 @@ export default function Tickets() {
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ["my-tickets"],
     queryFn: async () => {
+      // MODIFICAT AICI: am scos /api
       const res = await apiFetch("/tickets/my-tickets");
       if (!res.ok) throw new Error("Eroare la încărcarea tichetelor.");
       return res.json();
@@ -32,6 +33,7 @@ export default function Tickets() {
 
   const createTicketMutation = useMutation({
     mutationFn: async (newTicket) => {
+      // MODIFICAT AICI: am scos /api
       const res = await apiFetch("/tickets", {
         method: "POST",
         body: JSON.stringify(newTicket),
@@ -129,7 +131,6 @@ export default function Tickets() {
                   </div>
                   
                   <div className="flex items-center gap-8 justify-between md:justify-end">
-                    {/* DATA REINTROPUSA AICI */}
                     <div className="hidden md:block text-right">
                       <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Creat la</p>
                       <p className="text-xs font-bold text-gray-400">{new Date(t.createdAt).toLocaleDateString('ro-RO')}</p>
