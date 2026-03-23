@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-// --- IMPORTURILE PENTRU GOOGLE ---
-import { useGoogleLogin, useGoogleOneTapLogin } from "@react-oauth/google";
+import { useGoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 
 export default function Login() {
@@ -14,52 +13,42 @@ export default function Login() {
 
   const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
 
-  // FUNCȚIE REUTILIZABILĂ PENTRU LOGARE BACKEND
-  const sendTokenToBackend = async (googleToken) => {
-    setLoading(true);
-    try {
-      const res = await axios.post(`${API_URL}/auth/google`, {
-        token: googleToken,
-      });
-
-      if (res.data && res.data.accessToken) {
-        loginWithGoogle(res.data);
-        nav("/account");
-      }
-    } catch (err) {
-      console.error("Google Login Error:", err);
-      setError(err.response?.data?.error || "Eroare la sincronizarea cu contul Google.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 1. VARIANTA "ONE TAP" (Cea mai elegantă, apare singură în colț)
-  useGoogleOneTapLogin({
-    onSuccess: (credentialResponse) => {
-      // One Tap trimite un ID Token (credential), backend-ul tău e pregătit pentru Access Token
-      // Dacă vrei One Tap, backend-ul trebuie să verifice "credentialResponse.credential"
-      console.log("One Tap Success");
-    },
-    onError: () => console.log("One Tap skipped/error"),
-  });
-
-  // 2. VARIANTA REDIRECT (Pentru butonul mare, deschide în același tab)
+  // 1. LOGICA DE REPORENIRE DUPĂ REDIRECT
+  // Când Google se întoarce pe pagină, hook-ul useGoogleLogin nu mai "ține minte" starea.
+  // Dar, dacă folosim ux_mode: "redirect", codul este procesat automat de librărie sau trimis la redirect_uri.
+  
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
-      await sendTokenToBackend(tokenResponse.access_token);
+      setLoading(true);
+      setError("");
+      try {
+        // Trimitem access_token-ul primit de la Google către backend-ul tău
+        const res = await axios.post(`${API_URL}/auth/google`, {
+          token: tokenResponse.access_token,
+        });
+
+        if (res.data && res.data.accessToken) {
+          loginWithGoogle(res.data);
+          nav("/account");
+        }
+      } catch (err) {
+        console.error("Google Login Error:", err);
+        setError("Eroare la sincronizarea cu contul Google.");
+      } finally {
+        setLoading(false);
+      }
     },
     onError: (error) => {
       console.error("Google Auth Failure:", error);
       setError("Conectarea cu Google a eșuat.");
     },
-    // ACEASTA ESTE MODIFICAREA: Nu mai deschide popup, folosește tab-ul curent
-    ux_mode: "redirect", 
-    // Google are nevoie de o adresă unde să se întoarcă
-    redirect_uri: window.location.origin + "/auth/login", 
+    // --- MODIFICĂRILE CERUTE ---
+    ux_mode: "redirect", // Se deschide în același tab
+    redirect_uri: "https://karixcomputers.ro/auth/login", // Google se întoarce aici
+    flow: "implicit",
   });
 
-  // 3. Autentificare clasică
+  // 2. Autentificare clasică (Email/Parolă)
   async function submit(e) {
     e.preventDefault();
     setError("");
@@ -75,7 +64,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen pt-12 pb-24 px-4 relative overflow-hidden flex justify-center">
+    <div className="min-h-screen pt-12 pb-24 px-4 relative overflow-hidden flex justify-center bg-[#0b1020]">
       
       {/* Glow-uri de fundal Karix */}
       <div className="absolute top-0 -left-20 w-[400px] h-[400px] bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none" />
@@ -94,9 +83,9 @@ export default function Login() {
           </header>
 
           {error && (
-            <div className="mb-6 rounded-2xl border border-pink-500/30 bg-pink-500/10 p-5 animate-in fade-in slide-in-from-top-2">
-              <p className="text-sm text-pink-200 font-medium">
-                {error === "EMAIL_NOT_VERIFIED" ? "Contul tău nu este activat." : error}
+            <div className="mb-6 rounded-2xl border border-pink-500/30 bg-pink-500/10 p-5">
+              <p className="text-sm text-pink-200 font-medium text-center">
+                {error}
               </p>
             </div>
           )}
@@ -132,7 +121,7 @@ export default function Login() {
               disabled={loading}
               className="w-full mt-2 rounded-2xl py-5 text-lg font-black text-white bg-gradient-to-r from-indigo-500 to-pink-500 shadow-lg shadow-pink-500/20 hover:shadow-pink-500/40 hover:-translate-y-1 active:scale-[0.98] transition-all disabled:opacity-50"
             >
-              {loading ? "Se conectează..." : "Autentificare"}
+              {loading ? "Se procesează..." : "Autentificare"}
             </button>
 
             <div className="relative py-4">
@@ -140,7 +129,7 @@ export default function Login() {
                 <div className="w-full border-t border-white/10"></div>
               </div>
               <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest">
-                <span className="bg-[#0b1020] px-4 text-gray-500">sau</span>
+                <span className="bg-[#111729] px-4 text-gray-500">sau</span>
               </div>
             </div>
 

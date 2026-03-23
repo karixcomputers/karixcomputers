@@ -33,7 +33,10 @@ app.use("/api/webhooks", webhooksRoutes);
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
-    crossOriginOpenerPolicy: false, // Dezactivează temporar această verificare
+    // Dezactivăm complet COOP pentru a opri erorile window.closed
+    crossOriginOpenerPolicy: false, 
+    // Permitem browserului să încarce scripturile Google
+    contentSecurityPolicy: false, 
   })
 );
 
