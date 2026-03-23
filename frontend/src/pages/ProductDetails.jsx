@@ -114,7 +114,7 @@ export default function ProductDetails() {
   useEffect(() => {
     const getProduct = async () => {
       try {
-        const res = await apiFetch(`/api/products/${id}`);
+        const res = await apiFetch(`/products/${id}`);
         if (res.ok) setProduct(await res.json());
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
@@ -161,7 +161,7 @@ export default function ProductDetails() {
     setSubmittingReview(true);
     try {
       const token = localStorage.getItem("accessToken") || localStorage.getItem("token");
-      const res = await fetch(`http://192.168.0.162:4000/api/products/${id}/reviews`, {
+      const res = await fetch(`/products/${id}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ 
