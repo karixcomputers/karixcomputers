@@ -241,7 +241,7 @@ export default function Checkout() {
     if (cleanCui.length < 2) return;
 
     try {
-      const response = await fetch("http://192.168.0.162:4000/api/orders/anaf", {
+      const response = await fetch("https://karixcomputers.ro/api/orders/anaf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cui: cleanCui })
@@ -337,7 +337,7 @@ export default function Checkout() {
     };
 
     try {
-      const response = await fetch("http://192.168.0.162:4000/api/orders", {
+      const response = await fetch("https://karixcomputers.ro/api/orders", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json", 
