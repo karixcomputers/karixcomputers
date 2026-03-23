@@ -77,7 +77,7 @@ export default function Cart() {
     setCouponError("");
     setIsValidating(true);
     try {
-      const res = await apiFetch("/api/coupons/validate", {
+      const res = await apiFetch("/coupons/validate", {
         method: "POST",
         body: JSON.stringify({ 
           code: discountCode.toUpperCase(), 

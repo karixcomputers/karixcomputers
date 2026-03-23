@@ -12,7 +12,7 @@ export default function AdminWarranties() {
   useEffect(() => {
     const fetchAllOrders = async () => {
       try {
-        // MODIFICAT: din "/api/orders/admin/history" în "/orders/admin/history"
+        // MODIFICAT: din "/orders/admin/history" în "/orders/admin/history"
         const res = await apiFetch("/orders/admin/history");
         if (res.ok) {
           const data = await res.json();

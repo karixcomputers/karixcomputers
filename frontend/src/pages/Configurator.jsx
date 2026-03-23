@@ -30,7 +30,7 @@ export default function Configurator() {
   useEffect(() => {
     const fetchConfigComponents = async () => {
       try {
-        const res = await apiFetch("/api/adminconfigurator");
+        const res = await apiFetch("/adminconfigurator");
         if (res.ok) {
           const items = await res.json();
           const grouped = { cpu: [], gpu: [], ram: [], storage: [], motherboard: [], cooler: [], psu: [] };

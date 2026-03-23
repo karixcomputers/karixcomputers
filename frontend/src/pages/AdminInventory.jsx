@@ -22,7 +22,7 @@ export default function AdminInventory() {
 
   const fetchProducts = async () => {
     try {
-      // MODIFICAT: din "/api/products/admin-all" în "/products/admin-all"
+      // MODIFICAT: din "/products/admin-all" în "/products/admin-all"
       const res = await apiFetch("/products/admin-all");
       if (res.ok) setProducts(await res.json());
     } catch (err) { console.error(err); }
@@ -148,7 +148,7 @@ export default function AdminInventory() {
     const id = deleteConfirm.id;
     setDeleteConfirm({ show: false, id: null });
     try {
-      // MODIFICAT: din "/api/products/${id}" în "/products/${id}"
+      // MODIFICAT: din "/products/${id}" în "/products/${id}"
       const res = await apiFetch(`/products/${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchProducts();

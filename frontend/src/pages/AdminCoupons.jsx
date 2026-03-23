@@ -18,7 +18,7 @@ export default function AdminCoupons() {
 
   const fetchCoupons = async () => {
     try {
-      // MODIFICAT: din "/api/coupons" în "/coupons"
+      // MODIFICAT: din "/coupons" în "/coupons"
       const res = await apiFetch("/coupons");
       if (res.ok) setCoupons(await res.json());
     } catch (err) { console.error(err); }
@@ -36,7 +36,7 @@ export default function AdminCoupons() {
     };
 
     try {
-      // MODIFICAT: din "/api/coupons" în "/coupons"
+      // MODIFICAT: din "/coupons" în "/coupons"
       const res = await apiFetch("/coupons", {
         method: "POST",
         body: JSON.stringify(payload)
@@ -53,7 +53,7 @@ export default function AdminCoupons() {
 
   const deleteCoupon = async (id) => {
     if (!window.confirm("Ștergi acest cod?")) return;
-    // MODIFICAT: din "/api/coupons/${id}" în "/coupons/${id}"
+    // MODIFICAT: din "/coupons/${id}" în "/coupons/${id}"
     await apiFetch(`/coupons/${id}`, { method: "DELETE" });
     fetchCoupons();
   };

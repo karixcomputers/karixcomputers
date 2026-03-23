@@ -6,7 +6,7 @@ export async function fetchProducts(params = {}) {
     if (v !== undefined && v !== null && String(v).trim() !== "") qs.set(k, v);
   });
 
-  // MODIFICAT: din "/api/products..." în "/products..."
+  // MODIFICAT: din "/products..." în "/products..."
   const res = await apiFetch(`/products?${qs.toString()}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to load products");
@@ -14,7 +14,7 @@ export async function fetchProducts(params = {}) {
 }
 
 export async function fetchProduct(id) {
-  // MODIFICAT: din "/api/products/${id}" în "/products/${id}"
+  // MODIFICAT: din "/products/${id}" în "/products/${id}"
   const res = await apiFetch(`/products/${id}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to load product");

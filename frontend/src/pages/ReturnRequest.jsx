@@ -97,7 +97,7 @@ export default function ReturnRequest() {
       const pickupAddressFull = `${data.judet}, ${data.oras}, ${data.strada}`;
       const methodLabel = data.method === 'personal' ? 'RIDICARE PERSONALĂ ORADEA' : 'CURIER STANDARD';
       
-      const res = await apiFetch("/api/returns", {
+      const res = await apiFetch("/returns", {
         method: "POST",
         body: JSON.stringify({
           orderId: order?.id,

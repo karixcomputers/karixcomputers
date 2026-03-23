@@ -11,7 +11,7 @@ export default function AdminHistory() {
   const fetchHistory = async () => {
     try {
       setLoading(true);
-      // MODIFICAT: din "/api/orders/admin/history" în "/orders/admin/history"
+      // MODIFICAT: din "/orders/admin/history" în "/orders/admin/history"
       const res = await apiFetch("/orders/admin/history");
       if (!res.ok) {
         throw new Error("Nu s-a putut accesa baza de date a arhivei.");

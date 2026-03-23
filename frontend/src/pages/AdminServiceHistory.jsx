@@ -6,7 +6,7 @@ export default function AdminServiceHistory() {
   const { data: orders, isLoading } = useQuery({
     queryKey: ["adminServiceOrders"], // Refolosim cheia pentru cache
     queryFn: async () => {
-      // MODIFICAT: din "/api/service-orders/admin/all" în "/service-orders/admin/all"
+      // MODIFICAT: din "/service-orders/admin/all" în "/service-orders/admin/all"
       const res = await apiFetch("/service-orders/admin/all");
       return res.json();
     },

@@ -20,7 +20,7 @@ export default function AdminService() {
   const { data: allOrders, isLoading } = useQuery({
     queryKey: ["adminServiceOrders"],
     queryFn: async () => {
-      // MODIFICAT: din "/api/service-orders/admin/all" în "/service-orders/admin/all"
+      // MODIFICAT: din "/service-orders/admin/all" în "/service-orders/admin/all"
       const res = await apiFetch("/service-orders/admin/all");
       if (!res.ok) throw new Error("Eroare la încărcarea datelor.");
       return res.json();
@@ -31,7 +31,7 @@ export default function AdminService() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status, awb }) => {
-      // MODIFICAT: din "/api/service-orders/${id}/status" în "/service-orders/${id}/status"
+      // MODIFICAT: din "/service-orders/${id}/status" în "/service-orders/${id}/status"
       const res = await apiFetch(`/service-orders/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status, awb }),

@@ -15,7 +15,7 @@ export default function AdminReviews() {
 
   const fetchReviews = async () => {
     try {
-      // MODIFICAT: din "/api/reviews" în "/reviews"
+      // MODIFICAT: din "/reviews" în "/reviews"
       const res = await apiFetch("/reviews");
       if (res.ok) setReviews(await res.json());
     } catch (err) {
@@ -31,7 +31,7 @@ export default function AdminReviews() {
     const id = deleteConfirm.id;
     setDeleteConfirm({ show: false, id: null });
     try {
-      // MODIFICAT: din "/api/reviews/${id}" în "/reviews/${id}"
+      // MODIFICAT: din "/reviews/${id}" în "/reviews/${id}"
       const res = await apiFetch(`/reviews/${id}`, { method: "DELETE" });
       if (res.ok) {
         setReviews(prev => prev.map(r => r.id === id ? { ...r, isDeleted: true } : r));
@@ -42,7 +42,7 @@ export default function AdminReviews() {
 
   const handleRestore = async (id) => {
     try {
-      // MODIFICAT: din "/api/reviews/${id}/restore" în "/reviews/${id}/restore"
+      // MODIFICAT: din "/reviews/${id}/restore" în "/reviews/${id}/restore"
       const res = await apiFetch(`/reviews/${id}/restore`, { method: "PATCH" });
       if (res.ok) {
         setReviews(prev => prev.map(r => r.id === id ? { ...r, isDeleted: false } : r));

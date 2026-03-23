@@ -18,7 +18,7 @@ export default function AdminReturns() {
   const { data: returns, isLoading } = useQuery({
     queryKey: ["adminReturns"],
     queryFn: async () => {
-      // MODIFICAT: din "/api/returns/admin/all" în "/returns/admin/all"
+      // MODIFICAT: din "/returns/admin/all" în "/returns/admin/all"
       const res = await apiFetch("/returns/admin/all");
       return res.json();
     },
@@ -30,7 +30,7 @@ export default function AdminReturns() {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }) => {
-      // MODIFICAT: din "/api/returns/admin/${id}/status" în "/returns/admin/${id}/status"
+      // MODIFICAT: din "/returns/admin/${id}/status" în "/returns/admin/${id}/status"
       const res = await apiFetch(`/returns/admin/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status }),
@@ -74,7 +74,7 @@ export default function AdminReturns() {
 
   const sendAwbMutation = useMutation({
     mutationFn: async ({ id, awb }) => {
-      // MODIFICAT: din "/api/returns/admin/${id}/send-awb" în "/returns/admin/${id}/send-awb"
+      // MODIFICAT: din "/returns/admin/${id}/send-awb" în "/returns/admin/${id}/send-awb"
       const res = await apiFetch(`/returns/admin/${id}/send-awb`, {
         method: "PATCH",
         body: JSON.stringify({ awb }),

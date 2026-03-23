@@ -15,7 +15,7 @@ export default function AdminConfigurator() {
 
   const fetchItems = async () => {
     try {
-      // MODIFICAT: din "/api/adminconfigurator/all" în "/adminconfigurator/all"
+      // MODIFICAT: din "/adminconfigurator/all" în "/adminconfigurator/all"
       const res = await apiFetch("/adminconfigurator/all");
       if (res.ok) setItems(await res.json());
     } catch (err) { console.error(err); }
@@ -37,7 +37,7 @@ export default function AdminConfigurator() {
   const handleAdd = async (e) => {
     e.preventDefault();
     try {
-      // MODIFICAT: din "/api/adminconfigurator" în "/adminconfigurator"
+      // MODIFICAT: din "/adminconfigurator" în "/adminconfigurator"
       const res = await apiFetch("/adminconfigurator", {
         method: "POST",
         body: JSON.stringify({
@@ -56,7 +56,7 @@ export default function AdminConfigurator() {
   const handleDelete = async (id) => {
     if (!window.confirm("Sigur ștergi această componentă?")) return;
     try {
-      // MODIFICAT: din "/api/adminconfigurator/${id}" în "/adminconfigurator/${id}"
+      // MODIFICAT: din "/adminconfigurator/${id}" în "/adminconfigurator/${id}"
       const res = await apiFetch(`/adminconfigurator/${id}`, { method: "DELETE" });
       if (res.ok) setItems(prev => prev.filter(i => i.id !== id));
     } catch (err) { alert("Eroare la ștergere"); }

@@ -1,7 +1,7 @@
 // În src/api/auth.js
 
 export async function refreshApi() {
-  // MODIFICAT: din "/api/auth/refresh" în "/auth/refresh"
+  // MODIFICAT: din "/auth/refresh" în "/auth/refresh"
   const res = await apiFetch("/auth/refresh", { method: "POST" });
   
   const data = await res.json();

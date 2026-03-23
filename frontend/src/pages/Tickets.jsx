@@ -24,7 +24,7 @@ export default function Tickets() {
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ["my-tickets"],
     queryFn: async () => {
-      const res = await apiFetch("/api/tickets/my-tickets");
+      const res = await apiFetch("/tickets/my-tickets");
       if (!res.ok) throw new Error("Eroare la încărcarea tichetelor.");
       return res.json();
     }
@@ -32,7 +32,7 @@ export default function Tickets() {
 
   const createTicketMutation = useMutation({
     mutationFn: async (newTicket) => {
-      const res = await apiFetch("/api/tickets", {
+      const res = await apiFetch("/tickets", {
         method: "POST",
         body: JSON.stringify(newTicket),
       });

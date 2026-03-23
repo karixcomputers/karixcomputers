@@ -12,7 +12,7 @@ export default function AdminTickets() {
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ["admin-tickets"],
     queryFn: async () => {
-      // MODIFICAT: din "/api/tickets/admin/all" în "/tickets/admin/all"
+      // MODIFICAT: din "/tickets/admin/all" în "/tickets/admin/all"
       const res = await apiFetch("/tickets/admin/all");
       if (!res.ok) throw new Error("Nu s-au putut încărca tichetele.");
       return res.json();
@@ -23,7 +23,7 @@ export default function AdminTickets() {
   // 2. Mutație pentru schimbare status rapidă
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }) => {
-      // MODIFICAT: din "/api/tickets/${id}/status" în "/tickets/${id}/status"
+      // MODIFICAT: din "/tickets/${id}/status" în "/tickets/${id}/status"
       const res = await apiFetch(`/tickets/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status }),
