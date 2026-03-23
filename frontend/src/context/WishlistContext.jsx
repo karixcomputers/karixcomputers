@@ -13,7 +13,7 @@ export function WishlistProvider({ children }) {
   const fetchWishlist = async () => {
     if (!user) return;
     try {
-      const res = await apiFetch("/api/wishlist");
+      const res = await apiFetch("/wishlist");
       if (res.ok) setWishlist(await res.json());
     } catch (err) {
       console.error("Eroare la încărcarea wishlist-ului:", err);
@@ -32,7 +32,7 @@ export function WishlistProvider({ children }) {
       return;
     }
 
-    const res = await apiFetch("/api/wishlist/toggle", {
+    const res = await apiFetch("/wishlist/toggle", {
       method: "POST",
       body: JSON.stringify({ productId })
     });
