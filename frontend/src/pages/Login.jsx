@@ -35,7 +35,7 @@ export default function Login() {
       setError("");
       try {
         // Trimitem access_token-ul la backend-ul tău (Port 4000)
-        const res = await axios.post("http://localhost:4000/api/auth/google", {
+        const res = await axios.post(`${API_URL}/auth/google`, {
           token: tokenResponse.access_token,
         });
 
