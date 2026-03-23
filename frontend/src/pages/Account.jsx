@@ -75,7 +75,7 @@ export default function Account() {
             Panou <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Control</span>
           </h1>
           <p className="text-gray-400 font-medium tracking-wide uppercase text-xs">
-            Salut, {user?.name?.split(' ')[0] || "Pilot"}! Datele tale sunt actualizate.
+            Salut, {user?.name?.split(' ')[0] || "Pilot"}!
           </p>
         </header>
 
