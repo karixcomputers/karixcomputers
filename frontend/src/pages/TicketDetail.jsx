@@ -17,7 +17,7 @@ export default function TicketDetail() {
   const { data: ticket, isLoading, error } = useQuery({
     queryKey: ["ticket", id],
     queryFn: async () => {
-      const res = await apiFetch(`/api/tickets/${id}`);
+      const res = await apiFetch(`/tickets/${id}`);
       if (!res.ok) throw new Error("Nu am putut încărca conversația.");
       return res.json();
     },
@@ -27,7 +27,7 @@ export default function TicketDetail() {
   const sendMessageMutation = useMutation({
     mutationFn: async (formData) => {
       // Folosim apiFetch dar avem grijă la headers
-      const res = await apiFetch(`/api/tickets/${id}/messages`, {
+      const res = await apiFetch(`/tickets/${id}/messages`, {
         method: "POST",
         // Trimitem formData direct. apiFetch-ul tău trebuie să fie apelat 
         // astfel încât să NU adauge "Content-Type: application/json"
