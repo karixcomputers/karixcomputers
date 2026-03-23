@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String          @id @default(cuid())
+  email             String          @unique
+  
+  // 1. Modificăm passwordHash să fie opțional (adăugăm ?)
+  passwordHash      String?         
+  
+  name              String?
+  
+  // 2. Adăugăm câmpul pentru imaginea de profil de la Google
+  avatar            String?         
+  
+  phone             String?
+  isEmailVerified   Boolean         @default(false)
+  verificationCode  String?
+  
+  // 3. Adăugăm un identificator pentru Google (ID-ul unic de la ei)
+  googleId          String?         @unique
+  
+  role              String          @default("user") // "user" | "admin"
+  refreshTokenHash  String?
+  createdAt         DateTime        @default(now())
+  termsAccepted     Boolean         @default(false) 
+  termsAcceptedAt   DateTime        @default(now()) 
+  
+  // Relații
+  orders            Order[]
+  tickets           Ticket[]
+  serviceOrders     ServiceOrder[]
+  returnRequests    ReturnRequest[]
+  wishlist          WishlistItem[]
+  reviews           Review[]        
+}
+
+model Product {
+  id              String         @id // Generat manual în backend (5 cifre, salvat ca String)
+  name            String
+  priceCents      Int
+  images          String[]
+  description     String         @db.Text 
+  longDescription String?        @db.Text 
+  cpuBrand        String?
+  gpuBrand        String?
+  ramGb           String?
+  storageGb       String?
+  motherboard     String?        // NOU: Placa de bază
+  case            String?        // NOU: Carcasa
+  cooler          String?        
+  psu             String?        
+  stock           Int            @default(1)
+  tags            String[]
+  category        String         @default("pc")
+  warrantyMonths  Int            @default(24) 
+  createdAt       DateTime       @default(now())
+  favoritedBy     WishlistItem[]
+  reviews         Review[]      
+  benchmarks      Json? // Stochează: [{ "game": "CS2", "fps": "500", "color": "blue" }, ...] 
+  isVisible       Boolean  @default(true)
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      
+  comment   String   @db.Text
+  images    String[] // NOU: Array pentru a stoca imaginile (Base64) atașate la review
+  createdAt DateTime @default(now())
+
+  productId String   
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isDeleted Boolean  @default(false)
+}
+
+model Order {
+  id                Int             @id 
+  userId            String
+  user              User            @relation(fields: [userId], references: [id])
+  items             OrderItem[]
+  shippingName      String
+  shippingPhone     String
+  shippingAddress   String
+  totalCents        Int
+  status            String          @default("in_asteptare")
+  stripeSessionId   String?         @unique
+  paymentIntentId   String?
+  createdAt         DateTime        @default(now())
+  returnRequests    ReturnRequest[]
+
+  // --- DATE FACTURARE PERSOANĂ JURIDICĂ ---
+  isCompany         Boolean         @default(false)
+  companyName       String?
+  cui               String?
+  regCom            String?
+}
+
+model OrderItem {
+  id              String  @id @default(cuid())
+  orderId         Int
+  order           Order   @relation(fields: [orderId], references: [id])
+  productId       String  
+  productName     String
+  qty             Int
+  priceCentsAtBuy Int
+  warrantyMonths  Int     @default(24) 
+  status          String  @default("in_asteptare")
+  awb             String?
+}
+
+model Ticket {
+  id       Int    @id
+  subject  String
+  category String
+  status   String @default("deschis")
+  priority String @default("normal")
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  messages TicketMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TicketMessage {
+  id          String   @id @default(cuid())
+  text        String   @db.Text
+  image       String?
+  senderRole  String
+  ticketId    Int
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model ServiceOrder {
+  id                String   @id @default(cuid())
+  orderId           String
+  productName       String
+  customerName      String
+  phoneNumber       String
+  method            String
+  issueDescription  String   @db.Text
+  judet             String?
+  oras              String?
+  address           String?
+  preferredDate     String
+  status            String   @default("in_asteptare")
+  awb               String?
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ReturnRequest {
+  id              String   @id @default(cuid())
+  orderId         Int      
+  order           Order    @relation(fields: [orderId], references: [id])
+  orderNumber     String
+  reason          String
+  iban            String
+  titular         String
+  phoneNumber     String
+  comments        String?
+  returnedItems   String[] 
+  returnAwb       String?
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String   
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+model Coupon {
+  id            String    @id @default(cuid())
+  code          String    @unique 
+  discountType  String    
+  discountValue Int       
+  minOrderTotal Int       @default(0) 
+  usageLimit    Int?      
+  timesUsed     Int       @default(0)
+  isActive      Boolean   @default(true)
+  expiryDate    DateTime?
+  createdAt     DateTime  @default(now())
+}
+
+model ConfiguratorComponent {
+  id        String   @id @default(uuid())
+  category  String   // cpu, gpu, ram, storage, motherboard, cooler, psu
+  brand     String?  // Intel, AMD, Nvidia etc. (opțional pentru componentele fără filtru de brand)
+  name      String
+  spec      String?
+  price     Int      @default(0) // Preț în cents (ex: 10000 pentru 100 RON) - util pentru viitor
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}

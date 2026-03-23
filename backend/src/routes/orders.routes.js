@@ -1,0 +1,363 @@
+import express from "express";
+import axios from "axios";
+import { PrismaClient } from "@prisma/client";
+import { requireAuth } from "../middleware/auth.js";
+import { 
+  sendUnifiedOrderEmail, // Am importat noua funcție Master
+  sendOrderPlaced,       // Le păstrăm în import pentru siguranță, deși le vom înlocui în POST
+  sendServiceOrderPlaced, 
+  sendOrderReadyEmail, 
+  sendOrderShippedEmail,
+  sendOradeaPickupEmail,
+  sendServiceInPossessionEmail,
+  sendServiceFinishedEmail,
+  sendServiceShippedBackEmail,
+  sendServiceUnrepairableEmail,
+  sendOrderCanceledEmail 
+} from "../services/mail.service.js";
+
+const prisma = new PrismaClient();
+const router = express.Router();
+
+// --- FUNCȚIE HELPER: Generare ID de 5 cifre unic ---
+async function generateUniqueOrderId() {
+  let isUnique = false;
+  let newId;
+  while (!isUnique) {
+    newId = Math.floor(10000 + Math.random() * 90000);
+    const existing = await prisma.order.findUnique({ where: { id: newId } });
+    if (!existing) isUnique = true;
+  }
+  return newId;
+}
+
+const requireAdmin = (req, res, next) => {
+  if (req.user && req.user.role === "admin") {
+    next();
+  } else {
+    res.status(403).json({ error: "Acces interzis. Necesită drepturi de administrator." });
+  }
+};
+
+// 1. GET: Toate comenzile utilizatorului logat
+router.get("/", requireAuth, async (req, res, next) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { userId: req.user.sub },
+      orderBy: { createdAt: "desc" },
+      include: { 
+        items: true,
+        returnRequests: true 
+      },
+    });
+    res.json(orders);
+  } catch (e) { next(e); }
+});
+
+// 2. GET: Admin Active
+router.get("/admin/all", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const activeOrders = await prisma.order.findMany({
+      where: { NOT: { status: { in: ["livrat", "anulat"] } } },
+      orderBy: { createdAt: "desc" },
+      include: { 
+        items: true,
+        returnRequests: true,
+        user: { select: { email: true, name: true, phone: true } } 
+      },
+    });
+    res.json(activeOrders);
+  } catch (e) { next(e); }
+});
+
+// 3. GET: Istoric Admin
+router.get("/admin/history", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const historicalOrders = await prisma.order.findMany({
+      where: { status: { in: ["livrat", "anulat"] } },
+      orderBy: { createdAt: "desc" },
+      include: { 
+        items: true,
+        returnRequests: true,
+        user: { select: { email: true, name: true, phone: true } } 
+      },
+    });
+    res.json(historicalOrders);
+  } catch (e) { next(e); }
+});
+
+// 4. PATCH: Status Update Global
+router.patch("/:id/status", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10); 
+    const { status } = req.body; 
+    const updatedOrder = await prisma.order.update({
+      where: { id },
+      data: { status },
+      include: { user: { select: { email: true } } }
+    });
+    res.json({ success: true, order: updatedOrder });
+  } catch (e) { next(e); }
+});
+
+// 5. PATCH: ANULARE COMANDĂ (Client)
+router.patch("/:id/cancel", requireAuth, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const userId = req.user.sub;
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { items: true, user: true }
+    });
+
+    if (!order || order.userId !== userId) {
+      return res.status(404).json({ error: "Comanda nu a fost găsită." });
+    }
+
+    const cancelableStatuses = ["in_asteptare", "in_procesare", "in_asteptare_ridicare"];
+    const canCancel = order.items.every(it => cancelableStatuses.includes(it.status));
+
+    if (!canCancel) {
+      return res.status(400).json({ error: "Comanda nu mai poate fi anulată." });
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id },
+      data: { 
+        status: "anulat",
+        items: {
+          updateMany: {
+            where: {},
+            data: { status: "anulat" }
+          }
+        }
+      }
+    });
+
+    const mailData = {
+      customerName: order.shippingName,
+      orderId: order.id,
+      total: (order.totalCents / 100).toFixed(2)
+    };
+
+    await sendOrderCanceledEmail(order.user.email, mailData).catch(err => console.error(err));
+    res.json({ success: true, message: "Comanda a fost anulată." });
+  } catch (e) { next(e); }
+});
+
+// 6. PATCH: Status Update Granular (ITEM STATUS) - REPARAT PENTRU ORADEA
+router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { itemId } = req.params;
+    const { status, awb } = req.body;
+
+    const updatedItem = await prisma.orderItem.update({
+      where: { id: itemId },
+      data: { 
+        status, 
+        ...(awb && { awb }) 
+      },
+      include: { 
+        order: { 
+          include: { 
+            items: true, 
+            user: { select: { email: true } } 
+          } 
+        } 
+      }
+    });
+
+    const allItems = updatedItem.order.items;
+    let finalOrderStatus = status; 
+
+    const isAllDelivered = allItems.every(i => i.status === "livrat");
+    const isAnyShipped = allItems.some(i => i.status === "predat_curier");
+    const isAnyReady = allItems.some(i => i.status === "gata_de_livrare");
+    const isAllCanceled = allItems.every(i => i.status === "anulat");
+
+    if (isAllDelivered) finalOrderStatus = "livrat";
+    else if (isAllCanceled) finalOrderStatus = "anulat";
+    else if (isAnyShipped) finalOrderStatus = "predat_curier";
+    else if (isAnyReady) finalOrderStatus = "gata_de_livrare";
+
+    await prisma.order.update({
+      where: { id: updatedItem.orderId },
+      data: { status: finalOrderStatus }
+    });
+
+    const emailData = {
+      customerName: updatedItem.order.shippingName,
+      productName: updatedItem.productName,
+      orderId: updatedItem.orderId,
+      awb: awb || updatedItem.awb || "",
+      phone: updatedItem.order.shippingPhone
+    };
+
+    const userEmail = updatedItem.order.user.email;
+    const itemName = (updatedItem.productName || "").toLowerCase();
+    
+    const isService = itemName.includes('service') || 
+                      itemName.includes('mentenanta') || 
+                      itemName.includes('curatare') || 
+                      itemName.includes('reparatie');
+                      
+    const isOradea = updatedItem.order.shippingAddress?.toLowerCase().includes('oradea');
+
+    // ===============================================
+    // LOGICĂ INTELIGENTĂ DE TRIMITERE MAILURI STATUS
+    // ===============================================
+
+    if (status === "posesie") {
+      await sendServiceInPossessionEmail(userEmail, emailData).catch(err => console.error(err));
+    } 
+    else if (status === "reparat") {
+      await sendServiceFinishedEmail(userEmail, emailData).catch(err => console.error(err));
+    } 
+    else if (status === "ireparabil") {
+      await sendServiceUnrepairableEmail(userEmail, emailData).catch(err => console.error(err));
+    } 
+    else if (status === "gata_de_livrare") {
+      // Dacă e Oradea: Nu dăm mail. Presupunem că e gata de dus personal.
+      // Dacă e Service din Țară: Nu dăm mail, a primit deja mail de "reparat". Așteaptă doar AWB.
+      if (!isOradea && !isService) {
+        // E PC de trimis prin curier. Dăm mail-ul de "PC-ul așteaptă curierul"
+        await sendOrderReadyEmail(userEmail, emailData).catch(err => console.error(err));
+      }
+    } 
+    else if (status === "predat_curier") {
+      // Dacă cumva s-a forțat statusul ăsta în Oradea (via API), îl blocăm oricum. E doar pt Curier.
+      if (!isOradea) {
+        if (isService) {
+          await sendServiceShippedBackEmail(userEmail, emailData).catch(err => console.error(err));
+        } else {
+          await sendOrderShippedEmail(userEmail, emailData).catch(err => console.error(err));
+        }
+      }
+    }
+
+    res.json({ success: true, item: updatedItem, orderStatusSynced: finalOrderStatus });
+  } catch (e) { next(e); }
+});
+
+// 7. POST: Creare comandă (ACTUALIZATĂ COMPLET)
+router.post("/", requireAuth, async (req, res, next) => {
+  try {
+    const { client, cartItems, total, userEmail, pickupType, couponCode } = req.body;
+    const randomOrderId = await generateUniqueOrderId();
+
+    const newOrder = await prisma.order.create({
+      data: {
+        id: randomOrderId,
+        userId: req.user.sub,
+        totalCents: total,
+        shippingName: client.isCompany ? client.companyName : client.name, // Salvăm numele corect în funcție de tip
+        shippingPhone: client.phone,
+        shippingAddress: `${client.city}, ${client.county}, ${client.addressDetails}`,
+        
+        // --- SALVARE DATE B2B ---
+        isCompany: client.isCompany || false,
+        companyName: client.isCompany ? client.companyName : null,
+        cui: client.isCompany ? client.cui : null,
+        regCom: client.isCompany ? client.regCom : null,
+
+        items: {
+          create: cartItems.map(item => {
+            const nameLower = (item.name || item.productName || "").toLowerCase();
+            const isService = (item.category === 'service') || 
+                              ['service', 'mentenanta', 'curatare', 'reparatie'].some(kw => nameLower.includes(kw));
+            
+            return {
+              productId: String(item.id),
+              productName: item.name || item.productName, 
+              qty: item.qty || 1,
+              priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
+              status: isService ? "in_asteptare_ridicare" : "in_asteptare",
+              warrantyMonths: item.warrantyMonths ? parseInt(item.warrantyMonths) : (isService ? 0 : 24)
+            };
+          })
+        }
+      },
+      include: { items: true }
+    });
+
+    // --- INCREMENTARE FOLOSIRE CUPON ---
+    if (couponCode) {
+      await prisma.coupon.update({
+        where: { code: couponCode.toUpperCase() },
+        data: { timesUsed: { increment: 1 } }
+      }).catch(err => console.error("Eroare incrementare cupon:", err));
+    }
+
+    const commonMailData = {
+      client: client, // Obiectul client complet (conține acum și isCompany, cui, etc.)
+      orderId: newOrder.id,
+      total: total,
+      couponCode: couponCode || null,
+      pickupType: pickupType,
+      cartItems: cartItems.map(item => ({
+        name: item.name || item.productName,
+        qty: item.qty || 1,
+        priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
+        specs: item.specs 
+      }))
+    };
+
+    // ==========================================
+    // LOGICA UNIFICATĂ DE MAIL
+    // ==========================================
+    
+    // Trimitem confirmarea către client (1 singur apel care decide totul)
+    await sendUnifiedOrderEmail(userEmail || req.user.email, commonMailData).catch(err => console.error(err));
+
+    // Trimitem confirmarea către Admin (1 singur apel care decide totul)
+    const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
+    await sendUnifiedOrderEmail(adminEmail, commonMailData, true).catch(err => console.error(err));
+
+    // Am șters restul if-urilor cu sendServiceOrderPlaced și sendOradeaPickupEmail
+    // Deoarece sendUnifiedOrderEmail acoperă acum toate acele scenarii.
+
+    res.status(200).json({ success: true, orderId: newOrder.id });
+
+  } catch (error) {
+    console.error("Eroare Backend Comandă:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- RUTĂ PROXY PENTRU ANAF (V9 STABIL + SAFE FALLBACK) ---
+router.post("/anaf", async (req, res) => {
+  try {
+    const { cui } = req.body;
+    const numCui = Number(cui);
+
+    if (!numCui || isNaN(numCui)) {
+      return res.status(400).json({ error: "CUI invalid." });
+    }
+
+    // Folosim API-ul oficial ANAF V9 🚀
+    const response = await fetch("https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache"
+      },
+      body: JSON.stringify([{ cui: numCui, data: new Date().toISOString().split("T")[0] }])
+    });
+
+    if (!response.ok) {
+      console.warn(`⚠️ ANAF a răspuns cu status: ${response.status}`);
+      return res.status(200).json({ cod: 500, message: "ANAF indisponibil temporar" }); 
+    }
+
+    const anafData = await response.json();
+    res.json(anafData);
+
+  } catch (error) {
+    console.error("❌ Eroare conexiune ANAF:", error.message);
+    res.status(200).json({ cod: 500, message: "Conexiune refuzată de ANAF." });
+  }
+});
+
+
+export default router;

@@ -1,0 +1,276 @@
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { Link } from "react-router-dom";
+
+const API_URL = "http://localhost:4000/api/orders/admin/all";
+const STATUS_UPDATE_URL = "http://localhost:4000/api/orders"; 
+const ITEM_STATUS_URL = "http://localhost:4000/api/orders/item"; 
+
+export default function AdminDashboard() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  const [awbModal, setAwbModal] = useState({ open: false, itemId: null, orderId: null });
+  const [tempAwb, setTempAwb] = useState("");
+
+  const fetchOrders = async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const res = await axios.get(API_URL, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setOrders(Array.isArray(res.data) ? res.data : res.data.orders || []);
+    } catch (err) {
+      setError("Eroare la sincronizare.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchOrders(); }, []);
+
+  const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
+    // Dacă am selectat un status care cere AWB, deschidem modalul
+    if (newStatus === "predat_curier") {
+      setAwbModal({ open: true, itemId, orderId });
+      return;
+    }
+    // Altfel facem update direct
+    await executeItemUpdate(orderId, itemId, newStatus, null);
+  };
+
+  const executeItemUpdate = async (orderId, itemId, status, awb) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      await axios.patch(`${ITEM_STATUS_URL}/${itemId}/status`, 
+        { status, awb },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setOrders(prev => {
+        const updatedOrders = prev.map(order => {
+          if (order.id === orderId) {
+            const updatedItems = order.items.map(item => 
+              item.id === itemId ? { ...item, status, awb: awb || item.awb } : item
+            );
+            
+            const allDelivered = updatedItems.every(i => i.status === "livrat");
+            
+            if (allDelivered) {
+              axios.patch(`${STATUS_UPDATE_URL}/${orderId}/status`, { status: "livrat" }, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              return null; // Scoatem comanda din dashboard-ul activ
+            }
+            return { ...order, items: updatedItems };
+          }
+          return order;
+        });
+        return updatedOrders.filter(o => o !== null);
+      });
+
+      setAwbModal({ open: false, itemId: null, orderId: null });
+      setTempAwb("");
+    } catch (err) {
+      alert("Eroare la update: " + (err.response?.data?.error || "Eroare server."));
+    }
+  };
+
+  const renderStatusOptions = (item, order) => {
+    const itemName = (item.productName || "").toLowerCase();
+    const isService = itemName.includes('service') || 
+                      itemName.includes('mentenanta') ||
+                      itemName.includes('curatare') ||
+                      itemName.includes('reparatie');
+                      
+    const isOradea = order.shippingAddress?.toLowerCase().includes('oradea');
+
+    if (isService) {
+      // OPȚIUNI PENTRU SERVICE
+      if (isOradea) {
+        return (
+          <>
+            <option value="in_asteptare_ridicare">⏳ Așteptare Preluare Personală</option>
+            <option value="posesie">📥 În laboratorul Karix</option>
+            <option value="diagnosticare">🔍 Diagnosticare</option>
+            <option value="reparat">✅ Reparat / Gata</option>
+            <option value="ireparabil">❌ Ireparabil</option>
+            <option value="gata_de_livrare">🤝 Pregătit pentru Predare</option>
+            <option value="livrat">🏁 Predat (Finalizat)</option>
+          </>
+        );
+      } else {
+        return (
+          <>
+            <option value="in_asteptare_ridicare">🚚 Așteptare Curier (Către noi)</option>
+            <option value="posesie">📥 În laboratorul Karix</option>
+            <option value="diagnosticare">🔍 Diagnosticare</option>
+            <option value="reparat">✅ Reparat / Gata</option>
+            <option value="ireparabil">❌ Ireparabil</option>
+            <option value="predat_curier">📦 Predat Curier (Retur Către Client)</option>
+            <option value="livrat">🏁 Livrat Final</option>
+          </>
+        );
+      }
+    } else {
+      // OPȚIUNI PENTRU PC / PRODUSE HARDWARE
+      if (isOradea) {
+        return (
+          <>
+            <option value="in_procesare">⚙️ În Procesare</option>
+            <option value="in_pregatire">🛠️ În Asamblare</option>
+            <option value="gata_de_livrare">🤝 Gata de Livrare Personală</option>
+            <option value="livrat">🏁 Livrat Final</option>
+          </>
+        );
+      } else {
+        return (
+          <>
+            <option value="in_procesare">⚙️ În Procesare</option>
+            <option value="in_pregatire">🛠️ În Asamblare</option>
+            <option value="gata_de_livrare">📦 Ambalat (Așteaptă Curier)</option>
+            <option value="predat_curier">🚚 Predat Curier (AWB)</option>
+            <option value="livrat">🏁 Livrat Final</option>
+          </>
+        );
+      }
+    }
+  };
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-transparent">
+      <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+    </div>
+  );
+
+  return (
+    <div className="relative min-h-screen pt-32 pb-24 px-4 sm:px-8 bg-transparent">
+      <div className="max-w-7xl mx-auto relative z-10">
+        
+        <header className="mb-16 flex flex-col lg:flex-row justify-between items-end gap-8">
+          <div>
+            <p className="text-indigo-500 font-black text-[10px] uppercase tracking-[0.4em] mb-2 drop-shadow-md">Control Panel</p>
+            <h1 className="text-6xl font-black italic text-white tracking-tighter drop-shadow-2xl">Karix <span className="text-indigo-400">Computers</span></h1>
+          </div>
+          <div className="flex gap-4">
+            <Link to="/admin/history" className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-xs uppercase tracking-widest hover:bg-white/10 backdrop-blur-md transition-all shadow-xl">Arhivă 📜</Link>
+          </div>
+        </header>
+
+        <div className="space-y-8">
+          {orders.length === 0 ? (
+            <div className="text-center py-20 border border-white/5 rounded-[40px] bg-white/5 backdrop-blur-xl shadow-2xl">
+              <p className="text-gray-500 font-black uppercase tracking-widest text-sm italic">Nu există comenzi active momentan.</p>
+            </div>
+          ) : (
+            orders.map((order) => {
+              // Verificăm dacă e comandă din Oradea pentru a afișa eticheta
+              const isOrderOradea = order.shippingAddress?.toLowerCase().includes('oradea');
+
+              return (
+                <div key={order.id} className="p-8 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl transition-all hover:bg-white/[0.08]">
+                  <div className="flex flex-col lg:flex-row gap-10">
+                    
+                    {/* INFO CLIENT */}
+                    <div className="lg:w-1/3 lg:border-r border-white/5 lg:pr-10">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20">
+                          #{String(order.id).slice(-8).toUpperCase()}
+                        </span>
+                        {isOrderOradea && (
+                          <span className="text-[9px] font-black text-pink-400 uppercase tracking-widest bg-pink-500/10 px-2 py-1 rounded-lg border border-pink-500/20">
+                            📍 Oradea
+                          </span>
+                        )}
+                      </div>
+                      
+                      <h3 className="text-3xl font-black text-white uppercase italic leading-tight drop-shadow-md">{order.shippingName}</h3>
+                      
+                      {/* Afișare Date Firmă dacă e cazul */}
+                      {order.isCompany && (
+                        <div className="mt-3 bg-black/20 p-3 rounded-xl border border-indigo-500/20">
+                           <p className="text-[9px] text-indigo-400 font-black uppercase tracking-widest mb-1">Date Facturare B2B</p>
+                           <p className="text-xs font-bold text-white mb-1">{order.companyName}</p>
+                           <p className="text-[10px] text-gray-400">CUI: {order.cui} | Reg: {order.regCom}</p>
+                        </div>
+                      )}
+
+                      <div className="mt-6 space-y-4 text-gray-300 text-xs font-bold italic">
+                        <p className="flex items-center gap-2"><span>📧</span> {order.user?.email || 'Fără Email'}</p>
+                        <p className="flex items-center gap-2"><span>📞</span> {order.shippingPhone}</p>
+                        <p className="leading-relaxed flex items-start gap-2"><span>📍</span> {order.shippingAddress}</p>
+                      </div>
+                    </div>
+
+                    {/* MANAGEMENT PRODUSE */}
+                    <div className="lg:w-2/3 space-y-6">
+                      <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 text-center lg:text-left">Status Produse</h4>
+                      {order.items?.map((item) => {
+                         const itemName = (item.productName || "").toLowerCase();
+                         const isService = itemName.includes('service') || 
+                                           itemName.includes('mentenanta') ||
+                                           itemName.includes('curatare') ||
+                                           itemName.includes('reparatie');
+                         return (
+                            <div key={item.id} className={`p-6 rounded-[25px] border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 transition-all group backdrop-blur-md ${
+                              item.status === 'livrat' ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/5 hover:border-white/10'
+                            }`}>
+                              <div className="flex-1">
+                                <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isService ? 'text-pink-400' : 'text-indigo-400'}`}>
+                                  {isService ? '🛠️ Serviciu' : '💻 Hardware'}
+                                </p>
+                                <h5 className="text-lg font-bold text-white uppercase italic tracking-tight">{item.productName}</h5>
+                                {item.awb && (
+                                  <p className="text-[10px] text-cyan-400 font-mono mt-2 bg-cyan-500/10 px-2 py-1 rounded inline-block border border-cyan-500/20">AWB: {item.awb}</p>
+                                )}
+                              </div>
+
+                              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                                <select 
+                                  value={item.status}
+                                  onChange={(e) => handleUpdateItemStatus(order.id, item.id, e.target.value)}
+                                  className={`bg-[#0b1020]/90 border rounded-xl px-4 py-3 text-[10px] font-black text-white uppercase tracking-widest outline-none focus:border-indigo-500 transition-all cursor-pointer backdrop-blur-md ${
+                                    item.status === 'livrat' ? 'border-emerald-500/50 text-emerald-400' : 'border-white/10'
+                                  }`}
+                                >
+                                  {renderStatusOptions(item, order)}
+                                </select>
+                              </div>
+                            </div>
+                         );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* MODAL AWB TRANSPARENT */}
+      {awbModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setAwbModal({ open: false, itemId: null, orderId: null })}></div>
+          <div className="relative w-full max-w-md p-10 rounded-[40px] bg-[#12192c]/95 backdrop-blur-3xl border border-white/10 shadow-2xl animate-in zoom-in duration-300">
+            <h2 className="text-2xl font-black text-white uppercase italic mb-2">Introdu AWB</h2>
+            <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest mb-8 italic">Expediere către client prin Curier</p>
+            <input 
+              autoFocus 
+              type="text" 
+              value={tempAwb} 
+              onChange={(e) => setTempAwb(e.target.value)} 
+              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-black italic mb-6 outline-none focus:border-indigo-500 shadow-inner" 
+              placeholder="Cod Tracking (AWB)..." 
+            />
+            <div className="flex gap-4">
+                <button onClick={() => setAwbModal({ open: false, itemId: null, orderId: null })} className="flex-1 py-4 text-gray-500 font-black uppercase text-[10px] hover:text-white transition-colors">Anulare</button>
+                <button onClick={() => executeItemUpdate(awbModal.orderId, awbModal.itemId, "predat_curier", tempAwb)} className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black uppercase text-[10px] shadow-xl hover:bg-indigo-500 transition-colors">Salvează</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

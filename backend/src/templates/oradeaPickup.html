@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmare Service Oradea - Karix Computers</title>
+    <style>
+        /* REPARAȚIE TEXT INVIZIBIL ȘI CULOARE LINII */
+        .products-table td, 
+        .products-table span, 
+        .products-table b, 
+        .products-table div,
+        .products-table strong {
+            color: #ffffff !important;
+        }
+
+        /* FORȚĂM LINIA SĂ FIE GRI (NU ALBĂ) */
+        .products-table td {
+            border-bottom: 1px solid #1e293b !important;
+        }
+
+        /* ASIGURĂM VIZIBILITATEA TEXTULUI PENTRU INFO BOX */
+        .info-box div, .info-box strong, .info-box p, .info-box td {
+            color: #ffffff !important;
+        }
+
+        /* Vizibilitate mobil */
+        @media only screen and (max-width: 600px) {
+            .container { width: 100% !important; border-radius: 0 !important; }
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b1020; color: #ffffff;">
+    <center style="width: 100%; table-layout: fixed; background-color: #0b1020; padding: 40px 0;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #0f172a; border-radius: 24px; overflow: hidden; border: 1px solid #1e293b; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            
+            <tr>
+                <td align="center" style="background: linear-gradient(to right, #4f46e5, #ec4899); padding: 60px 20px;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; text-transform: uppercase; letter-spacing: 5px; font-style: italic; font-weight: 900; text-shadow: 0 2px 15px rgba(0,0,0,0.4);">
+                        Karix Computers
+                    </h1>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding: 40px 30px;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <img src="https://karixcomputers.ro/logomail.png" alt="Karix Logo" style="height: 150px; width: auto; display: inline-block; outline: none; border: none;">
+                    </div>
+
+                    <h2 style="margin-top: 0; color: #10b981; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; text-align: center; font-weight: 800;">
+                        Comandă Confirmată! 🎉
+                    </h2>
+                    
+                    <div style="color: #94a3b8; font-size: 16px; line-height: 1.6;">
+                        <p>Salut <strong style="color: #ffffff;">{{customerName}}</strong>,</p>
+                        <p>Îți mulțumim pentru solicitarea de service! Mai jos găsești detaliile comenzii <strong style="color: #ffffff;">#{{orderId}}</strong>.</p>
+                        
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(79, 70, 229, 0.05); border: 1px solid rgba(79, 70, 229, 0.2); border-radius: 16px; margin: 30px 0;">
+                            <tr>
+                                <td style="padding: 20px;">
+                                    <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #ffffff; text-transform: uppercase;">Date de Contact</h3>
+                                    <p style="margin: 0; font-size: 14px; color: #cbd5e1;">
+                                        <strong style="color: #ffffff;">Adresă:</strong> {{deliveryAddress}}<br>
+                                        <strong style="color: #ffffff;">Telefon:</strong> {{phone}}
+                                    </p>
+                                    
+                                    {{billingSection}}
+
+                                </td>
+                            </tr>
+                        </table>
+                        
+                        <h3 style="margin: 0 0 10px 0; font-size: 15px; color: #ffffff; border-bottom: 1px solid #1e293b; padding-bottom: 10px; text-transform: uppercase;">Servicii Solicitate</h3>
+                        
+                        <table class="products-table" border="0" cellpadding="12" cellspacing="0" width="100%" style="margin-bottom: 10px; font-size: 14px; color: #ffffff;">
+                            {{itemsList}}
+                            
+                            {{discountSection}}
+
+                            <tr>
+                                <td style="padding: 20px 12px; text-align: right; border-bottom: none !important;">
+                                    <strong style="text-transform: uppercase; letter-spacing: 1px; color: #94a3b8 !important;">Total:</strong>
+                                </td>
+                                <td style="padding: 20px 12px; text-align: right; border-bottom: none !important;">
+                                    <strong style="font-size: 20px; color: #ffffff !important;">{{finalTotal}}</strong>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <div style="margin-top: 50px; text-align: center;">
+                            <h2 style="margin-top: 0; color: #ffffff; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; text-align: center; font-weight: 800;">
+                                Ne ocupăm de restul! 📦
+                            </h2>
+                            
+                            <p style="margin-top: 15px;">Am observat că ești din <span style="color: #ffffff; font-weight: bold;">Oradea</span> și ai ales ridicarea personală.</p>
+                            <p>Vestea bună este că <span style="color: #06b6d4; font-weight: bold;">nu mai este nevoie de curier extern</span>. Vin eu personal să ridic dispozitivul!</p>
+
+                            <table class="info-box" width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 16px; margin: 30px 0; text-align: left;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <h4 style="margin: 0 0 15px 0; color: #06b6d4; text-transform: uppercase; font-size: 12px; letter-spacing: 2px;">Etapele următoare:</h4>
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="color: #ffffff; font-size: 14px; line-height: 1.8;">
+                                            <tr><td style="padding-bottom: 8px; border-bottom: none !important;">✅ <strong style="color: #06b6d4;">Programare:</strong> Te voi suna personal în cel mai scurt timp.</td></tr>
+                                            <tr><td style="padding-bottom: 8px; border-bottom: none !important;">✅ <strong style="color: #06b6d4;">Ridicarea:</strong> Stabilim o fereastră orară care îți convine.</td></tr>
+                                            <tr><td style="padding-bottom: 0; border-bottom: none !important;">✅ <strong style="color: #06b6d4;">Pregătire:</strong> Nu trebuie să ambalezi device-ul.</td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <div style="background-color: #0b1120; border: 1px solid #1e293b; padding: 20px; border-radius: 16px; text-align: center;">
+                                <div style="color: #818cf8; font-size: 10px; font-weight: bold; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px;">Adresa de ridicare:</div>
+                                <div style="color: #ffffff; font-size: 15px; font-weight: bold;">📍 {{deliveryAddress}}</div>
+                            </div>
+                        </div>
+
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 40px;">
+                            <tr>
+                                <td align="center">
+                                    <table border="0" cellpadding="0" cellspacing="0">
+                                        <tr>
+                                            <td align="center" style="border-radius: 12px;" bgcolor="#4f46e5">
+                                                <a href="{{accountUrl}}" style="display: inline-block; padding: 16px 32px; font-size: 14px; font-weight: bold; color: #ffffff; text-decoration: none; text-transform: uppercase; letter-spacing: 1px;">Urmărește statusul în cont</a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                    </div>
+                </td>
+            </tr>
+            
+            <tr>
+                <td align="center" style="padding: 35px 30px; background-color: #0b1120; border-top: 1px solid #1e293b; color: #475569; font-size: 12px; line-height: 1.8;">
+                    <p style="margin: 0; margin-bottom: 8px;">Acesta este un mesaj automat generat de sistemul Karix Computers.</p>
+                    <p style="margin: 0; font-weight: bold; color: #64748b;">© 2026 Karix Computers. Built for Performance.</p>
+                    <div style="margin-top: 15px;">
+                        <a href="https://instagram.com/karixcomputers" style="color: #4f46e5; text-decoration: none; margin: 0 10px;">Instagram</a>
+                        <a href="https://tiktok.com/@karixcomputers" style="color: #4f46e5; text-decoration: none; margin: 0 10px;">TikTok</a>
+                        <a href="https://discord.gg/FV7DgzyTJk" style="color: #4f46e5; text-decoration: none; margin: 0 10px;">Discord Community</a>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </center>
+</body>
+</html>
