@@ -75,7 +75,7 @@ export default function Login() {
           
           <header className="mb-8 text-center">
             <h1 className="text-3xl font-black text-white tracking-tight">
-              Bine ai <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">revenit</span>
+              Bine ai <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">revenit v2</span>
             </h1>
             <p className="text-sm text-gray-400 mt-2 font-medium">
               Introdu datele tale pentru a accesa contul Karix.
