@@ -22,7 +22,6 @@ export default function AdminInventory() {
 
   const fetchProducts = async () => {
     try {
-      // MODIFICAT: din "/products/admin-all" în "/products/admin-all"
       const res = await apiFetch("/products/admin-all");
       if (res.ok) setProducts(await res.json());
     } catch (err) { console.error(err); }
@@ -95,7 +94,6 @@ export default function AdminInventory() {
       };
 
       const method = editingId ? "PUT" : "POST";
-      // MODIFICAT: Eliminat prefixul /api din rutele de mai jos
       const url = editingId ? `/products/${editingId}` : "/products";
 
       const res = await apiFetch(url, { method, body: JSON.stringify(payload) });
@@ -148,7 +146,6 @@ export default function AdminInventory() {
     const id = deleteConfirm.id;
     setDeleteConfirm({ show: false, id: null });
     try {
-      // MODIFICAT: din "/products/${id}" în "/products/${id}"
       const res = await apiFetch(`/products/${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchProducts();
@@ -220,6 +217,10 @@ export default function AdminInventory() {
                 <input type="text" placeholder="Memorie RAM" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.ramGb} onChange={e => setForm({...form, ramGb: e.target.value})} />
                 <input type="text" placeholder="Stocare" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.storageGb} onChange={e => setForm({...form, storageGb: e.target.value})} />
                 <input type="text" placeholder="Carcasă" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.case} onChange={e => setForm({...form, case: e.target.value})} />
+                
+                {/* NOU: Adăugat input-uri pentru Cooler și Sursă */}
+                <input type="text" placeholder="Cooler" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.cooler} onChange={e => setForm({...form, cooler: e.target.value})} />
+                <input type="text" placeholder="Sursă (PSU)" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.psu} onChange={e => setForm({...form, psu: e.target.value})} />
 
                 <div className="md:col-span-3 mt-6">
                     <div className="flex justify-between items-center mb-4">
