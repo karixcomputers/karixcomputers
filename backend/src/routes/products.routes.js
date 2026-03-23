@@ -1,16 +1,73 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const prisma = new PrismaClient();
 const router = express.Router();
 
-// --- FUNCȚIE HELPER: Generare ID de 5 cifre unic (format String) ---
+// --- CONFIGURARE MULTER PENTRU UPLOAD IMAGINI ---
+
+// Ne asigurăm că folderul 'uploads' există pe server
+const uploadDir = 'uploads/';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Setăm unde se salvează fișierele și cum se numesc
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Generăm un nume unic: produs-timestamp-random.extensie
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'produs-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+// Filtru pentru a accepta doar imagini
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Fișierul nu este o imagine!'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // Limită de 5MB pe fișier
+});
+
+// --- RUTA NOUĂ: POST UPLOAD (Folosită de Admin Inventory) ---
+// Această rută primește fișierul și returnează URL-ul final
+router.post("/upload", requireAuth, (req, res) => {
+  upload.single('image')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: "Eroare Multer: " + err.message });
+    } else if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Te rugăm să selectezi un fișier." });
+    }
+
+    // Returnăm URL-ul complet care va fi salvat în baza de date
+    const imageUrl = `https://karixcomputers.ro/uploads/${req.file.filename}`;
+    res.json({ url: imageUrl });
+  });
+});
+
+// --- FUNCȚIE HELPER: Generare ID de 5 cifre unic ---
 async function generateUniqueProductId() {
   let isUnique = false;
   let newId;
   while (!isUnique) {
-    // Generăm un număr între 10000 și 99999
     newId = Math.floor(10000 + Math.random() * 90000).toString();
     const existing = await prisma.product.findUnique({ where: { id: newId } });
     if (!existing) isUnique = true;
@@ -28,21 +85,21 @@ const requireAdmin = (req, res, next) => {
 };
 
 /**
- * 1. GET: Toate produsele (Doar cele marcate ca vizibile)
+ * 1. GET: Toate produsele (Vizibile în Shop)
  */
 router.get("/", async (req, res, next) => {
   try {
     const products = await prisma.product.findMany({
-      where: {
-        isVisible: true, // <--- ADAUGAT: Filtrăm pentru a nu arăta produsele ascunse în Shop
-      },
+      where: { isVisible: true },
       orderBy: { createdAt: "desc" },
     });
     res.json(products);
   } catch (e) { next(e); }
 });
 
-// Rută specială pentru Admin - returnează TOT, inclusiv cele ascunse
+/**
+ * 2. GET: Admin All (Toate, inclusiv cele ascunse)
+ */
 router.get("/admin-all", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const products = await prisma.product.findMany({
@@ -53,8 +110,7 @@ router.get("/admin-all", requireAuth, requireAdmin, async (req, res, next) => {
 });
 
 /**
- * 2. GET: Detalii produs (Include Review-uri)
- * Notă: Aici nu filtrăm după isVisible pentru a permite accesul prin link direct
+ * 3. GET: Detalii produs
  */
 router.get("/:id", async (req, res, next) => {
   try {
@@ -77,29 +133,15 @@ router.get("/:id", async (req, res, next) => {
 });
 
 /**
- * 3. POST: Adaugă produs/serviciu (Include Benchmarks & Vizibilitate)
+ * 4. POST: Adaugă produs nou
  */
 router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { 
-      name, 
-      priceCents, 
-      description, 
-      longDescription, 
-      images, 
-      cpuBrand, 
-      gpuBrand, 
-      ramGb, 
-      storageGb, 
-      motherboard, 
-      case: caseBrand, 
-      cooler, 
-      psu,
-      stock,
-      category,
-      warrantyMonths,
-      benchmarks,
-      isVisible // <--- ADAUGAT
+      name, priceCents, description, longDescription, images, 
+      cpuBrand, gpuBrand, ramGb, storageGb, motherboard, 
+      case: caseBrand, cooler, psu, stock, category, 
+      warrantyMonths, benchmarks, isVisible 
     } = req.body;
 
     const randomId = await generateUniqueProductId();
@@ -124,7 +166,7 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
         stock: stock ? parseInt(stock) : 1,
         warrantyMonths: warrantyMonths ? parseInt(warrantyMonths) : 24,
         benchmarks: benchmarks || [],
-        isVisible: isVisible !== undefined ? isVisible : true // <--- SALVARE STATUS VIZIBILITATE
+        isVisible: isVisible !== undefined ? isVisible : true
       },
     });
 
@@ -136,30 +178,16 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
 });
 
 /**
- * 4. PUT: Actualizează produs existent
+ * 5. PUT: Actualizează produs
  */
 router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { 
-      name, 
-      priceCents, 
-      description, 
-      longDescription, 
-      images, 
-      cpuBrand, 
-      gpuBrand, 
-      ramGb, 
-      storageGb, 
-      motherboard, 
-      case: caseBrand, 
-      cooler, 
-      psu, 
-      stock,
-      category,
-      warrantyMonths,
-      benchmarks,
-      isVisible // <--- ADAUGAT
+      name, priceCents, description, longDescription, images, 
+      cpuBrand, gpuBrand, ramGb, storageGb, motherboard, 
+      case: caseBrand, cooler, psu, stock, category, 
+      warrantyMonths, benchmarks, isVisible 
     } = req.body;
 
     const existing = await prisma.product.findUnique({ where: { id } });
@@ -185,7 +213,7 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
         stock: stock ? parseInt(stock) : undefined,
         warrantyMonths: warrantyMonths !== undefined ? parseInt(warrantyMonths) : undefined,
         benchmarks: benchmarks ?? undefined,
-        isVisible: isVisible !== undefined ? isVisible : undefined // <--- ACTUALIZARE STATUS VIZIBILITATE
+        isVisible: isVisible !== undefined ? isVisible : undefined
       },
     });
 
@@ -197,7 +225,7 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
 });
 
 /**
- * 5. DELETE: Șterge produs
+ * 6. DELETE: Șterge produs
  */
 router.delete("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
@@ -211,13 +239,12 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res, next) => {
 });
 
 /**
- * 6. POST: Adaugă un review
+ * 7. POST: Recenzie produs
  */
 router.post("/:id/reviews", requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params; 
     const { rating, comment, images } = req.body; 
-
     const userId = req.user.sub; 
 
     if (!rating || !comment) {
@@ -229,16 +256,10 @@ router.post("/:id/reviews", requireAuth, async (req, res, next) => {
         rating: parseInt(rating),
         comment,
         images: images || [], 
-        product: {
-          connect: { id: id }
-        },
-        user: {
-          connect: { id: userId }
-        }
+        product: { connect: { id: id } },
+        user: { connect: { id: userId } }
       },
-      include: {
-        user: { select: { name: true } }
-      }
+      include: { user: { select: { name: true } } }
     });
 
     res.status(201).json(review);

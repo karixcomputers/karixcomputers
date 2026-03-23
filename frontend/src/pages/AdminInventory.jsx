@@ -20,6 +20,53 @@ export default function AdminInventory() {
     isVisible: true 
   });
 
+  // State pentru animația de upload
+  const [isUploading, setIsUploading] = useState(false);
+
+  // --- FUNCȚIE NOUĂ: UPLOAD IMAGINE PE SERVER ---
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Verificare rapidă format
+    if (!file.type.startsWith('image/')) {
+      setStatusModal({ show: true, message: "Te rugăm să alegi o imagine validă!", type: "error" });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    setIsUploading(true);
+    try {
+      // Preluăm token-ul pentru autentificare
+      const token = localStorage.getItem("accessToken");
+      
+      const res = await fetch("https://karixcomputers.ro/api/products/upload", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.url) {
+        // Punem URL-ul primit de la server direct în formular
+        setForm(prev => ({ ...prev, imageUrl: data.url }));
+        setStatusModal({ show: true, message: "Imagine salvată pe server!", type: "success" });
+      } else {
+        throw new Error(data.error || "Eroare la upload");
+      }
+    } catch (err) {
+      console.error(err);
+      setStatusModal({ show: true, message: "Eroare la încărcare: " + err.message, type: "error" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const fetchProducts = async () => {
     try {
       const res = await apiFetch("/products/admin-all");
@@ -33,22 +80,11 @@ export default function AdminInventory() {
   const copyProductLink = async (e, id) => {
     e.preventDefault(); 
     e.stopPropagation(); 
-
     const productUrl = `${window.location.origin}/product/${id}`;
-
     try {
       await navigator.clipboard.writeText(productUrl);
-      
-      setStatusModal({ 
-        show: true, 
-        message: `LINK COPIAT: ${productUrl}`, 
-        type: "success" 
-      });
-
-      setTimeout(() => {
-        setStatusModal(prev => ({ ...prev, show: false }));
-      }, 2000);
-      
+      setStatusModal({ show: true, message: `LINK COPIAT: ${productUrl}`, type: "success" });
+      setTimeout(() => { setStatusModal(prev => ({ ...prev, show: false })); }, 2000);
     } catch (err) {
       console.error("Eroare la copiere:", err);
       alert(`Nu s-a putut copia automat. Link-ul este: ${productUrl}`);
@@ -185,7 +221,20 @@ export default function AdminInventory() {
               <option value="service">Serviciu / Mentenanță</option>
             </select>
 
-            <input type="text" placeholder="URL Imagine" className="md:col-span-2 bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500" value={form.imageUrl} onChange={e => setForm({...form, imageUrl: e.target.value})} />
+            {/* SECTIUNE IMAGINE CU UPLOAD DIN PC */}
+            <div className="md:col-span-2 flex flex-col sm:flex-row gap-3">
+              <input 
+                type="text" 
+                placeholder="URL Imagine (sau se completează la upload)" 
+                className="flex-1 bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500 text-xs italic" 
+                value={form.imageUrl} 
+                onChange={e => setForm({...form, imageUrl: e.target.value})} 
+              />
+              <label className={`shrink-0 px-6 py-4 rounded-2xl font-black text-[10px] uppercase cursor-pointer transition-all flex items-center justify-center gap-2 shadow-lg ${isUploading ? 'bg-indigo-500/50 cursor-wait' : 'bg-indigo-600 hover:bg-indigo-500'}`}>
+                {isUploading ? '⏳ Upload...' : '📁 Încarcă din PC'}
+                <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
+              </label>
+            </div>
             
             <div className="flex flex-col gap-4">
               <select className="bg-[#0b1020] border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.warrantyMonths} onChange={e => setForm({...form, warrantyMonths: e.target.value})}>
@@ -217,8 +266,6 @@ export default function AdminInventory() {
                 <input type="text" placeholder="Memorie RAM" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.ramGb} onChange={e => setForm({...form, ramGb: e.target.value})} />
                 <input type="text" placeholder="Stocare" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.storageGb} onChange={e => setForm({...form, storageGb: e.target.value})} />
                 <input type="text" placeholder="Carcasă" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.case} onChange={e => setForm({...form, case: e.target.value})} />
-                
-                {/* NOU: Adăugat input-uri pentru Cooler și Sursă */}
                 <input type="text" placeholder="Cooler" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.cooler} onChange={e => setForm({...form, cooler: e.target.value})} />
                 <input type="text" placeholder="Sursă (PSU)" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.psu} onChange={e => setForm({...form, psu: e.target.value})} />
 
@@ -227,7 +274,6 @@ export default function AdminInventory() {
                         <h4 className="text-indigo-400 font-black uppercase text-[10px] tracking-widest">📈 Performanță Jocuri (FPS)</h4>
                         <button type="button" onClick={addBenchmark} className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-indigo-500 transition-all">＋ Adaugă Joc</button>
                     </div>
-                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {form.benchmarks.map((bench, idx) => (
                             <div key={idx} className="flex gap-2 p-3 bg-white/5 border border-white/5 rounded-2xl items-center">
