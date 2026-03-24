@@ -45,7 +45,7 @@ export const createSmartBillInvoice = async (order) => {
 
         console.log("🚀 Trimitere date SmartBill...");
 
-        const response = await fetch("https://ws.smartbill.ro/SBIT/api/invoice", {
+        const response = await fetch("https://ws.smartbill.ro/SBORO/api/invoice", {
             method: "POST",
             headers: {
                 "Authorization": authHeader,
@@ -86,7 +86,7 @@ export const getSmartBillPdf = async (seriesName, number) => {
         const authHeader = getAuthHeader();
         const cui = process.env.SMARTBILL_CUI;
         
-        const url = `https://ws.smartbill.ro/SBIT/api/invoice/pdf?cui=${cui}&series=${seriesName}&number=${number}`;
+        const url = `https://ws.smartbill.ro/SBORO/api/invoice/pdf?cui=${cui}&series=${seriesName}&number=${number}`;
         
         const response = await fetch(url, {
             method: "GET",
