@@ -1,13 +1,10 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
 import { sendUnifiedOrderEmail } from "../services/mail.service.js";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-const mobilpay = require("mobilpay-card"); // <--- LIBRĂRIA CORECTĂ
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -15,6 +12,37 @@ const prisma = new PrismaClient();
 const privateKeyPath = path.resolve(process.env.NETOPIA_PRIVATE_KEY_PATH);
 const publicKeyPath = path.resolve(process.env.NETOPIA_PUBLIC_KEY_PATH);
 
+// --- FUNCȚIE RC4 NATIVĂ (Evită erorile de SSL din Node.js) ---
+function rc4(keyBuf, dataBuf) {
+    let S = Array.from({length: 256}, (_, i) => i);
+    let j = 0;
+    for (let i = 0; i < 256; i++) {
+        j = (j + S[i] + keyBuf[i % keyBuf.length]) % 256;
+        [S[i], S[j]] = [S[j], S[i]];
+    }
+    let i = 0; j = 0;
+    let out = Buffer.alloc(dataBuf.length);
+    for (let k = 0; k < dataBuf.length; k++) {
+        i = (i + 1) % 256;
+        j = (j + S[i]) % 256;
+        [S[i], S[j]] = [S[j], S[i]];
+        out[k] = dataBuf[k] ^ S[(S[i] + S[j]) % 256];
+    }
+    return out;
+}
+
+// --- CURĂȚARE TEXT PENTRU XML ---
+function escapeXml(unsafe) {
+    return (unsafe || '').toString().replace(/[<>&'"]/g, function (c) {
+        switch (c) {
+            case '<': return '&lt;'; case '>': return '&gt;';
+            case '&': return '&amp;'; case '\'': return '&apos;';
+            case '"': return '&quot;';
+        }
+    });
+}
+
+// --- 1. CREARE PLATĂ (Generare XML & Criptare Nativă) ---
 const createPayment = async (req, res) => {
     try {
         const { orderId } = req.params;
@@ -25,58 +53,89 @@ const createPayment = async (req, res) => {
 
         if (!order) return res.status(404).json({ error: "Comanda nu a fost găsită." });
 
-        const amount = (order.totalCents || order.total || 0) / 100;
-        const nameParts = (order.shippingName || "Client Karix").split(' ');
+        const amount = ((order.totalCents || order.total || 0) / 100).toFixed(2);
+        const nameParts = (order.shippingName || "Client").split(' ');
+        const ts = new Date().toISOString().replace(/[-:T\.]/g, '').slice(0, 14);
 
-        // Construim pachetul exact cum vrea Netopia pentru redirecționare
-        const paymentPos = new mobilpay.Request();
-        paymentPos.signature = process.env.NETOPIA_SIGNATURE;
-        paymentPos.orderId = String(order.id);
-        paymentPos.confirmUrl = process.env.NETOPIA_CONFIRM_URL;
-        paymentPos.returnUrl = process.env.NETOPIA_RETURN_URL;
+        // Construim XML-ul exact cum îl cere Netopia
+        const xml = `<?xml version="1.0" encoding="utf-8"?>
+<order type="card" id="${order.id}" timestamp="${ts}">
+    <signature>${process.env.NETOPIA_SIGNATURE}</signature>
+    <url>
+        <return>${escapeXml(process.env.NETOPIA_RETURN_URL)}</return>
+        <confirm>${escapeXml(process.env.NETOPIA_CONFIRM_URL)}</confirm>
+    </url>
+    <invoice currency="RON" amount="${amount}">
+        <details>Comanda Karix #${order.id}</details>
+        <contact_info>
+            <billing type="${order.isCompany ? 'company' : 'person'}">
+                <first_name>${escapeXml(nameParts[0] || 'Client')}</first_name>
+                <last_name>${escapeXml(nameParts.slice(1).join(' ') || 'Karix')}</last_name>
+                <email>${escapeXml(order.user?.email || req.user?.email || 'client@karix.ro')}</email>
+                <mobile_phone>${escapeXml(order.shippingPhone || '0000000000')}</mobile_phone>
+                <address>${escapeXml(order.shippingAddress || 'Adresa nedefinită')}</address>
+            </billing>
+        </contact_info>
+    </invoice>
+</order>`;
 
-        paymentPos.invoice = new mobilpay.Invoice();
-        paymentPos.invoice.amount = amount;
-        paymentPos.invoice.currency = 'RON';
-        paymentPos.invoice.details = `Comanda Karix Computers #${order.id}`;
+        // Criptare Data (RC4)
+        const rc4Key = crypto.randomBytes(16);
+        const xmlBuffer = Buffer.from(xml, 'utf8');
+        const encryptedData = rc4(rc4Key, xmlBuffer).toString('base64');
 
-        paymentPos.invoice.billingAddress = new mobilpay.Address();
-        paymentPos.invoice.billingAddress.type = order.isCompany ? 'company' : 'person';
-        paymentPos.invoice.billingAddress.firstName = nameParts[0] || 'Client';
-        paymentPos.invoice.billingAddress.lastName = nameParts.slice(1).join(' ') || 'Karix';
-        paymentPos.invoice.billingAddress.email = order.user?.email || req.user?.email || 'client@karix.ro';
-        paymentPos.invoice.billingAddress.mobilePhone = order.shippingPhone || '0000000000';
-        paymentPos.invoice.billingAddress.address = order.shippingAddress || 'Adresa nedefinită';
-
-        // Criptăm datele cu fișierul .cer
-        paymentPos.encrypt(publicKeyPath);
+        // Criptare Cheie (RSA)
+        const publicKey = fs.readFileSync(publicKeyPath, 'utf8');
+        const encryptedEnvKey = crypto.publicEncrypt({
+            key: publicKey,
+            padding: crypto.constants.RSA_PKCS1_PADDING
+        }, rc4Key).toString('base64');
 
         res.json({
             paymentUrl: process.env.NETOPIA_SANDBOX === 'true' 
                 ? "https://sandboxsecure.mobilpay.ro" 
                 : "https://secure.mobilpay.ro",
-            env_key: paymentPos.getEnvKey(),
-            data: paymentPos.getXml(),
+            env_key: encryptedEnvKey,
+            data: encryptedData,
             orderId: order.id
         });
 
     } catch (error) {
-        console.error("Eroare Netopia Create:", error);
-        res.status(500).json({ error: "Eroare internă la Netopia: " + error.message });
+        console.error("Eroare Netopia Create Nativ:", error);
+        res.status(500).json({ error: "Eroare internă la procesarea plății." });
     }
 };
 
+// --- 2. CONFIRMARE PLATĂ (Decriptare Nativă) ---
 const confirmPayment = async (req, res) => {
     try {
         const { env_key, data } = req.body;
-        const paymentRes = new mobilpay.Response();
-        
-        // Decriptăm răspunsul de la Netopia
-        paymentRes.decrypt(privateKeyPath, env_key, data);
-        
-        const responseObj = paymentRes.getResponseObj();
-        const orderId = parseInt(responseObj.orderId);
-        const action = responseObj.action;
+
+        if (!env_key || !data) {
+            return res.status(400).send("Missing keys");
+        }
+
+        // Decriptăm cheia RC4 cu Private Key-ul nostru
+        const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+        const rc4Key = crypto.privateDecrypt({
+            key: privateKey,
+            padding: crypto.constants.RSA_PKCS1_PADDING
+        }, Buffer.from(env_key, 'base64'));
+
+        // Decriptăm XML-ul
+        const encryptedDataBuf = Buffer.from(data, 'base64');
+        const xml = rc4(rc4Key, encryptedDataBuf).toString('utf8');
+
+        // Extragem datele vitale din XML cu un Regex simplu
+        const actionMatch = xml.match(/<action>\s*(.*?)\s*<\/action>/);
+        const orderIdMatch = xml.match(/<order .*?id="([^"]+)".*?>/);
+
+        if (!actionMatch || !orderIdMatch) {
+            throw new Error("XML invalid primit de la Netopia");
+        }
+
+        const action = actionMatch[1];
+        const orderId = parseInt(orderIdMatch[1]);
 
         if (action === 'confirmed' || action === 'confirmed_pending') {
             const updatedOrder = await prisma.order.update({
@@ -85,9 +144,9 @@ const confirmPayment = async (req, res) => {
                 include: { items: true, user: true }
             });
             
-            console.log(`✅ Plata confirmată pentru comanda ${orderId}`);
+            console.log(`✅ Plata confirmată NATIV pentru comanda ${orderId}`);
 
-            // Trimitere pe Discord
+            // Trimitere Discord
             const discordWebhookUrl = "https://discord.com/api/webhooks/1483959911363772491/v08mslfmiPRvt5VXqImwxKD3IABfgcVm5JuoY_vDlPOqqGh1qLgBHxPuNi2E4e3v4oNj";
             const clientInfo = updatedOrder.isCompany ? `🏢 **${updatedOrder.companyName}**\nCUI: ${updatedOrder.cui}` : `👤 **${updatedOrder.shippingName}**`;
             
@@ -105,12 +164,10 @@ const confirmPayment = async (req, res) => {
             };
 
             await fetch(discordWebhookUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(discordMessage)
-            }).catch(err => console.error("Eroare Discord Backend:", err));
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(discordMessage)
+            }).catch(e => console.error(e));
 
-            // Trimitere Email
+            // Trimitere Emailuri
             const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
             const containsServices = updatedOrder.items.some(item => serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)));
 
@@ -123,8 +180,7 @@ const confirmPayment = async (req, res) => {
                 pickupType: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'ridicare_personala' : 'curier',
                 isServiceOrder: containsServices,
                 cartItems: updatedOrder.items.map(item => ({
-                    ...item, name: item.productName,
-                    isServiceItem: serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
+                    ...item, name: item.productName, isServiceItem: serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
                     qty: item.qty || 1, priceCentsAtBuy: item.priceCentsAtBuy || item.priceCents
                 }))
             };
@@ -134,12 +190,12 @@ const confirmPayment = async (req, res) => {
             await sendUnifiedOrderEmail(adminEmail, commonMailData, true).catch(e => console.error(e));
         }
 
-        // Răspunsul OBLIGATORIU pentru Netopia ca să știe că am preluat notificarea
+        // Răspundem obligatoriu Netopiei
         res.set('Content-Type', 'text/xml');
-        res.send(paymentRes.buildXml());
+        res.send(`<?xml version="1.0" encoding="utf-8"?><crc>Success</crc>`);
 
     } catch (error) {
-        console.error("Eroare Netopia Confirm:", error);
+        console.error("Eroare Netopia Confirm:", error.message);
         res.status(500).send("Error");
     }
 };
