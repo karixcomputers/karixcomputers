@@ -158,7 +158,7 @@ const confirmPayment = async (req, res) => {
             };
             await fetch(discordWebhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(discordMessage) }).catch(e => console.error(e));
 
-            // --- LOGICĂ SMARTBILL ---
+            // --- LOGICĂ SMARTBILL (DOAR FACTURĂ) ---
             let invoicePdfBuffer = null;
             try {
                 console.log("⏳ Generare factură SmartBill...");
@@ -167,9 +167,6 @@ const confirmPayment = async (req, res) => {
                 if (invoiceData && invoiceData.series && invoiceData.number) {
                     console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
                     invoicePdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
-                    if (invoicePdfBuffer) {
-                        console.log("✅ PDF-ul facturii a fost preluat cu succes.");
-                    }
                 }
             } catch (sbError) {
                 console.error("❌ Eroare SmartBill Integration:", sbError.message);
@@ -193,14 +190,14 @@ const confirmPayment = async (req, res) => {
                 }))
             };
 
-            // Trimitem mail clientului (cu PDF dacă există)
+            // Trimitem mail clientului (CU PDF-ul facturii)
             if (updatedOrder.user?.email) {
                 await sendUnifiedOrderEmail(updatedOrder.user.email, commonMailData, false, invoicePdfBuffer).catch(e => console.error(e));
             }
             
-            // Trimitem mail admin-ului (cu PDF dacă există)
+            // Trimitem mail admin-ului (FĂRĂ PDF-ul facturii)
             const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
-            await sendUnifiedOrderEmail(adminEmail, commonMailData, true, invoicePdfBuffer).catch(e => console.error(e));
+            await sendUnifiedOrderEmail(adminEmail, commonMailData, true, null).catch(e => console.error(e));
         }
 
         res.set('Content-Type', 'text/xml');
