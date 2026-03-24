@@ -3,64 +3,68 @@ import fetch from "node-fetch";
 export const createSmartBillInvoice = async (order) => {
     try {
         console.log("=== 1. START SMARTBILL ===");
-        const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
         
-        const products = (order.items || []).map(item => ({
-            name: item.productName || "Produs Karix",
-            code: String(item.productId || "SKU"),
-            measuringUnitName: "buc",
-            currency: "RON",
-            quantity: item.qty || 1,
-            price: Number(((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2)), 
-            isTaxIncluded: true,
-            vatRate: 19 // ATENTIE: Daca esti neplatitor de TVA, sterge 19 si pune 0 aici !!!
-        }));
-
+        // Curățăm variabilele din .env de orice spațiu invizibil care ar putea da crash la ei
+        const CUI = (process.env.SMARTBILL_CUI || "").trim();
+        const SERIA = (process.env.SMARTBILL_SERIA || "").trim();
+        const USER = (process.env.SMARTBILL_USER || "").trim();
+        const TOKEN = (process.env.SMARTBILL_TOKEN || "").trim();
+        const auth = Buffer.from(`${USER}:${TOKEN}`).toString("base64");
+        
+        // Client minimalist. Doar Nume, Adresă și Țară.
         const clientObj = {
             name: order.isCompany ? order.companyName : (order.shippingName || "Client Karix"),
             address: order.shippingAddress || "România",
-            isTaxPayer: !!order.isCompany,
-            city: "Oradea",
-            county: "Bihor",
             country: "Romania",
-            email: order.user?.email || "karixcomputers@gmail.com",
+            isTaxPayer: !!order.isCompany,
             saveToDb: false
         };
 
-        if (order.isCompany && order.cui) clientObj.vatCode = order.cui;
-        if (order.isCompany && order.regCom) clientObj.regCom = order.regCom;
+        if (order.isCompany && order.cui) {
+            clientObj.vatCode = order.cui;
+        }
+
+        // Produs minimalist. Lăsăm SmartBill să aplice setările tale de firmă.
+        const products = (order.items || []).map(item => ({
+            name: item.productName || "Produs Karix",
+            code: String(item.productId || "00"),
+            measuringUnitName: "buc",
+            currency: "RON",
+            quantity: Number(item.qty || 1),
+            price: Number(((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2)), 
+            isTaxIncluded: false
+        }));
 
         const payload = {
-            companyVatCode: process.env.SMARTBILL_CUI,
+            companyVatCode: CUI,
             client: clientObj,
             issueDate: new Date().toISOString().split("T")[0],
-            seriesName: process.env.SMARTBILL_SERIA,
+            seriesName: SERIA,
             isDraft: false,
-            dueDate: new Date().toISOString().split("T")[0],
-            isCollecting: false, 
-            observations: "ACHITAT ONLINE CU CARDUL (NETOPIA). NU MAI NECESITA PLATA.",
             products: products
         };
 
-        // Rămânem pe SBORO, cu User-Agent ca să nu luăm 403
+        console.log("=== 2. PAYLOAD TRIMIS ===", JSON.stringify(payload));
+
         const response = await fetch("https://ws.smartbill.ro/SBORO/api/invoice", {
             method: "POST",
             headers: {
                 "Authorization": `Basic ${auth}`,
                 "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": "KarixApp/1.0"
+                "Accept": "application/json"
             },
             body: JSON.stringify(payload)
         });
 
-        const text = await response.text();
-        console.log("=== 2. RASPUNS SMARTBILL ===", text);
+        console.log("=== 3. STATUS HTTP ===", response.status);
 
-        if (!response.ok) return null;
+        if (!response.ok) {
+            console.log("=== 4. EROARE ===", await response.text());
+            return null;
+        }
 
-        const data = JSON.parse(text);
-        console.log("=== 3. FACTURA CREATA ===", data.series, data.number);
+        const data = await response.json();
+        console.log("=== 5. FACTURA CREATA ===", data.series, data.number);
         return data;
 
     } catch (error) {
@@ -71,17 +75,16 @@ export const createSmartBillInvoice = async (order) => {
 
 export const getSmartBillPdf = async (seriesName, number) => {
     try {
-        const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
-        const cui = process.env.SMARTBILL_CUI;
+        const CUI = (process.env.SMARTBILL_CUI || "").trim();
+        const auth = Buffer.from(`${(process.env.SMARTBILL_USER || "").trim()}:${(process.env.SMARTBILL_TOKEN || "").trim()}`).toString("base64");
         
-        const url = `https://ws.smartbill.ro/SBORO/api/invoice/pdf?cif=${cui}&seriesname=${seriesName}&number=${number}`;
+        const url = `https://ws.smartbill.ro/SBORO/api/invoice/pdf?cif=${CUI}&seriesname=${seriesName}&number=${number}`;
         
         const response = await fetch(url, {
             method: "GET",
             headers: {
                 "Authorization": `Basic ${auth}`,
-                "Accept": "application/octet-stream",
-                "User-Agent": "KarixApp/1.0"
+                "Accept": "application/octet-stream"
             }
         });
 
