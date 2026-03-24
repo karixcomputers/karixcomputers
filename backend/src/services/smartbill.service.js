@@ -7,9 +7,9 @@ const getAuthHeader = () => {
 
 export const createSmartBillInvoice = async (order) => {
     try {
+        console.log("➡️ [1] Începem prepararea datelor pentru SmartBill...");
         const authHeader = getAuthHeader();
-        
-        // --- STRUCTURA EXACTĂ CARE A GENERAT FACTURA 1002 ---
+
         const products = (order.items || []).map(item => ({
             name: item.productName || "Produs Karix",
             code: item.productId ? String(item.productId) : "SKU",
@@ -19,8 +19,10 @@ export const createSmartBillInvoice = async (order) => {
             quantity: item.qty || 1,
             price: (item.priceCentsAtBuy || item.priceCents || 0) / 100,
             isService: false,
-            vatRate: 19 // <- ACESTA E CÂMPUL CARE LIPSEA ȘI DĂDEA EROARE 500
+            vatRate: 19 // <--- Dacă ești firmă neplătitoare de TVA, pune aici 0 în loc de 19
         }));
+
+        console.log("➡️ [2] Produse mapate. Cantitate primul produs:", products[0]?.quantity);
 
         const payload = {
             companyVatCode: process.env.SMARTBILL_CUI,
@@ -37,13 +39,15 @@ export const createSmartBillInvoice = async (order) => {
                 saveToDb: true
             },
             issueDate: new Date().toISOString().split("T")[0],
-            seriesName: process.env.SMARTBILL_SERIA, // Trebuie sa fie KRXCOMP in .env
+            seriesName: process.env.SMARTBILL_SERIA, 
             isDraft: false,
             dueDate: new Date().toISOString().split("T")[0],
             isCollecting: false,
             observations: "FACTURĂ ACHITATĂ ONLINE CU CARDUL (NETOPIA). NU MAI NECESITĂ PLATĂ.",
             products: products
         };
+
+        console.log("➡️ [3] Trimitere request către SmartBill pe SBORO...");
 
         const response = await fetch("https://ws.smartbill.ro/SBORO/api/invoice", {
             method: "POST",
@@ -56,24 +60,22 @@ export const createSmartBillInvoice = async (order) => {
             body: JSON.stringify(payload)
         });
 
+        console.log("➡️ [4] Am primit răspunsul, verificăm statusul:", response.status);
+
         const rawText = await response.text(); 
+        console.log("➡️ [5] Răspuns RAW de la server:", rawText);
         
         if (!response.ok) {
-            console.error("❌ EROARE HTTP SMARTBILL:", response.status, rawText);
+            console.error("❌ EROARE HTTP SMARTBILL:", response.status);
             return null;
         }
 
-        try {
-            const data = JSON.parse(rawText);
-            console.log("✅ FACTURA CREATĂ CU SUCCES:", data.series, data.number);
-            return data;
-        } catch (parseError) {
-            console.error("❌ EROARE PARSARE JSON:", parseError.message);
-            return null;
-        }
+        const data = JSON.parse(rawText);
+        console.log("✅ FACTURA CREATĂ CU SUCCES:", data.series, data.number);
+        return data;
 
     } catch (error) {
-        console.error("❌ CRASH TOTAL SMARTBILL SERVICE:", error.message);
+        console.error("❌ CRASH COMPLET ÎN SMARTBILL SERVICE:", error.message);
         return null;
     }
 };
