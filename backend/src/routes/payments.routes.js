@@ -7,20 +7,13 @@ import { sendUnifiedOrderEmail } from "../services/mail.service.js";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const netopiaModule = require("netopia-card");
+const mobilpay = require("mobilpay-card"); // <--- LIBRĂRIA CORECTĂ
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 const privateKeyPath = path.resolve(process.env.NETOPIA_PRIVATE_KEY_PATH);
 const publicKeyPath = path.resolve(process.env.NETOPIA_PUBLIC_KEY_PATH);
-
-const netopiaConfig = {
-    signature: process.env.NETOPIA_SIGNATURE,
-    publicKey: fs.readFileSync(publicKeyPath).toString(),
-    privateKey: fs.readFileSync(privateKeyPath).toString(),
-    sandbox: process.env.NETOPIA_SANDBOX === 'true'
-};
 
 const createPayment = async (req, res) => {
     try {
@@ -34,63 +27,39 @@ const createPayment = async (req, res) => {
 
         const amount = (order.totalCents || order.total || 0) / 100;
         const nameParts = (order.shippingName || "Client Karix").split(' ');
-        const billingData = {
-            firstName: nameParts[0] || 'Client',
-            lastName: nameParts.slice(1).join(' ') || 'Karix',
-            email: order.user?.email || req.user?.email || 'client@karix.ro',
-            phone: order.shippingPhone || '0000000000',
-            address: order.shippingAddress || 'Adresa nedefinită'
-        };
 
-        if (netopiaModule.Netopia || (typeof netopiaModule === 'function' && netopiaModule.prototype?.setPaymentData)) {
-            const NetopiaClass = netopiaModule.Netopia || netopiaModule.default || netopiaModule;
-            const netopia = new NetopiaClass(netopiaConfig);
-            
-            netopia.setPaymentData({
-                account: process.env.NETOPIA_SIGNATURE, // <--- AICI ERA PROBLEMA (LIPSEA)
-                orderId: String(order.id),
-                amount: amount,
-                currency: 'RON',
-                details: `Comanda Karix Computers #${order.id}`,
-                confirmUrl: process.env.NETOPIA_CONFIRM_URL,
-                returnUrl: process.env.NETOPIA_RETURN_URL
-            });
-            netopia.setClientBillingData(billingData);
-            
-            const request = netopia.buildRequest();
-            return res.json({
-                paymentUrl: request.url,
-                env_key: request.env_key,
-                data: request.data,
-                orderId: order.id
-            });
+        // Construim pachetul exact cum vrea Netopia pentru redirecționare
+        const paymentPos = new mobilpay.Request();
+        paymentPos.signature = process.env.NETOPIA_SIGNATURE;
+        paymentPos.orderId = String(order.id);
+        paymentPos.confirmUrl = process.env.NETOPIA_CONFIRM_URL;
+        paymentPos.returnUrl = process.env.NETOPIA_RETURN_URL;
 
-        } else {
-            const CardClass = netopiaModule.Card || netopiaModule.default || netopiaModule;
-            const RequestClass = CardClass.Request || netopiaModule.Request;
+        paymentPos.invoice = new mobilpay.Invoice();
+        paymentPos.invoice.amount = amount;
+        paymentPos.invoice.currency = 'RON';
+        paymentPos.invoice.details = `Comanda Karix Computers #${order.id}`;
 
-            if (!RequestClass) throw new Error("Pachet necunoscut.");
+        paymentPos.invoice.billingAddress = new mobilpay.Address();
+        paymentPos.invoice.billingAddress.type = order.isCompany ? 'company' : 'person';
+        paymentPos.invoice.billingAddress.firstName = nameParts[0] || 'Client';
+        paymentPos.invoice.billingAddress.lastName = nameParts.slice(1).join(' ') || 'Karix';
+        paymentPos.invoice.billingAddress.email = order.user?.email || req.user?.email || 'client@karix.ro';
+        paymentPos.invoice.billingAddress.mobilePhone = order.shippingPhone || '0000000000';
+        paymentPos.invoice.billingAddress.address = order.shippingAddress || 'Adresa nedefinită';
 
-            const paymentPos = new RequestClass();
-            paymentPos.account = process.env.NETOPIA_SIGNATURE; // Adăugat și aici preventiv
-            paymentPos.orderId = String(order.id);
-            paymentPos.amount = amount;
-            paymentPos.currency = 'RON';
-            paymentPos.description = `Comanda Karix Computers #${order.id}`;
-            paymentPos.billing = billingData;
-            paymentPos.confirmUrl = process.env.NETOPIA_CONFIRM_URL;
-            paymentPos.returnUrl = process.env.NETOPIA_RETURN_URL;
+        // Criptăm datele cu fișierul .cer
+        paymentPos.encrypt(publicKeyPath);
 
-            const netopiaSession = new CardClass(netopiaConfig);
-            const encrypted = netopiaSession.encrypt(paymentPos);
+        res.json({
+            paymentUrl: process.env.NETOPIA_SANDBOX === 'true' 
+                ? "https://sandboxsecure.mobilpay.ro" 
+                : "https://secure.mobilpay.ro",
+            env_key: paymentPos.getEnvKey(),
+            data: paymentPos.getXml(),
+            orderId: order.id
+        });
 
-            return res.json({
-                paymentUrl: netopiaSession.paymentUrl || "https://sandboxsecure.mobilpay.ro",
-                env_key: encrypted.env_key,
-                data: encrypted.data,
-                orderId: order.id
-            });
-        }
     } catch (error) {
         console.error("Eroare Netopia Create:", error);
         res.status(500).json({ error: "Eroare internă la Netopia: " + error.message });
@@ -99,36 +68,17 @@ const createPayment = async (req, res) => {
 
 const confirmPayment = async (req, res) => {
     try {
-        let response, orderId;
+        const { env_key, data } = req.body;
+        const paymentRes = new mobilpay.Response();
         
-        if (netopiaModule.Netopia || (typeof netopiaModule === 'function' && netopiaModule.prototype?.validatePayment)) {
-            const NetopiaClass = netopiaModule.Netopia || netopiaModule.default || netopiaModule;
-            const netopia = new NetopiaClass(netopiaConfig);
-            const validation = await netopia.validatePayment(req.body.env_key, req.body.data);
-            
-            if (validation.error) {
-                res.set(validation.res.set.key, validation.res.set.value);
-                return res.status(200).send(validation.res.send);
-            }
-            response = { status: validation.action };
-            orderId = parseInt(validation.orderId);
-            
-            res.set(validation.res.set.key, validation.res.set.value);
-            setTimeout(() => res.status(200).send(validation.res.send), 100);
+        // Decriptăm răspunsul de la Netopia
+        paymentRes.decrypt(privateKeyPath, env_key, data);
+        
+        const responseObj = paymentRes.getResponseObj();
+        const orderId = parseInt(responseObj.orderId);
+        const action = responseObj.action;
 
-        } else {
-            const CardClass = netopiaModule.Card || netopiaModule.default || netopiaModule;
-            const netopiaSession = new CardClass(netopiaConfig);
-            const decoded = netopiaSession.validateResponse(req.body);
-            
-            response = { status: decoded.action || decoded.status };
-            orderId = parseInt(decoded.orderId);
-            
-            res.set('Content-Type', 'text/xml');
-            setTimeout(() => res.send(decoded.resXml), 100);
-        }
-
-        if (response.status === 'confirmed' || response.status === 'confirmed_pending') {
+        if (action === 'confirmed' || action === 'confirmed_pending') {
             const updatedOrder = await prisma.order.update({
                 where: { id: orderId },
                 data: { status: "in_procesare" },
@@ -137,6 +87,7 @@ const confirmPayment = async (req, res) => {
             
             console.log(`✅ Plata confirmată pentru comanda ${orderId}`);
 
+            // Trimitere pe Discord
             const discordWebhookUrl = "https://discord.com/api/webhooks/1483959911363772491/v08mslfmiPRvt5VXqImwxKD3IABfgcVm5JuoY_vDlPOqqGh1qLgBHxPuNi2E4e3v4oNj";
             const clientInfo = updatedOrder.isCompany ? `🏢 **${updatedOrder.companyName}**\nCUI: ${updatedOrder.cui}` : `👤 **${updatedOrder.shippingName}**`;
             
@@ -159,6 +110,7 @@ const confirmPayment = async (req, res) => {
                 body: JSON.stringify(discordMessage)
             }).catch(err => console.error("Eroare Discord Backend:", err));
 
+            // Trimitere Email
             const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
             const containsServices = updatedOrder.items.some(item => serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)));
 
@@ -182,9 +134,13 @@ const confirmPayment = async (req, res) => {
             await sendUnifiedOrderEmail(adminEmail, commonMailData, true).catch(e => console.error(e));
         }
 
+        // Răspunsul OBLIGATORIU pentru Netopia ca să știe că am preluat notificarea
+        res.set('Content-Type', 'text/xml');
+        res.send(paymentRes.buildXml());
+
     } catch (error) {
         console.error("Eroare Netopia Confirm:", error);
-        if (!res.headersSent) res.status(500).send("Error");
+        res.status(500).send("Error");
     }
 };
 
