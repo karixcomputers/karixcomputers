@@ -234,10 +234,11 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
   } catch (e) { next(e); }
 });
 
-// 7. POST: Creare comandă (CORECȚIE INTEGRALĂ SERVICII ȘI MAIL)
+// 7. POST: Creare comandă
 router.post("/", requireAuth, async (req, res, next) => {
   try {
-    const { client, cartItems, total, userEmail, pickupType, couponCode } = req.body;
+    // MODIFICARE AICI: Am adăugat paymentMethod în destructuring pentru a ști cum plătește
+    const { client, cartItems, total, userEmail, pickupType, couponCode, paymentMethod } = req.body;
     const randomOrderId = await generateUniqueOrderId();
 
     // 1. Identificăm tipul de conținut folosind aceeași logică ca în Mail Service
@@ -261,6 +262,9 @@ router.post("/", requireAuth, async (req, res, next) => {
         companyName: client.isCompany ? client.companyName : null,
         cui: client.isCompany ? client.cui : null,
         regCom: client.isCompany ? client.regCom : null,
+
+        // MODIFICARE OPȚIONALĂ: Setăm statusul inițial diferit pentru plăți online vs ramburs
+        status: paymentMethod === 'online' ? "neplatita" : "in_asteptare",
 
         items: {
           create: cartItems.map(item => {
@@ -290,14 +294,14 @@ router.post("/", requireAuth, async (req, res, next) => {
       }).catch(err => console.error("Eroare incrementare cupon:", err));
     }
 
-    // 2. Pregătim datele pentru mail (ASIGURĂM flag-urile și numele corecte)
+    // 2. Pregătim datele pentru mail
     const commonMailData = {
       client: client,
       orderId: newOrder.id,
       total: total,
       couponCode: couponCode || null,
       pickupType: pickupType,
-      isServiceOrder: containsServices, // FLAG-UL CRITIC PENTRU TEMPLATE
+      isServiceOrder: containsServices, 
       cartItems: cartItems.map(item => {
         const nameFinal = item.productName || item.name;
         const nameLower = nameFinal.toLowerCase();
@@ -305,7 +309,7 @@ router.post("/", requireAuth, async (req, res, next) => {
         
         return {
           ...item,
-          name: nameFinal, // Forțăm proprietatea 'name' pentru template-urile HTML
+          name: nameFinal, 
           isServiceItem: isSrv,
           priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
           qty: item.qty || 1
@@ -313,13 +317,17 @@ router.post("/", requireAuth, async (req, res, next) => {
       })
     };
 
-    // 3. Trimitem confirmările unificate
-    // Client
-    await sendUnifiedOrderEmail(userEmail || req.user.email, commonMailData).catch(err => console.error("Eroare Mail Client:", err));
-
-    // Admin
-    const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
-    await sendUnifiedOrderEmail(adminEmail, commonMailData, true).catch(err => console.error("Eroare Mail Admin:", err));
+    // 3. Trimitem confirmările unificate DOAR dacă NU e plată online
+    // Dacă e plată online, aceste mailuri vor pleca din payments.routes.js, după confirmare
+    if (paymentMethod !== 'online') {
+      const uEmail = userEmail || (req.user && req.user.email);
+      if (uEmail) {
+         await sendUnifiedOrderEmail(uEmail, commonMailData).catch(err => console.error("Eroare Mail Client:", err));
+      }
+      
+      const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
+      await sendUnifiedOrderEmail(adminEmail, commonMailData, true).catch(err => console.error("Eroare Mail Admin:", err));
+    }
 
     res.status(200).json({ success: true, orderId: newOrder.id });
 

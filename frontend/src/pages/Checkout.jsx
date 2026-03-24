@@ -137,7 +137,7 @@ export default function Checkout() {
   });
 
   const [pickupByKarix, setPickupByKarix] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("ramburs"); // Metodă plată implicită
+  const [paymentMethod, setPaymentMethod] = useState("ramburs"); // Implicit ramburs
   
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -237,13 +237,12 @@ export default function Checkout() {
     }));
   };
 
-  // --- AUTO-COMPLETARE ANAF + PARSARE + AUTO-BIFARE ORADEA ---
   const fetchCompanyData = async (cuiInput) => {
     const cleanCui = cuiInput.replace(/[^0-9]/g, "");
     if (cleanCui.length < 2) return;
 
     try {
-      const response = await fetch("https://karixcomputers.ro/api/orders/anaf", {
+      const response = await fetch("https://api.karixcomputers.ro/api/orders/anaf", { // Modificat aici de la karixcomputers.ro la api.karixcomputers.ro pentru consistență
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cui: cleanCui })
@@ -339,7 +338,7 @@ export default function Checkout() {
       total: totalCents, 
       userEmail: user?.email, 
       pickupType: pickupByKarix ? "KarixPersonal" : "Courier",
-      paymentMethod: paymentMethod, 
+      paymentMethod: paymentMethod, // Va trimite "online" sau "ramburs"
       couponCode: appliedCoupon?.code || null 
     };
 
@@ -363,7 +362,7 @@ export default function Checkout() {
       if (clearCart) clearCart();
 
       // 2. Logică de redirecționare pe baza metodei de plată
-      if (paymentMethod === "netopia") {
+      if (paymentMethod === "online") {
         // Dacă s-a ales plata cu cardul, cerem datele de plată de la backend
         const paymentResponse = await fetch(`https://api.karixcomputers.ro/api/payments/netopia/pay/${data.orderId}`, {
           method: "POST",
@@ -398,7 +397,7 @@ export default function Checkout() {
 
         document.body.appendChild(form);
         form.submit(); // Redirecționare automată către pagina securizată Netopia
-        return; // Oprim execuția aici ca să nu meargă la success direct
+        return; 
       } else {
         // Pentru plata ramburs, mergem direct la pagina de succes
         nav("/success"); 
@@ -591,18 +590,18 @@ export default function Checkout() {
                 {/* Buton NETOPIA ACTIVAT */}
                 <button 
                   type="button" 
-                  onClick={() => setPaymentMethod("netopia")}
-                  className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${paymentMethod === "netopia" ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}
+                  onClick={() => setPaymentMethod("online")}
+                  className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${paymentMethod === "online" ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}
                 >
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${paymentMethod === "netopia" ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${paymentMethod === "online" ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
                     💳
                   </div>
                   <div className="flex-1">
                     <h4 className="text-white font-black text-xs uppercase tracking-wider">Plată Online cu Cardul</h4>
                     <p className="text-gray-400 text-[10px]">Plată securizată 100% prin Netopia Payments.</p>
                   </div>
-                  <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "netopia" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
-                    {paymentMethod === "netopia" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                  <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "online" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
+                    {paymentMethod === "online" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
                   </div>
                 </button>
 
@@ -675,7 +674,7 @@ export default function Checkout() {
                 <span className="relative z-10 text-lg uppercase tracking-widest italic drop-shadow-md">
                   {loading 
                     ? "Se procesează..." 
-                    : (paymentMethod === "netopia" ? "Plătește Acum →" : "Plasează Comanda →")}
+                    : (paymentMethod === "online" ? "Plătește Acum →" : "Plasează Comanda →")}
                 </span>
               </button>
             </div>
