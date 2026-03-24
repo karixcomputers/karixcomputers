@@ -78,7 +78,7 @@ app.get("/health", (req, res) => res.json({ ok: true, timestamp: new Date() }));
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productsRoutes);
 app.use("/api/orders", ordersRoutes);
-app.use("/api/payments", paymentsRoutes);
+app.use("/api/payments/netopia", paymentsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/service-orders", serviceOrdersRoutes);
