@@ -55,7 +55,7 @@ export const createSmartBillInvoice = async (order) => {
                 email: order.user?.email || "client@karix.ro",
                 saveToDb: true
             },
-issueDate: new Date().toISOString().split("T")[0],
+            issueDate: new Date().toISOString().split("T")[0],
             seriesName: process.env.SMARTBILL_SERIA,
             isDraft: false, 
             dueDate: new Date().toISOString().split("T")[0],
