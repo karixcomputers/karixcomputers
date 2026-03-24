@@ -69,22 +69,32 @@ export async function sendHtmlMail({ to, subject, html, attachments = [] }) {
  */
 export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
   try {
-    const products = orderData.cartItems || orderData.items || [];
+    // 0. Standardizăm produsele și denumirile
+    const products = (orderData.cartItems || orderData.items || []).map(i => ({
+      ...i,
+      // Ne asigurăm că avem un nume valid pentru HTML și template
+      displayName: i.productName || i.name || "Produs/Serviciu Karix"
+    }));
+
     const isOradea = orderData.pickupType === "KarixPersonal";
     
-    // 1. Detectăm tipul de conținut
-    const isServiceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare'];
-    const hasPC = products.some(i => {
-      const name = (i.productName || i.name || "").toLowerCase();
-      return (i.specs && i.specs.cpu) || i.category === 'pc' || !isServiceKeywords.some(kw => name.includes(kw));
-    });
+    // 1. Detectăm tipul de conținut (Logică strictă)
+    const isServiceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'stick-drift', 'hall-effect'];
+    
     const hasService = products.some(i => {
-      const name = (i.productName || i.name || "").toLowerCase();
+      const name = i.displayName.toLowerCase();
       return i.category === 'service' || isServiceKeywords.some(kw => name.includes(kw));
     });
 
-// 2. Alegem Template-ul și Subiectul
-    let templateName = "orderPlaced.html"; // Default: Doar PC + Curier
+    const hasPC = products.some(i => {
+      const name = i.displayName.toLowerCase();
+      const isActuallyService = i.category === 'service' || isServiceKeywords.some(kw => name.includes(kw));
+      // Este PC dacă e marcat ca PC, are specificații sau dacă NU este un serviciu
+      return i.category === 'pc' || (i.specs && (i.specs.cpu || i.specs.gpu)) || !isActuallyService;
+    });
+
+    // 2. Alegem Template-ul și Subiectul
+    let templateName = "orderPlaced.html"; // Default
     let subject = isAdmin ? "🟢 VÂNZARE NOUĂ" : "Confirmare Comandă - Karix Computers";
 
     if (isOradea) {
@@ -100,15 +110,12 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
       }
     } else {
       if (hasPC && hasService) {
-        // NOU: MIXED (PC + Service) + Țară (Curier)
-        templateName = "serviceOradeaNotification.html";
+        templateName = "serviceOradeaNotification.html"; // Atenție: Verifică dacă acest template e pt Țară/Mixed
         subject = isAdmin ? "🟣 MIXED ORDER (Curier)" : "Livrare PC & Instrucțiuni Service - Karix Computers";
       } else if (!hasPC && hasService) {
-        // Doar Service + Țară (Curier)
         templateName = "servicePlaced.html";
         subject = isAdmin ? "🛠️ SERVICE NOU (Curier)" : "Instrucțiuni Expediere Service - Karix Computers";
       }
-      // Dacă e doar PC, rămâne default-ul "orderPlaced.html" stabilit mai sus.
     }
 
     if (isAdmin) {
@@ -118,17 +125,20 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
 
     // 3. Generăm lista de produse HTML unificată
     const itemsHtml = products.map(item => {
-      const s = item.specs || item; 
-      const isHardware = s.cpu || s.gpu || s.ram;
-      let details = isHardware 
+      const s = item.specs || {}; 
+      // Verificăm dacă are specificații de PC
+      const isPC = s.cpu || s.gpu || item.category === 'pc';
+      
+      let details = isPC 
         ? `<div style="font-size: 11px; color: #94a3b8; margin-top: 4px; font-style: italic;">⚡ CPU: ${s.cpu || 'N/A'} | 🎮 GPU: ${s.gpu || 'N/A'}<br>📟 RAM: ${s.ram || 'N/A'} | 💾 SSD: ${s.storage || 'N/A'}</div>`
-        : `<div style="font-size: 11px; color: #6366f1; margin-top: 4px; font-weight: bold; font-style: italic;">🛠️ Serviciu Karix Mentenanță / Upgrade</div>`;
+        : `<div style="font-size: 11px; color: #6366f1; margin-top: 4px; font-weight: bold; font-style: italic;">🛠️ Serviciu Karix Mentenanță / Reparatie</div>`;
       
       const price = ((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2);
+      
       return `
         <tr>
-          <td style="border-bottom: 1px solid #1e293b; padding: 15px 0; color: #ffffff !important;">
-            <strong style="text-transform: uppercase; font-size: 13px; color: #ffffff !important;">${item.productName || item.name}</strong> 
+          <td style="border-bottom: 1px solid #1e293b; padding: 15px 0;">
+            <strong style="text-transform: uppercase; font-size: 13px; color: #ffffff !important;">${item.displayName}</strong> 
             <span style="color: #64748b; font-size: 11px;">(x${item.qty || 1})</span>
             ${details}
           </td>
