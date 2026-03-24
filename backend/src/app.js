@@ -45,25 +45,35 @@ app.use(rateLimiter);
 
 // 4. CONFIGURARE CORS DINAMICĂ
 const allowedOrigins = [
-  env.CLIENT_URL,
-  "http://localhost:5173",
+  env.CLIENT_URL,                    // Adresa ta oficială (ex: https://karixcomputers.ro)
+  "https://karixcomputers.ro",       // Hardcoded ca siguranță
+  "https://www.karixcomputers.ro",
+  "http://localhost:5173",           // Vite default
   "http://127.0.0.1:5173",
-  "http://192.168.0.162:5173"
+  "http://192.168.0.162:5173",       // IP-ul tău local de rețea
+  "https://claude.ai",               // Permitem testele din Claude
+  "https://mirror.claude.ai"
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitem cererile fără origine (ex: Postman)
+    // 1. Permitem cererile fără origine (Postman, server-to-server)
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+    // 2. Dacă originea e în listă, o permitem
+    const isAllowed = allowedOrigins.includes(origin);
+    
+    // 3. Permitem orice în modul 'development' sau dacă e în whitelist
+    if (isAllowed || process.env.NODE_ENV === 'development') {
       return callback(null, true);
     } else {
-      console.log(`⚠️ CORS Blocked: ${origin}`);
+      console.warn(`⚠️ CORS Blocked: ${origin}`);
       return callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 }));
 
 // 5. MIDDLEWARES STANDARD
