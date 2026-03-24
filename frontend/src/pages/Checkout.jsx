@@ -72,7 +72,6 @@ const notifyDiscord = async (orderData, coupon) => {
     ? `🏢 **${orderData.client.companyName}**\nCUI: ${orderData.client.cui}`
     : `👤 **${orderData.client.name}**`;
 
-  // Informația despre metoda de plată
   const paymentMethodInfo = orderData.paymentMethod === "ramburs" ? "💵 Numerar la Livrare (Ramburs)" : "💳 Plată Online (Netopia)";
 
   const message = {
@@ -137,7 +136,7 @@ export default function Checkout() {
   });
 
   const [pickupByKarix, setPickupByKarix] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("ramburs"); // Implicit ramburs
+  const [paymentMethod, setPaymentMethod] = useState("ramburs"); 
   
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -242,7 +241,7 @@ export default function Checkout() {
     if (cleanCui.length < 2) return;
 
     try {
-      const response = await fetch("https://api.karixcomputers.ro/api/orders/anaf", { // Modificat aici de la karixcomputers.ro la api.karixcomputers.ro pentru consistență
+      const response = await fetch("https://api.karixcomputers.ro/api/orders/anaf", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cui: cleanCui })
@@ -338,7 +337,7 @@ export default function Checkout() {
       total: totalCents, 
       userEmail: user?.email, 
       pickupType: pickupByKarix ? "KarixPersonal" : "Courier",
-      paymentMethod: paymentMethod, // Va trimite "online" sau "ramburs"
+      paymentMethod: paymentMethod, 
       couponCode: appliedCoupon?.code || null 
     };
 
@@ -357,13 +356,10 @@ export default function Checkout() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Eroare la procesarea comenzii.");
       
-      await notifyDiscord(orderData, appliedCoupon);
-
-      if (clearCart) clearCart();
-
-      // 2. Logică de redirecționare pe baza metodei de plată
+      // 2. Logică separată de acțiune în funcție de metoda de plată
       if (paymentMethod === "online") {
         // Dacă s-a ales plata cu cardul, cerem datele de plată de la backend
+        // NU apelăm Discord, NU golim coșul încă!
         const paymentResponse = await fetch(`https://api.karixcomputers.ro/api/payments/netopia/pay/${data.orderId}`, {
           method: "POST",
           headers: { 
@@ -374,9 +370,13 @@ export default function Checkout() {
 
         const paymentData = await paymentResponse.json();
 
+        // Dacă generarea plății eșuează, aruncăm eroarea (coșul rămâne intact)
         if (!paymentResponse.ok) {
-          throw new Error(paymentData.error || "Eroare la inițierea plății Netopia.");
+          throw new Error(paymentData.error || "Eroare la inițierea plății Netopia. Te rugăm să reîncerci.");
         }
+
+        // Totul e ok cu Netopia, abia ACUM golim coșul și redirecționăm
+        if (clearCart) clearCart();
 
         // Construim un formular ascuns pentru a trimite clientul la Netopia
         const form = document.createElement("form");
@@ -398,8 +398,11 @@ export default function Checkout() {
         document.body.appendChild(form);
         form.submit(); // Redirecționare automată către pagina securizată Netopia
         return; 
+
       } else {
-        // Pentru plata ramburs, mergem direct la pagina de succes
+        // Dacă este plată RAMBURS, procesul este clasic: notificăm, golim coșul și trimitem pe succes
+        await notifyDiscord(orderData, appliedCoupon);
+        if (clearCart) clearCart();
         nav("/success"); 
       }
       
@@ -565,7 +568,7 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* 3. Metodă de Plată (ACTUALIZATĂ) */}
+            {/* 3. Metodă de Plată */}
             <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
               <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">3. Metodă de Plată</h2>
               <div className="flex flex-col gap-4">
@@ -587,7 +590,7 @@ export default function Checkout() {
                   </div>
                 </button>
 
-                {/* Buton NETOPIA ACTIVAT */}
+                {/* Buton NETOPIA */}
                 <button 
                   type="button" 
                   onClick={() => setPaymentMethod("online")}
