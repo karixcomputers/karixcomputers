@@ -69,32 +69,40 @@ export async function sendHtmlMail({ to, subject, html, attachments = [] }) {
  */
 export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
   try {
-    // 0. Standardizăm produsele și denumirile
-    const products = (orderData.cartItems || orderData.items || []).map(i => ({
-      ...i,
-      // Ne asigurăm că avem un nume valid pentru HTML și template
-      displayName: i.productName || i.name || "Produs/Serviciu Karix"
-    }));
+    // 0. Standardizăm produsele și denumirile (FORȚĂM SĂ EXISTE UN NUME)
+    const products = (orderData.cartItems || orderData.items || []).map(i => {
+      const finalName = i.productName || i.name || i.displayName || "Produs/Serviciu Karix";
+      return {
+        ...i,
+        displayName: finalName
+      };
+    });
 
-    const isOradea = orderData.pickupType === "KarixPersonal";
+    // Detectăm locația și tipul livrării
+    // Adăugăm o verificare extra și pentru oraș în caz că pickupType e null
+    const isOradea = orderData.pickupType === "KarixPersonal" || 
+                     orderData.client?.city?.toLowerCase() === "oradea";
     
-    // 1. Detectăm tipul de conținut (Logică strictă)
-    const isServiceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'stick-drift', 'hall-effect'];
+    // 1. Detectăm tipul de conținut (Logică ÎMBUNĂTĂȚITĂ)
+    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'stick-drift', 'hall-effect'];
     
     const hasService = products.some(i => {
       const name = i.displayName.toLowerCase();
-      return i.category === 'service' || isServiceKeywords.some(kw => name.includes(kw));
+      return i.category === 'service' || serviceKeywords.some(kw => name.includes(kw));
     });
 
     const hasPC = products.some(i => {
       const name = i.displayName.toLowerCase();
-      const isActuallyService = i.category === 'service' || isServiceKeywords.some(kw => name.includes(kw));
-      // Este PC dacă e marcat ca PC, are specificații sau dacă NU este un serviciu
+      // Un item este PC dacă: e marcat PC, are specificații sau NU este serviciu
+      const isActuallyService = i.category === 'service' || serviceKeywords.some(kw => name.includes(kw));
       return i.category === 'pc' || (i.specs && (i.specs.cpu || i.specs.gpu)) || !isActuallyService;
     });
 
+    // --- LOG DE DEBUG PENTRU CONSOLĂ (Verifică-l în pm2 logs) ---
+    console.log(`[MAIL SYSTEM] Order #${orderData.id || orderData.orderId}: hasPC=${hasPC}, hasService=${hasService}, isOradea=${isOradea}`);
+
     // 2. Alegem Template-ul și Subiectul
-    let templateName = "orderPlaced.html"; // Default
+    let templateName = "orderPlaced.html"; // Default: Doar PC
     let subject = isAdmin ? "🟢 VÂNZARE NOUĂ" : "Confirmare Comandă - Karix Computers";
 
     if (isOradea) {
@@ -109,13 +117,16 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
         subject = isAdmin ? "📍 SERVICE NOU (Oradea)" : "Confirmare Ridicare Service Oradea";
       }
     } else {
+      // Pentru restul țării (CURIER)
       if (hasPC && hasService) {
-        templateName = "serviceOradeaNotification.html"; // Atenție: Verifică dacă acest template e pt Țară/Mixed
+        templateName = "serviceOradeaNotification.html"; // Acesta este template-ul de Mixed/Curier
         subject = isAdmin ? "🟣 MIXED ORDER (Curier)" : "Livrare PC & Instrucțiuni Service - Karix Computers";
-      } else if (!hasPC && hasService) {
+      } else if (hasService && !hasPC) {
+        // DOAR SERVICE (AICI ERA PROBLEMA TA)
         templateName = "servicePlaced.html";
         subject = isAdmin ? "🛠️ SERVICE NOU (Curier)" : "Instrucțiuni Expediere Service - Karix Computers";
       }
+      // Dacă e doar PC (hasPC true, hasService false), rămâne orderPlaced.html
     }
 
     if (isAdmin) {
@@ -126,10 +137,9 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
     // 3. Generăm lista de produse HTML unificată
     const itemsHtml = products.map(item => {
       const s = item.specs || {}; 
-      // Verificăm dacă are specificații de PC
-      const isPC = s.cpu || s.gpu || item.category === 'pc';
+      const isHardware = s.cpu || s.gpu || item.category === 'pc';
       
-      let details = isPC 
+      let details = isHardware 
         ? `<div style="font-size: 11px; color: #94a3b8; margin-top: 4px; font-style: italic;">⚡ CPU: ${s.cpu || 'N/A'} | 🎮 GPU: ${s.gpu || 'N/A'}<br>📟 RAM: ${s.ram || 'N/A'} | 💾 SSD: ${s.storage || 'N/A'}</div>`
         : `<div style="font-size: 11px; color: #6366f1; margin-top: 4px; font-weight: bold; font-style: italic;">🛠️ Serviciu Karix Mentenanță / Reparatie</div>`;
       
@@ -137,17 +147,17 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
       
       return `
         <tr>
-          <td style="border-bottom: 1px solid #1e293b; padding: 15px 0;">
+          <td style="border-bottom: 1px solid #1e293b; padding: 15px 0; vertical-align: top;">
             <strong style="text-transform: uppercase; font-size: 13px; color: #ffffff !important;">${item.displayName}</strong> 
             <span style="color: #64748b; font-size: 11px;">(x${item.qty || 1})</span>
             ${details}
           </td>
-          <td align="right" style="border-bottom: 1px solid #1e293b; color: #ffffff !important; font-weight: 800; padding: 15px 0; font-size: 14px;">${price} RON</td>
+          <td align="right" style="border-bottom: 1px solid #1e293b; color: #ffffff !important; font-weight: 800; padding: 15px 0; font-size: 14px; vertical-align: top;">${price} RON</td>
         </tr>
       `;
     }).join("");
 
-    // 4. Secțiune Date B2B (PJ)
+    // 4. Secțiune Date B2B
     let billingHtml = "";
     if (orderData.client?.isCompany) {
       billingHtml = `
@@ -159,7 +169,7 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
       `;
     }
 
-    // 5. Discount Calculation
+    // 5. Discount / Voucher
     let discountSectionHtml = "";
     const totalCents = orderData.total || orderData.totalCents || 0;
     if (orderData.couponCode) {
@@ -180,14 +190,14 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
       }
     }
 
-    const name = orderData.client?.isCompany ? orderData.client.companyName : (orderData.client?.name || orderData.customerName || "Client Karix");
-    const address = orderData.shippingAddress || (orderData.client ? `${orderData.client.addressDetails}, ${orderData.client.city}, ${orderData.client.county}` : "Nespecificată");
+    const clientName = orderData.client?.isCompany ? orderData.client.companyName : (orderData.client?.name || orderData.customerName || "Client Karix");
+    const fullAddress = orderData.shippingAddress || (orderData.client ? `${orderData.client.addressDetails}, ${orderData.client.city}, ${orderData.client.county}` : "Nespecificată");
 
     const tpl = loadTemplate(templateName);
     const html = render(tpl, {
-      customerName: name,
+      customerName: clientName,
       orderId: orderData.id || orderData.orderId,
-      deliveryAddress: address,
+      deliveryAddress: fullAddress,
       phone: orderData.client?.phone || orderData.phone || "Nespecificat",
       itemsList: itemsHtml,
       billingSection: billingHtml,
@@ -198,10 +208,14 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
       accountUrl: `https://karixcomputers.ro/orders`
     });
 
-    await sendHtmlMail({ to: isAdmin ? (env.ADMIN_EMAIL || "karixcomputers@gmail.com") : to, subject, html });
+    await sendHtmlMail({ 
+        to: isAdmin ? (process.env.ADMIN_EMAIL || "karixcomputers@gmail.com") : to, 
+        subject, 
+        html 
+    });
 
   } catch (err) {
-    console.error("❌ Eroare sendUnifiedOrderEmail:", err.message);
+    console.error("❌ Eroare sendUnifiedOrderEmail:", err);
   }
 }
 
