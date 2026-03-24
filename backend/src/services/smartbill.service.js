@@ -5,7 +5,7 @@ export const createSmartBillInvoice = async (order) => {
         console.log("=== 1. START SMARTBILL ===");
         const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
         
-        // Câmpurile obligatorii de taxe REINTRODUSE (fără ele API-ul dă 500)
+        // Dacă nu trimitem taxName și taxPercentage, SmartBill dă 500
         const products = (order.items || []).map(item => ({
             name: item.productName || "Produs Karix",
             code: String(item.productId || "SKU"),
@@ -15,11 +15,10 @@ export const createSmartBillInvoice = async (order) => {
             quantity: item.qty || 1,
             price: Number(((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2)), 
             isTaxIncluded: true,
-            taxName: "Scutita",  // Obligatoriu în schema lor
-            taxPercentage: 0     // Obligatoriu în schema lor
+            taxName: "Scutita",  // OBLIGATORIU
+            taxPercentage: 0     // OBLIGATORIU
         }));
 
-        // Construim clientul FĂRĂ să îi dăm vatCode/regCom gol dacă e persoană fizică
         const clientObj = {
             name: order.isCompany ? order.companyName : (order.shippingName || "Client Karix"),
             address: order.shippingAddress || "România",
@@ -31,7 +30,7 @@ export const createSmartBillInvoice = async (order) => {
             saveToDb: false
         };
 
-        // Doar dacă e firmă, îi atașăm CUI și RegCom
+        // Adăugăm CUI doar dacă e firmă, ca să nu trimitem texte goale care dau crash
         if (order.isCompany && order.cui) {
             clientObj.vatCode = order.cui;
         }
@@ -66,16 +65,14 @@ export const createSmartBillInvoice = async (order) => {
         const text = await response.text();
         console.log("=== 3. RASPUNS SMARTBILL ===", text);
 
-        if (!response.ok) {
-            return null;
-        }
+        if (!response.ok) return null;
 
         const data = JSON.parse(text);
         console.log("=== 4. FACTURA CREATA ===", data.series, data.number);
         return data;
 
     } catch (error) {
-        console.log("=== CRASH ==", error.message);
+        console.log("=== CRASH ===", error.message);
         return null;
     }
 };
@@ -84,7 +81,6 @@ export const getSmartBillPdf = async (seriesName, number) => {
     try {
         const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
         const cui = process.env.SMARTBILL_CUI;
-        
         const url = `https://ws.smartbill.ro/SBORO/api/invoice/pdf?cif=${cui}&seriesname=${seriesName}&number=${number}`;
         
         const response = await fetch(url, {
