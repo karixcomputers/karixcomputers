@@ -9,37 +9,18 @@ export const createSmartBillInvoice = async (order) => {
     try {
         const authHeader = getAuthHeader();
         
-        // Formatăm produsele pentru SmartBill
-        const products = (order.items || []).map(item => {
-            return {
-                name: item.productName || "Produs Karix",
-                code: item.productId ? String(item.productId) : "SKU-00",
-                isDiscount: false,
-                measuringUnitName: "buc",
-                currency: "RON",
-                quantity: item.qty || 1,
-                price: ((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2),
-                isTaxIncluded: true,
-                taxName: "Scutita", // Pentru firme neplătitoare de TVA
-                taxPercentage: 0    // 0% TVA
-            };
-        });
-
-        // Fallback în caz că nu există produse explicite
-        if (products.length === 0) {
-            products.push({
-                name: `Comanda Karix #${order.id}`,
-                code: "CMD",
-                isDiscount: false,
-                measuringUnitName: "buc",
-                currency: "RON",
-                quantity: 1,
-                price: ((order.totalCents || 0) / 100).toFixed(2),
-                isTaxIncluded: true,
-                taxName: "Scutita",
-                taxPercentage: 0
-            });
-        }
+        const products = (order.items || []).map(item => ({
+            name: item.productName || "Produs Karix",
+            code: item.productId ? String(item.productId) : "SKU-00",
+            isDiscount: false,
+            measuringUnitName: "buc",
+            currency: "RON",
+            quantity: item.qty || 1,
+            price: ((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2),
+            isTaxIncluded: true,
+            taxName: "Scutita", 
+            taxPercentage: 0    
+        }));
 
         const payload = {
             companyVatCode: process.env.SMARTBILL_CUI,
@@ -58,17 +39,13 @@ export const createSmartBillInvoice = async (order) => {
             issueDate: new Date().toISOString().split("T")[0],
             seriesName: process.env.SMARTBILL_SERIA,
             isDraft: false,
-            
-            // 1. Facem scadența azi (ca să nu apară că trebuie plătită în viitor)
             dueDate: new Date().toISOString().split("T")[0],
 
-            // 2. Marcam factura ca "Incasată" doar INTERN (pentru contabilitatea ta)
-            isCollecting: true,
-            collectingType: "Card", 
+            // --- AM SCOS TOTUL DE AICI ---
+            isCollecting: false, // Nu mai emite chitanță automat
+            // -----------------------------
 
-            // 3. TEXTUL CARE VA APARE PE FACTURĂ (Soluția ta)
-            observations: "ACHITAT ONLINE CU CARDUL (NETOPIA) - NU MAI NECESITĂ PLATĂ.",
-
+            observations: "FACTURĂ ACHITATĂ ONLINE CU CARDUL (NETOPIA). NU MAI NECESITĂ PLATĂ.",
             products: products
         };
 
@@ -83,12 +60,10 @@ export const createSmartBillInvoice = async (order) => {
         });
 
         const data = await response.json();
-        
-        // Printează în consolă exact ce zice SmartBill (pentru control)
         console.log("📄 Răspuns API SmartBill:", data);
 
         if (!response.ok) {
-            throw new Error(data.errorText || "Eroare la crearea facturii în SmartBill");
+            throw new Error(data.errorText || "Eroare la crearea facturii");
         }
 
         return data; 
@@ -104,7 +79,10 @@ export const getSmartBillPdf = async (seriesName, number) => {
         const authHeader = getAuthHeader();
         const cui = process.env.SMARTBILL_CUI;
         
-        const response = await fetch(`https://ws.smartbill.ro/SBORO/api/invoice/pdf?cif=${cui}&seriesname=${seriesName}&number=${number}`, {
+        // Folosim SBIT (endpoint-ul corect pentru facturi)
+        const url = `https://ws.smartbill.ro/SBIT/api/invoice/pdf?cui=${cui}&series=${seriesName}&number=${number}`;
+        
+        const response = await fetch(url, {
             method: "GET",
             headers: {
                 "Authorization": authHeader,
@@ -112,12 +90,12 @@ export const getSmartBillPdf = async (seriesName, number) => {
             }
         });
 
-        if (!response.ok) throw new Error("Nu am putut descărca PDF-ul facturii.");
+        if (!response.ok) throw new Error("Nu am putut descărca PDF-ul.");
 
         const arrayBuffer = await response.arrayBuffer();
         return Buffer.from(arrayBuffer); 
     } catch (error) {
         console.error("❌ Eroare Descărcare PDF SmartBill:", error.message);
         return null;
-    }
+    } 
 };
