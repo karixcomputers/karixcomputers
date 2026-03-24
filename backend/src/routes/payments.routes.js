@@ -6,8 +6,10 @@ import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
 import { sendUnifiedOrderEmail } from "../services/mail.service.js";
 
-const router = express.Router();
+// --- IMPORT SMARTBILL ---
+import { createSmartBillInvoice, getSmartBillPdf } from "../services/smartbill.service.js";
 
+const router = express.Router();
 router.use(express.urlencoded({ extended: true }));
 
 const prisma = new PrismaClient();
@@ -15,7 +17,7 @@ const prisma = new PrismaClient();
 const privateKeyPath = path.resolve(process.env.NETOPIA_PRIVATE_KEY_PATH);
 const publicKeyPath = path.resolve(process.env.NETOPIA_PUBLIC_KEY_PATH);
 
-// --- FUNCȚIE RC4 NATIVĂ (Evită erorile de SSL din Node.js) ---
+// --- FUNCȚIE RC4 NATIVĂ ---
 function rc4(keyBuf, dataBuf) {
     let S = Array.from({length: 256}, (_, i) => i);
     let j = 0;
@@ -34,7 +36,6 @@ function rc4(keyBuf, dataBuf) {
     return out;
 }
 
-// --- CURĂȚARE TEXT PENTRU XML ---
 function escapeXml(unsafe) {
     return (unsafe || '').toString().replace(/[<>&'"]/g, function (c) {
         switch (c) {
@@ -45,7 +46,7 @@ function escapeXml(unsafe) {
     });
 }
 
-// --- 1. CREARE PLATĂ (Generare XML & Criptare Nativă) ---
+// --- 1. CREARE PLATĂ ---
 const createPayment = async (req, res) => {
     try {
         const { orderId } = req.params;
@@ -60,7 +61,6 @@ const createPayment = async (req, res) => {
         const nameParts = (order.shippingName || "Client").split(' ');
         const ts = new Date().toISOString().replace(/[-:T\.]/g, '').slice(0, 14);
 
-        // Construim XML-ul exact cum îl cere Netopia
         const xml = `<?xml version="1.0" encoding="utf-8"?>
 <order type="card" id="${order.id}" timestamp="${ts}">
     <signature>${process.env.NETOPIA_SIGNATURE}</signature>
@@ -82,12 +82,10 @@ const createPayment = async (req, res) => {
     </invoice>
 </order>`;
 
-        // Criptare Data (RC4)
         const rc4Key = crypto.randomBytes(16);
         const xmlBuffer = Buffer.from(xml, 'utf8');
         const encryptedData = rc4(rc4Key, xmlBuffer).toString('base64');
 
-        // Criptare Cheie (RSA)
         const publicKey = fs.readFileSync(publicKeyPath, 'utf8');
         const encryptedEnvKey = crypto.publicEncrypt({
             key: publicKey,
@@ -109,33 +107,26 @@ const createPayment = async (req, res) => {
     }
 };
 
-// --- 2. CONFIRMARE PLATĂ (Decriptare Nativă) ---
+// --- 2. CONFIRMARE PLATĂ ---
 const confirmPayment = async (req, res) => {
     try {
         const { env_key, data } = req.body;
 
-        if (!env_key || !data) {
-            return res.status(400).send("Missing keys");
-        }
+        if (!env_key || !data) return res.status(400).send("Missing keys");
 
-        // Decriptăm cheia RC4 cu Private Key-ul nostru
         const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
         const rc4Key = crypto.privateDecrypt({
             key: privateKey,
             padding: crypto.constants.RSA_PKCS1_PADDING
         }, Buffer.from(env_key, 'base64'));
 
-        // Decriptăm XML-ul
         const encryptedDataBuf = Buffer.from(data, 'base64');
         const xml = rc4(rc4Key, encryptedDataBuf).toString('utf8');
 
-        // Extragem datele vitale din XML cu un Regex simplu
         const actionMatch = xml.match(/<action>\s*(.*?)\s*<\/action>/);
         const orderIdMatch = xml.match(/<order .*?id="([^"]+)".*?>/);
 
-        if (!actionMatch || !orderIdMatch) {
-            throw new Error("XML invalid primit de la Netopia");
-        }
+        if (!actionMatch || !orderIdMatch) throw new Error("XML invalid primit de la Netopia");
 
         const action = actionMatch[1];
         const orderId = parseInt(orderIdMatch[1]);
@@ -149,7 +140,7 @@ const confirmPayment = async (req, res) => {
             
             console.log(`✅ Plata confirmată NATIV pentru comanda ${orderId}`);
 
-            // Trimitere Discord
+            // --- DISCORD ---
             const discordWebhookUrl = "https://discord.com/api/webhooks/1483959911363772491/v08mslfmiPRvt5VXqImwxKD3IABfgcVm5JuoY_vDlPOqqGh1qLgBHxPuNi2E4e3v4oNj";
             const clientInfo = updatedOrder.isCompany ? `🏢 **${updatedOrder.companyName}**\nCUI: ${updatedOrder.cui}` : `👤 **${updatedOrder.shippingName}**`;
             
@@ -165,12 +156,26 @@ const confirmPayment = async (req, res) => {
                     ]
                 }]
             };
+            await fetch(discordWebhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(discordMessage) }).catch(e => console.error(e));
 
-            await fetch(discordWebhookUrl, {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(discordMessage)
-            }).catch(e => console.error(e));
+            // --- LOGICĂ SMARTBILL ---
+            let invoicePdfBuffer = null;
+            try {
+                console.log("⏳ Generare factură SmartBill...");
+                const invoiceData = await createSmartBillInvoice(updatedOrder);
+                
+                if (invoiceData && invoiceData.series && invoiceData.number) {
+                    console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
+                    invoicePdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
+                    if (invoicePdfBuffer) {
+                        console.log("✅ PDF-ul facturii a fost preluat cu succes.");
+                    }
+                }
+            } catch (sbError) {
+                console.error("❌ Eroare SmartBill Integration:", sbError.message);
+            }
 
-            // Trimitere Emailuri
+            // --- EMAIL-URI ---
             const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
             const containsServices = updatedOrder.items.some(item => serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)));
 
@@ -188,12 +193,16 @@ const confirmPayment = async (req, res) => {
                 }))
             };
 
-            if (updatedOrder.user?.email) await sendUnifiedOrderEmail(updatedOrder.user.email, commonMailData).catch(e => console.error(e));
+            // Trimitem mail clientului (cu PDF dacă există)
+            if (updatedOrder.user?.email) {
+                await sendUnifiedOrderEmail(updatedOrder.user.email, commonMailData, false, invoicePdfBuffer).catch(e => console.error(e));
+            }
+            
+            // Trimitem mail admin-ului (cu PDF dacă există)
             const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
-            await sendUnifiedOrderEmail(adminEmail, commonMailData, true).catch(e => console.error(e));
+            await sendUnifiedOrderEmail(adminEmail, commonMailData, true, invoicePdfBuffer).catch(e => console.error(e));
         }
 
-        // Răspundem obligatoriu Netopiei
         res.set('Content-Type', 'text/xml');
         res.send(`<?xml version="1.0" encoding="utf-8"?><crc>Success</crc>`);
 
