@@ -42,13 +42,12 @@ const createPayment = async (req, res) => {
             address: order.shippingAddress || 'Adresa nedefinită'
         };
 
-        // --- DETECȚIE AUTOMATĂ A VERSIUNII LIBRĂRIEI NETOPIA ---
         if (netopiaModule.Netopia || (typeof netopiaModule === 'function' && netopiaModule.prototype?.setPaymentData)) {
-            // Varianta 1: API-ul modern
             const NetopiaClass = netopiaModule.Netopia || netopiaModule.default || netopiaModule;
             const netopia = new NetopiaClass(netopiaConfig);
             
             netopia.setPaymentData({
+                account: process.env.NETOPIA_SIGNATURE, // <--- AICI ERA PROBLEMA (LIPSEA)
                 orderId: String(order.id),
                 amount: amount,
                 currency: 'RON',
@@ -67,16 +66,13 @@ const createPayment = async (req, res) => {
             });
 
         } else {
-            // Varianta 2: API-ul clasic (cel mai probabil acesta e pe serverul tău)
             const CardClass = netopiaModule.Card || netopiaModule.default || netopiaModule;
             const RequestClass = CardClass.Request || netopiaModule.Request;
 
-            if (!RequestClass) {
-                // Dacă nu e nici varianta 1, nici 2, afișăm exact ce avem ca să o rezolvăm chirurgical.
-                throw new Error("Pachet necunoscut. Conținut exportat: " + Object.keys(netopiaModule).join(", "));
-            }
+            if (!RequestClass) throw new Error("Pachet necunoscut.");
 
             const paymentPos = new RequestClass();
+            paymentPos.account = process.env.NETOPIA_SIGNATURE; // Adăugat și aici preventiv
             paymentPos.orderId = String(order.id);
             paymentPos.amount = amount;
             paymentPos.currency = 'RON';
@@ -105,7 +101,6 @@ const confirmPayment = async (req, res) => {
     try {
         let response, orderId;
         
-        // --- DETECȚIE AUTOMATĂ PENTRU CONFIRMARE ---
         if (netopiaModule.Netopia || (typeof netopiaModule === 'function' && netopiaModule.prototype?.validatePayment)) {
             const NetopiaClass = netopiaModule.Netopia || netopiaModule.default || netopiaModule;
             const netopia = new NetopiaClass(netopiaConfig);
@@ -133,7 +128,6 @@ const confirmPayment = async (req, res) => {
             setTimeout(() => res.send(decoded.resXml), 100);
         }
 
-        // --- ACȚIUNILE DE DUPĂ PLATĂ (Bază de date + Discord + Mail) ---
         if (response.status === 'confirmed' || response.status === 'confirmed_pending') {
             const updatedOrder = await prisma.order.update({
                 where: { id: orderId },
