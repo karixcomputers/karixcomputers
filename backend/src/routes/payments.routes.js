@@ -2,10 +2,11 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import fetch from "node-fetch"; // <--- IMPORTUL ACERSTA LIPSEA ȘI PUTEA BLOCHA TOTUL
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
 import { sendUnifiedOrderEmail } from "../services/mail.service.js";
+
+// --- IMPORT SMARTBILL ---
 import { createSmartBillInvoice, getSmartBillPdf } from "../services/smartbill.service.js";
 
 const router = express.Router();
@@ -45,7 +46,7 @@ function escapeXml(unsafe) {
     });
 }
 
-// --- 1. CREARE PLATĂ (Aici se face redirect-ul) ---
+// --- 1. CREARE PLATĂ ---
 const createPayment = async (req, res) => {
     try {
         const { orderId } = req.params;
@@ -91,7 +92,6 @@ const createPayment = async (req, res) => {
             padding: crypto.constants.RSA_PKCS1_PADDING
         }, rc4Key).toString('base64');
 
-        // Trimitem datele înapoi la Frontend pentru redirect
         res.json({
             paymentUrl: process.env.NETOPIA_SANDBOX === 'true' 
                 ? "https://sandboxsecure.mobilpay.ro" 
@@ -102,15 +102,16 @@ const createPayment = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("❌ Eroare la generarea plății Netopia:", error);
-        res.status(500).json({ error: "Eroare la procesarea plății." });
+        console.error("Eroare Netopia Create Nativ:", error);
+        res.status(500).json({ error: "Eroare internă la procesarea plății." });
     }
 };
 
-// --- 2. CONFIRMARE PLATĂ (Webhook) ---
+// --- 2. CONFIRMARE PLATĂ ---
 const confirmPayment = async (req, res) => {
     try {
         const { env_key, data } = req.body;
+
         if (!env_key || !data) return res.status(400).send("Missing keys");
 
         const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
@@ -139,36 +140,43 @@ const confirmPayment = async (req, res) => {
             
             console.log(`✅ Plata confirmată NATIV pentru comanda ${orderId}`);
 
-            // Discord Webhook
+            // --- DISCORD ---
             const discordWebhookUrl = "https://discord.com/api/webhooks/1483959911363772491/v08mslfmiPRvt5VXqImwxKD3IABfgcVm5JuoY_vDlPOqqGh1qLgBHxPuNi2E4e3v4oNj";
-            const clientInfo = updatedOrder.isCompany ? `🏢 **${updatedOrder.companyName}**` : `👤 **${updatedOrder.shippingName}**`;
+            const clientInfo = updatedOrder.isCompany ? `🏢 **${updatedOrder.companyName}**\nCUI: ${updatedOrder.cui}` : `👤 **${updatedOrder.shippingName}**`;
             
             const discordMessage = {
                 embeds: [{
-                    title: "✅ COMANDĂ NOUĂ PLĂTITĂ!",
+                    title: "✅ COMANDĂ NOUĂ KARIX (PLĂTITĂ ONLINE)!",
                     color: 0x10b981,
                     fields: [
-                        { name: "Client", value: clientInfo, inline: true },
-                        { name: "Total", value: `${(updatedOrder.totalCents / 100).toFixed(2)} RON`, inline: true }
+                        { name: "📋 Tip Client", value: updatedOrder.isCompany ? "Persoană Juridică" : "Persoană Fizică", inline: true },
+                        { name: "👤 Identitate", value: clientInfo, inline: true },
+                        { name: "💳 Metodă Plată", value: "💳 Plată Online (CONFIRMATĂ)", inline: true },
+                        { name: "💰 Total", value: `**${(updatedOrder.totalCents / 100).toFixed(2)} RON**`, inline: true }
                     ]
                 }]
             };
             await fetch(discordWebhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(discordMessage) }).catch(e => console.error(e));
 
-            // SmartBill Integration
+            // --- LOGICĂ SMARTBILL ---
             let invoicePdfBuffer = null;
             try {
                 console.log("⏳ Generare factură SmartBill...");
                 const invoiceData = await createSmartBillInvoice(updatedOrder);
+                
                 if (invoiceData && invoiceData.series && invoiceData.number) {
+                    console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
                     invoicePdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
+                    if (invoicePdfBuffer) {
+                        console.log("✅ PDF-ul facturii a fost preluat cu succes.");
+                    }
                 }
             } catch (sbError) {
-                console.error("❌ Eroare SmartBill:", sbError.message);
+                console.error("❌ Eroare SmartBill Integration:", sbError.message);
             }
 
-            // Mail Delivery
-            const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare'];
+            // --- EMAIL-URI ---
+            const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
             const containsServices = updatedOrder.items.some(item => serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)));
 
             const commonMailData = {
@@ -185,17 +193,21 @@ const confirmPayment = async (req, res) => {
                 }))
             };
 
+            // Trimitem mail clientului (cu PDF dacă există)
             if (updatedOrder.user?.email) {
                 await sendUnifiedOrderEmail(updatedOrder.user.email, commonMailData, false, invoicePdfBuffer).catch(e => console.error(e));
             }
+            
+            // Trimitem mail admin-ului (cu PDF dacă există)
             const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
             await sendUnifiedOrderEmail(adminEmail, commonMailData, true, invoicePdfBuffer).catch(e => console.error(e));
         }
 
         res.set('Content-Type', 'text/xml');
         res.send(`<?xml version="1.0" encoding="utf-8"?><crc>Success</crc>`);
+
     } catch (error) {
-        console.error("❌ Eroare Netopia Confirm:", error.message);
+        console.error("Eroare Netopia Confirm:", error.message);
         res.status(500).send("Error");
     }
 };
