@@ -200,6 +200,8 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
     const isService = itemName.includes('service') || 
                       itemName.includes('mentenanta') || 
                       itemName.includes('curatare') || 
+                      itemName.includes('drift') || 
+                      itemName.includes('hall') || 
                       itemName.includes('reparatie');
                       
     const isOradea = updatedItem.order.shippingAddress?.toLowerCase().includes('oradea');
@@ -232,17 +234,18 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
   } catch (e) { next(e); }
 });
 
-// 7. POST: Creare comandă (REPARATĂ PENTRU SERVICII)
+// 7. POST: Creare comandă (CORECȚIE INTEGRALĂ SERVICII ȘI MAIL)
 router.post("/", requireAuth, async (req, res, next) => {
   try {
     const { client, cartItems, total, userEmail, pickupType, couponCode } = req.body;
     const randomOrderId = await generateUniqueOrderId();
 
-    // --- DETECȚIE TIP COMANDĂ PENTRU EMAIL ---
+    // 1. Identificăm tipul de conținut folosind aceeași logică ca în Mail Service
+    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
+    
     const containsServices = cartItems.some(item => {
-        const name = (item.name || item.productName || "").toLowerCase();
-        return item.category === 'service' || 
-               ['service', 'mentenanta', 'curatare', 'reparatie'].some(kw => name.includes(kw));
+        const name = (item.productName || item.name || "").toLowerCase();
+        return item.category === 'service' || serviceKeywords.some(kw => name.includes(kw));
     });
 
     const newOrder = await prisma.order.create({
@@ -252,7 +255,7 @@ router.post("/", requireAuth, async (req, res, next) => {
         totalCents: total,
         shippingName: client.isCompany ? client.companyName : client.name,
         shippingPhone: client.phone,
-        shippingAddress: `${client.city}, ${client.county}, ${client.addressDetails}`,
+        shippingAddress: `${client.addressDetails}, ${client.city}, ${client.county}`,
         
         isCompany: client.isCompany || false,
         companyName: client.isCompany ? client.companyName : null,
@@ -264,7 +267,7 @@ router.post("/", requireAuth, async (req, res, next) => {
             const nameFinal = item.productName || item.name;
             const nameLower = nameFinal.toLowerCase();
             const isServiceItem = (item.category === 'service') || 
-                                  ['service', 'mentenanta', 'curatare', 'reparatie'].some(kw => nameLower.includes(kw));
+                                  serviceKeywords.some(kw => nameLower.includes(kw));
             
             return {
               productId: String(item.id),
@@ -287,27 +290,36 @@ router.post("/", requireAuth, async (req, res, next) => {
       }).catch(err => console.error("Eroare incrementare cupon:", err));
     }
 
+    // 2. Pregătim datele pentru mail (ASIGURĂM flag-urile și numele corecte)
     const commonMailData = {
       client: client,
       orderId: newOrder.id,
       total: total,
       couponCode: couponCode || null,
       pickupType: pickupType,
-      isServiceOrder: containsServices, // <--- ADAUGAT: Trimitem flag-ul către Mail Service
-      cartItems: cartItems.map(item => ({
-        name: item.productName || item.name, // <--- ASIGURĂM NUMELE CORECT
-        qty: item.qty || 1,
-        priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
-        specs: item.specs 
-      }))
+      isServiceOrder: containsServices, // FLAG-UL CRITIC PENTRU TEMPLATE
+      cartItems: cartItems.map(item => {
+        const nameFinal = item.productName || item.name;
+        const nameLower = nameFinal.toLowerCase();
+        const isSrv = (item.category === 'service') || serviceKeywords.some(kw => nameLower.includes(kw));
+        
+        return {
+          ...item,
+          name: nameFinal, // Forțăm proprietatea 'name' pentru template-urile HTML
+          isServiceItem: isSrv,
+          priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
+          qty: item.qty || 1
+        };
+      })
     };
 
-    // Trimitem confirmarea către client
-    await sendUnifiedOrderEmail(userEmail || req.user.email, commonMailData).catch(err => console.error(err));
+    // 3. Trimitem confirmările unificate
+    // Client
+    await sendUnifiedOrderEmail(userEmail || req.user.email, commonMailData).catch(err => console.error("Eroare Mail Client:", err));
 
-    // Trimitem confirmarea către Admin
+    // Admin
     const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
-    await sendUnifiedOrderEmail(adminEmail, commonMailData, true).catch(err => console.error(err));
+    await sendUnifiedOrderEmail(adminEmail, commonMailData, true).catch(err => console.error("Eroare Mail Admin:", err));
 
     res.status(200).json({ success: true, orderId: newOrder.id });
 
@@ -334,6 +346,7 @@ router.post("/anaf", async (req, res) => {
     const anafData = await response.json();
     res.json(anafData);
   } catch (error) {
+    console.error("❌ Eroare conexiune ANAF:", error.message);
     res.status(200).json({ cod: 500, message: "Conexiune refuzată de ANAF." });
   }
 });
