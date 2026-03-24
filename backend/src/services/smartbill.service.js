@@ -57,20 +57,22 @@ export const createSmartBillInvoice = async (order) => {
             },
             issueDate: new Date().toISOString().split("T")[0],
             seriesName: process.env.SMARTBILL_SERIA,
-            isDraft: false, 
+            isDraft: false,
+            
+            // 1. Facem scadența azi (ca să nu apară că trebuie plătită în viitor)
             dueDate: new Date().toISOString().split("T")[0],
 
-            // --- CELE 4 LINII PENTRU ACHITARE AUTOMATĂ ---
+            // 2. Marcam factura ca "Incasată" doar INTERN (pentru contabilitatea ta)
             isCollecting: true,
-            collectingType: "Card",
-            collectingSeriesName: process.env.SMARTBILL_SERIA_CHITANTA, // <--- ADAUGĂ ACEASTĂ LINIE
-            observations: "Achitat online cu cardul (Netopia Payments).",
-            // ----------------------------------------------------
+            collectingType: "Card", 
+
+            // 3. TEXTUL CARE VA APARE PE FACTURĂ (Soluția ta)
+            observations: "ACHITAT ONLINE CU CARDUL (NETOPIA) - NU MAI NECESITĂ PLATĂ.",
 
             products: products
         };
 
-        const response = await fetch("https://ws.smartbill.ro/SBORO/api/invoice", {
+        const response = await fetch("https://ws.smartbill.ro/SBIT/api/invoice", {
             method: "POST",
             headers: {
                 "Authorization": authHeader,
