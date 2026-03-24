@@ -1,15 +1,10 @@
-import fs from 'fs';
-import path from 'path';
 import express from "express";
+import fs from "fs";
+import path from "path";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
 import { sendUnifiedOrderEmail } from "../services/mail.service.js";
-
-// --- TRUCUL PENTRU LIBRĂRII VECHI ÎN ESM ---
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const Netopia = require("netopia-card");
-// -------------------------------------------
+import netopiaLib from "netopia-card"; // Import standard ESM
 
 const prisma = new PrismaClient();
 const router = express.Router(); 
@@ -37,8 +32,9 @@ const createPayment = async (req, res) => {
 
         if (!order) return res.status(404).json({ error: "Comanda nu există." });
 
-        // Acum instanțierea va merge perfect
-        const paymentPos = new Netopia.Card.Request();
+        // Extragem corect Card din librărie, indiferent cum a fost împachetată de NPM
+        const Card = netopiaLib.Card || netopiaLib.default?.Card || netopiaLib;
+        const paymentPos = new Card.Request();
         
         paymentPos.orderId = String(order.id);
         const amount = (order.totalCents || order.total || 0) / 100;
@@ -58,7 +54,7 @@ const createPayment = async (req, res) => {
         paymentPos.confirmUrl = process.env.NETOPIA_CONFIRM_URL;
         paymentPos.returnUrl = process.env.NETOPIA_RETURN_URL;
 
-        const netopiaSession = new Netopia.Card(netopiaConfig);
+        const netopiaSession = new Card(netopiaConfig);
         const encrypted = netopiaSession.encrypt(paymentPos);
 
         res.json({
@@ -77,7 +73,8 @@ const createPayment = async (req, res) => {
 // 3. LOGICA: Confirmare Plată (AICI PLECĂ MAILUL)
 const confirmPayment = async (req, res) => {
     try {
-        const netopiaSession = new Netopia.Card(netopiaConfig);
+        const Card = netopiaLib.Card || netopiaLib.default?.Card || netopiaLib;
+        const netopiaSession = new Card(netopiaConfig);
         const response = netopiaSession.validateResponse(req.body);
 
         const orderId = parseInt(response.orderId);
