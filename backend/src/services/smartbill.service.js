@@ -9,15 +9,17 @@ export const createSmartBillInvoice = async (order) => {
     try {
         const authHeader = getAuthHeader();
         
+        // --- STRUCTURA EXACTĂ CARE A GENERAT FACTURA 1002 ---
         const products = (order.items || []).map(item => ({
             name: item.productName || "Produs Karix",
             code: item.productId ? String(item.productId) : "SKU",
-            isDiscount: false,
+            isTaxIncluded: true,
             measuringUnitName: "buc",
             currency: "RON",
             quantity: item.qty || 1,
             price: (item.priceCentsAtBuy || item.priceCents || 0) / 100,
-            isTaxIncluded: true
+            isService: false,
+            vatRate: 19 // <- ACESTA E CÂMPUL CARE LIPSEA ȘI DĂDEA EROARE 500
         }));
 
         const payload = {
@@ -43,8 +45,6 @@ export const createSmartBillInvoice = async (order) => {
             products: products
         };
 
-        console.log("🚀 Trimitere date SmartBill...");
-
         const response = await fetch("https://ws.smartbill.ro/SBORO/api/invoice", {
             method: "POST",
             headers: {
@@ -56,17 +56,14 @@ export const createSmartBillInvoice = async (order) => {
             body: JSON.stringify(payload)
         });
 
-        // --- PARTEA DE DETECTIV ÎNCEPE AICI ---
         const rawText = await response.text(); 
-        console.log("📡 RAW RESPONSE SMARTBILL:", rawText);
-
+        
         if (!response.ok) {
-            console.error("❌ EROARE HTTP SMARTBILL:", response.status);
-            return null; // Oprim aici dacă avem eroare, ca să nu mai crape JSON-ul
+            console.error("❌ EROARE HTTP SMARTBILL:", response.status, rawText);
+            return null;
         }
 
         try {
-            // Dacă răspunsul e OK (status 200), încercăm să-l transformăm în obiect
             const data = JSON.parse(rawText);
             console.log("✅ FACTURA CREATĂ CU SUCCES:", data.series, data.number);
             return data;
@@ -86,17 +83,22 @@ export const getSmartBillPdf = async (seriesName, number) => {
         const authHeader = getAuthHeader();
         const cui = process.env.SMARTBILL_CUI;
         
-        const url = `https://ws.smartbill.ro/SBORO/api/invoice/pdf?cui=${cui}&series=${seriesName}&number=${number}`;
+        const url = `https://ws.smartbill.ro/SBORO/api/invoice/pdf?cif=${cui}&seriesname=${seriesName}&number=${number}`;
         
         const response = await fetch(url, {
             method: "GET",
             headers: {
                 "Authorization": authHeader,
-                "Accept": "application/octet-stream"
+                "Accept": "application/octet-stream",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KarixApp/1.0"
             }
         });
 
-        if (!response.ok) throw new Error("Nu am putut descărca PDF-ul.");
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error("❌ EROARE DESCARCARE PDF:", errText);
+            return null;
+        }
 
         const arrayBuffer = await response.arrayBuffer();
         return Buffer.from(arrayBuffer); 
