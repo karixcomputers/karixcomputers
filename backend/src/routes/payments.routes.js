@@ -1,10 +1,14 @@
 import Netopia from 'netopia-card';
 import fs from 'fs';
 import path from 'path';
+import express from "express";
 import { PrismaClient } from "@prisma/client";
+import { requireAuth } from "../middleware/auth.js";
 
 const prisma = new PrismaClient();
+const router = express.Router();
 
+// 1. CONFIGURARE NETOPIA
 // Încărcăm cheile folosind căile din .env
 const privateKeyPath = path.resolve(process.env.NETOPIA_PRIVATE_KEY_PATH);
 const publicKeyPath = path.resolve(process.env.NETOPIA_PUBLIC_KEY_PATH);
@@ -16,11 +20,11 @@ const netopiaConfig = {
     sandbox: process.env.NETOPIA_SANDBOX === 'true'
 };
 
-export const createPayment = async (req, res) => {
+// 2. LOGICA: Creare Plată (createPayment)
+const createPayment = async (req, res) => {
     try {
         const { orderId } = req.params;
 
-        // 1. Căutăm comanda în baza de date
         const order = await prisma.order.findUnique({
             where: { id: parseInt(orderId) },
             include: { user: true }
@@ -28,14 +32,12 @@ export const createPayment = async (req, res) => {
 
         if (!order) return res.status(404).json({ error: "Comanda nu există." });
 
-        // 2. Pregătim datele pentru Netopia
         const paymentPos = new Netopia.Card.Request();
         paymentPos.orderId = String(order.id);
-        paymentPos.amount = order.totalCents / 100; // Netopia vrea RON, nu bani/cents
+        paymentPos.amount = order.totalCents / 100; // RON
         paymentPos.currency = 'RON';
         paymentPos.description = `Comanda Karix Computers #${order.id}`;
 
-        // Date client (Mapping din shippingName)
         const nameParts = order.shippingName.split(' ');
         paymentPos.billing = {
             firstName: nameParts[0] || 'Client',
@@ -45,20 +47,17 @@ export const createPayment = async (req, res) => {
             address: order.shippingAddress
         };
 
-        // URL-urile de întoarcere
         paymentPos.confirmUrl = process.env.NETOPIA_CONFIRM_URL;
         paymentPos.returnUrl = process.env.NETOPIA_RETURN_URL;
 
-        // 3. Criptăm cererea
         const netopia = new Netopia.Card(netopiaConfig);
         const encrypted = netopia.encrypt(paymentPos);
 
-        // 4. Trimitem datele către Frontend
-        // Frontend-ul va trebui să facă un POST automat către URL-ul Netopia cu aceste date
         res.json({
             paymentUrl: netopia.paymentUrl,
             env_key: encrypted.env_key,
-            data: encrypted.data
+            data: encrypted.data,
+            orderId: order.id
         });
 
     } catch (error) {
@@ -67,8 +66,8 @@ export const createPayment = async (req, res) => {
     }
 };
 
-// Rută pentru confirmarea plății (IPN) - Aici Netopia ne anunță că s-au primit banii
-export const confirmPayment = async (req, res) => {
+// 3. LOGICA: Confirmare Plată (confirmPayment)
+const confirmPayment = async (req, res) => {
     try {
         const netopia = new Netopia.Card(netopiaConfig);
         const response = netopia.validateResponse(req.body);
@@ -76,16 +75,13 @@ export const confirmPayment = async (req, res) => {
         const orderId = parseInt(response.orderId);
 
         if (response.status === 'confirmed' || response.status === 'confirmed_pending') {
-            // Actualizăm comanda în baza de date
             await prisma.order.update({
                 where: { id: orderId },
-                data: { status: "procesare" } // Sau ce status folosești tu pentru comenzi achitate
+                data: { status: "procesare" } 
             });
-            
             console.log(`✅ Plata confirmată pentru comanda ${orderId}`);
         }
 
-        // Netopia are nevoie de un răspuns XML specific ca să nu mai trimită notificări
         res.set('Content-Type', 'text/xml');
         res.send(response.resXml);
 
@@ -94,5 +90,9 @@ export const confirmPayment = async (req, res) => {
         res.status(500).send("Error");
     }
 };
+
+// 4. DEFINIRE RUTE
+router.post("/pay/:orderId", requireAuth, createPayment);
+router.post("/confirm", confirmPayment);
 
 export default router;
