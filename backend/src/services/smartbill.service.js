@@ -1,13 +1,9 @@
-import axios from "axios";
-
-const getAuthHeader = () => {
-    const credentials = `${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`;
-    return `Basic ${Buffer.from(credentials).toString("base64")}`;
-};
+import fetch from "node-fetch";
 
 export const createSmartBillInvoice = async (order) => {
     try {
-        console.log("⏳ START SMARTBILL (cu Axios)...");
+        console.log("=== 1. START SMARTBILL ===");
+        const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
         
         const products = (order.items || []).map(item => ({
             name: item.productName || "Produs Karix",
@@ -18,7 +14,7 @@ export const createSmartBillInvoice = async (order) => {
             quantity: item.qty || 1,
             price: (item.priceCentsAtBuy || item.priceCents || 0) / 100,
             isService: false,
-            vatRate: 19 // Sau 0 dacă ești neplătitor
+            vatRate: 19 // ATENȚIE: Dacă ești neplătitor de TVA, pune 0 aici!
         }));
 
         const payload = {
@@ -36,64 +32,68 @@ export const createSmartBillInvoice = async (order) => {
                 saveToDb: true
             },
             issueDate: new Date().toISOString().split("T")[0],
-            seriesName: process.env.SMARTBILL_SERIA,
+            seriesName: process.env.SMARTBILL_SERIA, // Trebuie să fie KRXCOMP
             isDraft: false,
             dueDate: new Date().toISOString().split("T")[0],
-            isCollecting: false,
+            isCollecting: false, // Fără chitanță
             observations: "ACHITAT ONLINE CU CARDUL (NETOPIA). NU MAI NECESITĂ PLATĂ.",
             products: products
         };
 
-        // Am adăugat timeout de 10 secunde ca să nu mai stea agățat
-        const response = await axios({
-            method: 'post',
-            url: "https://ws.smartbill.ro/SBIT/api/invoice",
+        const response = await fetch("https://ws.smartbill.ro/SBIT/api/invoice", {
+            method: "POST",
             headers: {
-                "Authorization": getAuthHeader(),
+                "Authorization": `Basic ${auth}`,
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KarixApp/1.0"
+                "User-Agent": "KarixApp/1.0"
             },
-            data: payload,
-            timeout: 10000 
+            body: JSON.stringify(payload)
         });
 
-        console.log("✅ FACTURA CREATĂ:", response.data.series, response.data.number);
-        return response.data;
+        const text = await response.text();
+        console.log("=== 2. RASPUNS SMARTBILL ===", text);
+
+        if (!response.ok) {
+            console.log("=== 3. EROARE DE LA SMARTBILL HTTP ===", response.status);
+            return null;
+        }
+
+        const data = JSON.parse(text);
+        console.log("=== 4. FACTURA CREATA ===", data.series, data.number);
+        return data;
 
     } catch (error) {
-        // Axios ne dă erori mult mai detaliate
-        if (error.response) {
-            console.error("❌ EROARE SMARTBILL (Server):", error.response.status, error.response.data);
-        } else if (error.request) {
-            console.error("❌ EROARE SMARTBILL (Rețea - Nu răspunde):", error.message);
-        } else {
-            console.error("❌ CRASH SMARTBILL SERVICE:", error.message);
-        }
+        console.log("=== CRASH IN COD (Ex: date lipsa din env) ===", error.message);
         return null;
     }
 };
 
 export const getSmartBillPdf = async (seriesName, number) => {
     try {
+        const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
         const cui = process.env.SMARTBILL_CUI;
         const url = `https://ws.smartbill.ro/SBIT/api/invoice/pdf?cui=${cui}&series=${seriesName}&number=${number}`;
         
-        const response = await axios({
-            method: 'get',
-            url: url,
+        const response = await fetch(url, {
+            method: "GET",
             headers: {
-                "Authorization": getAuthHeader(),
+                "Authorization": `Basic ${auth}`,
                 "Accept": "application/octet-stream",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KarixApp/1.0"
-            },
-            responseType: 'arraybuffer', // Axios știe să aducă fișiere ușor așa
-            timeout: 15000
+                "User-Agent": "KarixApp/1.0"
+            }
         });
 
-        return Buffer.from(response.data); 
+        if (!response.ok) {
+            const text = await response.text();
+            console.log("=== EROARE DESCARCARE PDF ===", text);
+            return null;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        return Buffer.from(arrayBuffer); 
     } catch (error) {
-        console.error("❌ Eroare Descărcare PDF SmartBill:", error.message);
+        console.log("=== CRASH DESCARCARE PDF ===", error.message);
         return null;
     } 
 };
