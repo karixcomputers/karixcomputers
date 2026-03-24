@@ -5,18 +5,15 @@ export const createSmartBillInvoice = async (order) => {
         console.log("=== 1. START SMARTBILL ===");
         const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
         
-        // Dacă nu trimitem taxName și taxPercentage, SmartBill dă 500
         const products = (order.items || []).map(item => ({
             name: item.productName || "Produs Karix",
             code: String(item.productId || "SKU"),
-            isDiscount: false,
             measuringUnitName: "buc",
             currency: "RON",
             quantity: item.qty || 1,
             price: Number(((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2)), 
             isTaxIncluded: true,
-            taxName: "Scutita",  // OBLIGATORIU
-            taxPercentage: 0     // OBLIGATORIU
+            vatRate: 19 // ATENTIE: Daca esti neplatitor de TVA, sterge 19 si pune 0 aici !!!
         }));
 
         const clientObj = {
@@ -30,13 +27,8 @@ export const createSmartBillInvoice = async (order) => {
             saveToDb: false
         };
 
-        // Adăugăm CUI doar dacă e firmă, ca să nu trimitem texte goale care dau crash
-        if (order.isCompany && order.cui) {
-            clientObj.vatCode = order.cui;
-        }
-        if (order.isCompany && order.regCom) {
-            clientObj.regCom = order.regCom;
-        }
+        if (order.isCompany && order.cui) clientObj.vatCode = order.cui;
+        if (order.isCompany && order.regCom) clientObj.regCom = order.regCom;
 
         const payload = {
             companyVatCode: process.env.SMARTBILL_CUI,
@@ -50,25 +42,25 @@ export const createSmartBillInvoice = async (order) => {
             products: products
         };
 
-        console.log("=== 2. DATE TRIMISE ===", JSON.stringify(payload));
-
+        // Rămânem pe SBORO, cu User-Agent ca să nu luăm 403
         const response = await fetch("https://ws.smartbill.ro/SBORO/api/invoice", {
             method: "POST",
             headers: {
                 "Authorization": `Basic ${auth}`,
                 "Content-Type": "application/json",
-                "Accept": "application/json"
+                "Accept": "application/json",
+                "User-Agent": "KarixApp/1.0"
             },
             body: JSON.stringify(payload)
         });
 
         const text = await response.text();
-        console.log("=== 3. RASPUNS SMARTBILL ===", text);
+        console.log("=== 2. RASPUNS SMARTBILL ===", text);
 
         if (!response.ok) return null;
 
         const data = JSON.parse(text);
-        console.log("=== 4. FACTURA CREATA ===", data.series, data.number);
+        console.log("=== 3. FACTURA CREATA ===", data.series, data.number);
         return data;
 
     } catch (error) {
@@ -81,13 +73,15 @@ export const getSmartBillPdf = async (seriesName, number) => {
     try {
         const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
         const cui = process.env.SMARTBILL_CUI;
+        
         const url = `https://ws.smartbill.ro/SBORO/api/invoice/pdf?cif=${cui}&seriesname=${seriesName}&number=${number}`;
         
         const response = await fetch(url, {
             method: "GET",
             headers: {
                 "Authorization": `Basic ${auth}`,
-                "Accept": "application/octet-stream"
+                "Accept": "application/octet-stream",
+                "User-Agent": "KarixApp/1.0"
             }
         });
 
