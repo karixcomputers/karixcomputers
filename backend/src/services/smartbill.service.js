@@ -9,7 +9,7 @@ export const createSmartBillInvoice = async (order) => {
     try {
         const authHeader = getAuthHeader();
         
-        // 1. Formatăm produsele pentru SmartBill
+        // Formatăm produsele pentru SmartBill
         const products = (order.items || []).map(item => {
             return {
                 name: item.productName || "Produs Karix",
@@ -25,7 +25,7 @@ export const createSmartBillInvoice = async (order) => {
             };
         });
 
-        // Fallback în caz că items e gol
+        // Fallback în caz că nu există produse explicite
         if (products.length === 0) {
             products.push({
                 name: `Comanda Karix #${order.id}`,
@@ -41,7 +41,6 @@ export const createSmartBillInvoice = async (order) => {
             });
         }
 
-        // 2. Construim cererea (Payload)
         const payload = {
             companyVatCode: process.env.SMARTBILL_CUI,
             client: {
@@ -49,8 +48,8 @@ export const createSmartBillInvoice = async (order) => {
                 vatCode: order.isCompany ? order.cui : "",
                 regCom: order.isCompany ? order.regCom : "",
                 address: order.shippingAddress || "Adresa nespecificata",
-                isTaxPayer: order.isCompany,
-                city: "Oradea", // Implicit (poti adapta daca adaugi camp separat de oras in baza de date)
+                isTaxPayer: !!order.isCompany,
+                city: "Oradea", 
                 county: "Bihor",
                 country: "Romania",
                 email: order.user?.email || "client@karix.ro",
@@ -58,12 +57,11 @@ export const createSmartBillInvoice = async (order) => {
             },
             issueDate: new Date().toISOString().split("T")[0],
             seriesName: process.env.SMARTBILL_SERIA,
-            isDraft: true, // <--- ⚠️ SETAT PE TRUE (CIORNĂ) PENTRU TESTE SIGURE
+            isDraft: false, // <--- AICI AM TRECUT PE FACTURĂ REALĂ
             dueDate: new Date().toISOString().split("T")[0],
             products: products
         };
 
-        // 3. Trimitem datele la SmartBill
         const response = await fetch("https://ws.smartbill.ro/SBORO/api/invoice", {
             method: "POST",
             headers: {
@@ -75,12 +73,15 @@ export const createSmartBillInvoice = async (order) => {
         });
 
         const data = await response.json();
+        
+        // Printează în consolă exact ce zice SmartBill (pentru control)
+        console.log("📄 Răspuns API SmartBill:", data);
 
         if (!response.ok) {
             throw new Error(data.errorText || "Eroare la crearea facturii în SmartBill");
         }
 
-        return data; // Returnează seria și numărul (ex: KRXCOMP 1)
+        return data; 
 
     } catch (error) {
         console.error("❌ Eroare SmartBill API:", error.message);
