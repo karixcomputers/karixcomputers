@@ -94,3 +94,5 @@ export const confirmPayment = async (req, res) => {
         res.status(500).send("Error");
     }
 };
+
+export default router;
