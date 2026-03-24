@@ -7,6 +7,9 @@ import { requireAuth } from "../middleware/auth.js";
 import { sendUnifiedOrderEmail } from "../services/mail.service.js";
 
 const router = express.Router();
+
+router.use(express.urlencoded({ extended: true }));
+
 const prisma = new PrismaClient();
 
 const privateKeyPath = path.resolve(process.env.NETOPIA_PRIVATE_KEY_PATH);
