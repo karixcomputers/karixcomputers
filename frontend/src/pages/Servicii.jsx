@@ -10,21 +10,25 @@ export default function Servicii() {
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
+  // --- HELPER IMAGINI (Pentru a vedea pozele urcate) ---
+  const getImageUrl = (img) => {
+    if (!img) return null;
+    if (img.startsWith("http")) return img;
+    return `https://karixcomputers.ro/api/uploads/${img}`;
+  };
+
   useEffect(() => {
     const fetchServices = async () => {
       try {
         const res = await apiFetch("/products");
-        
         if (res.ok) {
           const data = await res.json();
-          
           const onlyServices = data.filter(p => 
             p.category === "service" || 
             p.name.toLowerCase().includes("mentenanta") || 
             p.name.toLowerCase().includes("diagnosticare") ||
             p.name.toLowerCase().includes("service")
           );
-          
           setServices(onlyServices);
         }
       } catch (err) {
@@ -37,17 +41,17 @@ export default function Servicii() {
   }, []);
 
   const handleAddToCart = (service) => {
+    // MODIFICAT: Trimitem productName pentru a fi recunoscut de backend/email
     addItem({
       id: service.id,
-      name: service.name,
+      productName: service.name, // <--- REPARAT (era 'name')
       priceCents: service.priceCents, 
-      image: service.images?.[0] || null, 
+      image: getImageUrl(service.images?.[0]), // <--- REPARAT (helper imagini)
       category: 'service'
     });
 
     const id = Date.now(); 
     setToasts((prev) => [...prev, { id, message: `Ai adăugat "${service.name}" în coș!` }]);
-    
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
     }, 3000);
@@ -60,14 +64,10 @@ export default function Servicii() {
   );
 
   return (
-    /* Modificat: bg-[#0b1020] eliminat pentru a lăsa animația globală să se vadă */
     <div className="min-h-screen text-gray-200 relative pt-32 pb-24 px-4 overflow-hidden bg-transparent">
-      
-      {/* Glow discret peste animație pentru a scoate conținutul în evidență */}
       <div className="absolute top-20 left-10 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
       
       <div className="max-w-6xl mx-auto relative z-10">
-        
         <div className="text-center mb-16 md:mb-20">
           <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-4 drop-shadow-2xl uppercase italic">
             Karix <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Services</span>
@@ -86,13 +86,12 @@ export default function Servicii() {
             {services.map((service) => (
               <div 
                 key={service.id}
-                /* Modificat: Background semi-transparent cu blur pentru efectul de sticlă */
                 className="flex flex-col p-8 rounded-[32px] bg-white/5 border border-white/10 hover:border-indigo-500/40 transition-all duration-500 group backdrop-blur-md relative overflow-hidden text-center shadow-2xl"
               >
                 <div className="h-32 w-32 rounded-2xl flex items-center justify-center mb-6 border bg-white/5 border-white/10 overflow-hidden transition-transform duration-300 group-hover:scale-110 mx-auto shadow-inner">
                   {service.images && service.images[0] ? (
                     <img 
-                      src={service.images[0]} 
+                      src={getImageUrl(service.images[0])} 
                       alt={service.name} 
                       className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
                     />

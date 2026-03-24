@@ -3,8 +3,8 @@ import axios from "axios";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
 import { 
-  sendUnifiedOrderEmail, // Am importat noua funcție Master
-  sendOrderPlaced,       // Le păstrăm în import pentru siguranță, deși le vom înlocui în POST
+  sendUnifiedOrderEmail, 
+  sendOrderPlaced,       
   sendServiceOrderPlaced, 
   sendOrderReadyEmail, 
   sendOrderShippedEmail,
@@ -61,7 +61,7 @@ router.get("/admin/all", requireAuth, requireAdmin, async (req, res, next) => {
       where: { NOT: { status: { in: ["livrat", "anulat"] } } },
       orderBy: { createdAt: "desc" },
       include: { 
-        items: true,
+        items: true, 
         returnRequests: true,
         user: { select: { email: true, name: true, phone: true } } 
       },
@@ -146,7 +146,7 @@ router.patch("/:id/cancel", requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// 6. PATCH: Status Update Granular (ITEM STATUS) - REPARAT PENTRU ORADEA
+// 6. PATCH: Status Update Granular (ITEM STATUS)
 router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { itemId } = req.params;
@@ -204,10 +204,6 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
                       
     const isOradea = updatedItem.order.shippingAddress?.toLowerCase().includes('oradea');
 
-    // ===============================================
-    // LOGICĂ INTELIGENTĂ DE TRIMITERE MAILURI STATUS
-    // ===============================================
-
     if (status === "posesie") {
       await sendServiceInPossessionEmail(userEmail, emailData).catch(err => console.error(err));
     } 
@@ -218,15 +214,11 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
       await sendServiceUnrepairableEmail(userEmail, emailData).catch(err => console.error(err));
     } 
     else if (status === "gata_de_livrare") {
-      // Dacă e Oradea: Nu dăm mail. Presupunem că e gata de dus personal.
-      // Dacă e Service din Țară: Nu dăm mail, a primit deja mail de "reparat". Așteaptă doar AWB.
       if (!isOradea && !isService) {
-        // E PC de trimis prin curier. Dăm mail-ul de "PC-ul așteaptă curierul"
         await sendOrderReadyEmail(userEmail, emailData).catch(err => console.error(err));
       }
     } 
     else if (status === "predat_curier") {
-      // Dacă cumva s-a forțat statusul ăsta în Oradea (via API), îl blocăm oricum. E doar pt Curier.
       if (!isOradea) {
         if (isService) {
           await sendServiceShippedBackEmail(userEmail, emailData).catch(err => console.error(err));
@@ -240,22 +232,28 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
   } catch (e) { next(e); }
 });
 
-// 7. POST: Creare comandă (ACTUALIZATĂ COMPLET)
+// 7. POST: Creare comandă (REPARATĂ PENTRU SERVICII)
 router.post("/", requireAuth, async (req, res, next) => {
   try {
     const { client, cartItems, total, userEmail, pickupType, couponCode } = req.body;
     const randomOrderId = await generateUniqueOrderId();
+
+    // --- DETECȚIE TIP COMANDĂ PENTRU EMAIL ---
+    const containsServices = cartItems.some(item => {
+        const name = (item.name || item.productName || "").toLowerCase();
+        return item.category === 'service' || 
+               ['service', 'mentenanta', 'curatare', 'reparatie'].some(kw => name.includes(kw));
+    });
 
     const newOrder = await prisma.order.create({
       data: {
         id: randomOrderId,
         userId: req.user.sub,
         totalCents: total,
-        shippingName: client.isCompany ? client.companyName : client.name, // Salvăm numele corect în funcție de tip
+        shippingName: client.isCompany ? client.companyName : client.name,
         shippingPhone: client.phone,
         shippingAddress: `${client.city}, ${client.county}, ${client.addressDetails}`,
         
-        // --- SALVARE DATE B2B ---
         isCompany: client.isCompany || false,
         companyName: client.isCompany ? client.companyName : null,
         cui: client.isCompany ? client.cui : null,
@@ -263,17 +261,18 @@ router.post("/", requireAuth, async (req, res, next) => {
 
         items: {
           create: cartItems.map(item => {
-            const nameLower = (item.name || item.productName || "").toLowerCase();
-            const isService = (item.category === 'service') || 
-                              ['service', 'mentenanta', 'curatare', 'reparatie'].some(kw => nameLower.includes(kw));
+            const nameFinal = item.productName || item.name;
+            const nameLower = nameFinal.toLowerCase();
+            const isServiceItem = (item.category === 'service') || 
+                                  ['service', 'mentenanta', 'curatare', 'reparatie'].some(kw => nameLower.includes(kw));
             
             return {
               productId: String(item.id),
-              productName: item.name || item.productName, 
+              productName: nameFinal, 
               qty: item.qty || 1,
               priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
-              status: isService ? "in_asteptare_ridicare" : "in_asteptare",
-              warrantyMonths: item.warrantyMonths ? parseInt(item.warrantyMonths) : (isService ? 0 : 24)
+              status: isServiceItem ? "in_asteptare_ridicare" : "in_asteptare",
+              warrantyMonths: item.warrantyMonths ? parseInt(item.warrantyMonths) : (isServiceItem ? 0 : 24)
             };
           })
         }
@@ -281,7 +280,6 @@ router.post("/", requireAuth, async (req, res, next) => {
       include: { items: true }
     });
 
-    // --- INCREMENTARE FOLOSIRE CUPON ---
     if (couponCode) {
       await prisma.coupon.update({
         where: { code: couponCode.toUpperCase() },
@@ -290,32 +288,26 @@ router.post("/", requireAuth, async (req, res, next) => {
     }
 
     const commonMailData = {
-      client: client, // Obiectul client complet (conține acum și isCompany, cui, etc.)
+      client: client,
       orderId: newOrder.id,
       total: total,
       couponCode: couponCode || null,
       pickupType: pickupType,
+      isServiceOrder: containsServices, // <--- ADAUGAT: Trimitem flag-ul către Mail Service
       cartItems: cartItems.map(item => ({
-        name: item.name || item.productName,
+        name: item.productName || item.name, // <--- ASIGURĂM NUMELE CORECT
         qty: item.qty || 1,
         priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
         specs: item.specs 
       }))
     };
 
-    // ==========================================
-    // LOGICA UNIFICATĂ DE MAIL
-    // ==========================================
-    
-    // Trimitem confirmarea către client (1 singur apel care decide totul)
+    // Trimitem confirmarea către client
     await sendUnifiedOrderEmail(userEmail || req.user.email, commonMailData).catch(err => console.error(err));
 
-    // Trimitem confirmarea către Admin (1 singur apel care decide totul)
+    // Trimitem confirmarea către Admin
     const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
     await sendUnifiedOrderEmail(adminEmail, commonMailData, true).catch(err => console.error(err));
-
-    // Am șters restul if-urilor cu sendServiceOrderPlaced și sendOradeaPickupEmail
-    // Deoarece sendUnifiedOrderEmail acoperă acum toate acele scenarii.
 
     res.status(200).json({ success: true, orderId: newOrder.id });
 
@@ -325,39 +317,25 @@ router.post("/", requireAuth, async (req, res, next) => {
   }
 });
 
-// --- RUTĂ PROXY PENTRU ANAF (V9 STABIL + SAFE FALLBACK) ---
+// --- RUTĂ PROXY PENTRU ANAF ---
 router.post("/anaf", async (req, res) => {
   try {
     const { cui } = req.body;
     const numCui = Number(cui);
+    if (!numCui || isNaN(numCui)) return res.status(400).json({ error: "CUI invalid." });
 
-    if (!numCui || isNaN(numCui)) {
-      return res.status(400).json({ error: "CUI invalid." });
-    }
-
-    // Folosim API-ul oficial ANAF V9 🚀
     const response = await fetch("https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva", {
       method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache"
-      },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
       body: JSON.stringify([{ cui: numCui, data: new Date().toISOString().split("T")[0] }])
     });
 
-    if (!response.ok) {
-      console.warn(`⚠️ ANAF a răspuns cu status: ${response.status}`);
-      return res.status(200).json({ cod: 500, message: "ANAF indisponibil temporar" }); 
-    }
-
+    if (!response.ok) return res.status(200).json({ cod: 500, message: "ANAF indisponibil" }); 
     const anafData = await response.json();
     res.json(anafData);
-
   } catch (error) {
-    console.error("❌ Eroare conexiune ANAF:", error.message);
     res.status(200).json({ cod: 500, message: "Conexiune refuzată de ANAF." });
   }
 });
-
 
 export default router;
