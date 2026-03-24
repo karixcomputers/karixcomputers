@@ -119,7 +119,7 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
       const isActuallyService = item.isServiceItem || item.category === 'service';
       
       let details = !isActuallyService 
-        ? `<div style="font-size: 11px; color: #94a3b8; margin-top: 4px; font-style: italic;">⚡ Specificații hardware incluse</div>`
+        ? `<div style="font-size: 11px; color: #94a3b8; margin-top: 4px; font-style: italic;">⚡ PC</div>`
         : `<div style="font-size: 11px; color: #6366f1; margin-top: 4px; font-weight: bold; font-style: italic;">🛠️ Serviciu</div>`;
       
       const price = ((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2);
