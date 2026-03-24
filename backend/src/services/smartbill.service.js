@@ -2,33 +2,46 @@ import fetch from "node-fetch";
 
 export const createSmartBillInvoice = async (order) => {
     try {
-        console.log("=== 1. START SMARTBILL (Ultra-Safe) ===");
+        console.log("=== 1. START SMARTBILL ===");
         const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
         
+        // Câmpurile obligatorii de taxe REINTRODUSE (fără ele API-ul dă 500)
         const products = (order.items || []).map(item => ({
             name: item.productName || "Produs Karix",
             code: String(item.productId || "SKU"),
+            isDiscount: false,
             measuringUnitName: "buc",
             currency: "RON",
             quantity: item.qty || 1,
             price: Number(((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2)), 
-            isTaxIncluded: false // Scos tot ce ține de taxe ca să nu mai crape Java
+            isTaxIncluded: true,
+            taxName: "Scutita",  // Obligatoriu în schema lor
+            taxPercentage: 0     // Obligatoriu în schema lor
         }));
+
+        // Construim clientul FĂRĂ să îi dăm vatCode/regCom gol dacă e persoană fizică
+        const clientObj = {
+            name: order.isCompany ? order.companyName : (order.shippingName || "Client Karix"),
+            address: order.shippingAddress || "România",
+            isTaxPayer: !!order.isCompany,
+            city: "Oradea",
+            county: "Bihor",
+            country: "Romania",
+            email: order.user?.email || "karixcomputers@gmail.com",
+            saveToDb: false
+        };
+
+        // Doar dacă e firmă, îi atașăm CUI și RegCom
+        if (order.isCompany && order.cui) {
+            clientObj.vatCode = order.cui;
+        }
+        if (order.isCompany && order.regCom) {
+            clientObj.regCom = order.regCom;
+        }
 
         const payload = {
             companyVatCode: process.env.SMARTBILL_CUI,
-            client: {
-                name: order.isCompany ? order.companyName : (order.shippingName || "Client Karix"),
-                vatCode: order.isCompany ? (order.cui || "") : "", // Obligatoriu de trimis măcar gol
-                regCom: order.isCompany ? (order.regCom || "") : "",
-                address: order.shippingAddress || "România",
-                isTaxPayer: !!order.isCompany,
-                city: "Oradea",   // OBLIGATORIU
-                county: "Bihor",  // OBLIGATORIU
-                country: "Romania",
-                email: order.user?.email || "karixcomputers@gmail.com",
-                saveToDb: false
-            },
+            client: clientObj,
             issueDate: new Date().toISOString().split("T")[0],
             seriesName: process.env.SMARTBILL_SERIA,
             isDraft: false,
@@ -62,7 +75,7 @@ export const createSmartBillInvoice = async (order) => {
         return data;
 
     } catch (error) {
-        console.log("=== CRASH ===", error.message);
+        console.log("=== CRASH ==", error.message);
         return null;
     }
 };
@@ -82,9 +95,7 @@ export const getSmartBillPdf = async (seriesName, number) => {
             }
         });
 
-        if (!response.ok) {
-            return null;
-        }
+        if (!response.ok) return null;
 
         const arrayBuffer = await response.arrayBuffer();
         return Buffer.from(arrayBuffer); 
