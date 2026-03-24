@@ -57,8 +57,16 @@ export const createSmartBillInvoice = async (order) => {
             },
             issueDate: new Date().toISOString().split("T")[0],
             seriesName: process.env.SMARTBILL_SERIA,
-            isDraft: false, // <--- AICI AM TRECUT PE FACTURĂ REALĂ
+            isDraft: false, 
             dueDate: new Date().toISOString().split("T")[0],
+
+            // --- CELE 4 LINII PENTRU ACHITARE AUTOMATĂ ---
+            isCollecting: true,
+            collectingType: "Card",
+            collectingSeriesName: process.env.SMARTBILL_SERIA_CHITANTA, // <--- ADAUGĂ ACEASTĂ LINIE
+            observations: "Achitat online cu cardul (Netopia Payments).",
+            // ----------------------------------------------------
+
             products: products
         };
 

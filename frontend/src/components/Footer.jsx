@@ -33,26 +33,18 @@ export default function Footer() {
         {/* Secțiune Plăți & Autorități */}
         <div className="flex flex-col items-center gap-8 mb-10 w-full">
           {/* Plăți */}
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-600">Plăți securizate prin Netopia</p>
-            <div className="flex items-center gap-6">
-               <img 
-                 src="https://www.logo.wine/a/logo/Visa_Inc./Visa_Inc.-Logo.wine.svg" 
-                 alt="Visa" 
-                 className="h-10 md:h-12 -my-2 opacity-70 hover:opacity-100 transition-opacity object-contain" 
-               />
-               <img 
-                 src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png" 
-                 alt="Mastercard" 
-                 className="h-6 md:h-7 opacity-70 hover:opacity-100 transition-opacity object-contain" 
-               />
-                <img 
-                  src="/netopia.png" 
-                  alt="Netopia Payments" 
-                  className="h-6 md:h-7 opacity-70 hover:opacity-100 transition-opacity object-contain" 
-                />
-            </div>
-          </div>
+<div className="flex flex-col items-center gap-4">
+  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-600">
+    Plăți securizate prin Netopia
+  </p>
+  <div className="flex items-center justify-center">
+    <img 
+      src="https://mny.ro/np-black-0.svg" 
+      alt="Netopia Payments" 
+      className="h-10 md:h-12 opacity-70 hover:opacity-100 transition-opacity object-contain" 
+    />
+  </div>
+</div>
 
           {/* Autorități cu poze PNG */}
           {/* Modificat: Folosim flex-row și un gap mai mic pentru mobil pentru a forța alinierea stânga-dreapta */}
