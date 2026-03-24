@@ -16,10 +16,8 @@ export const createSmartBillInvoice = async (order) => {
             measuringUnitName: "buc",
             currency: "RON",
             quantity: item.qty || 1,
-            // AICI E REZOLVAREA 1: Fără toFixed, ca să rămână număr, nu string!
             price: (item.priceCentsAtBuy || item.priceCents || 0) / 100,
             isTaxIncluded: true
-            // AICI E REZOLVAREA 2: Am sters taxName si taxPercentage. SmartBill va pune automat ce ai setat in cont (probabil "Neplatitor").
         }));
 
         const payload = {
@@ -45,6 +43,8 @@ export const createSmartBillInvoice = async (order) => {
             products: products
         };
 
+        console.log("🚀 Trimitere date SmartBill...");
+
         const response = await fetch("https://ws.smartbill.ro/SBIT/api/invoice", {
             method: "POST",
             headers: {
@@ -55,17 +55,27 @@ export const createSmartBillInvoice = async (order) => {
             body: JSON.stringify(payload)
         });
 
-        const data = await response.json();
-        console.log("📄 Răspuns API SmartBill:", data);
+        // --- PARTEA DE DETECTIV ÎNCEPE AICI ---
+        const rawText = await response.text(); 
+        console.log("📡 RAW RESPONSE SMARTBILL:", rawText);
 
         if (!response.ok) {
-            throw new Error(data.errorText || "Eroare la crearea facturii");
+            console.error("❌ EROARE HTTP SMARTBILL:", response.status);
+            return null; // Oprim aici dacă avem eroare, ca să nu mai crape JSON-ul
         }
 
-        return data; 
+        try {
+            // Dacă răspunsul e OK (status 200), încercăm să-l transformăm în obiect
+            const data = JSON.parse(rawText);
+            console.log("✅ FACTURA CREATĂ CU SUCCES:", data.series, data.number);
+            return data;
+        } catch (parseError) {
+            console.error("❌ EROARE PARSARE JSON:", parseError.message);
+            return null;
+        }
 
     } catch (error) {
-        console.error("❌ Eroare SmartBill API:", error.message);
+        console.error("❌ CRASH TOTAL SMARTBILL SERVICE:", error.message);
         return null;
     }
 };
