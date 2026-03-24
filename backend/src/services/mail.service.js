@@ -43,7 +43,6 @@ export async function sendHtmlMail({ to, subject, html, attachments = [] }) {
     
     console.log(`✉️ Trimitere mail: [To: ${recipient}] [Subject: ${subject}]`);
     
-    // Acum await-ul va funcționa corect
     const info = await transporter.sendMail({ 
       from: env.MAIL_FROM, 
       to: recipient, 
@@ -62,60 +61,47 @@ export async function sendHtmlMail({ to, subject, html, attachments = [] }) {
 
 /**
  * ============================================================
- * 🚀 NOU: UNIFIED ORDER SYSTEM (FUNCȚIA MASTER ADĂUGATĂ)
- * Această funcție decide singură ce template și subiect să folosească.
- * O poți folosi în noul flow din orders.routes.js
+ * 🚀 UNIFIED ORDER SYSTEM (FUNCȚIA MASTER)
+ * Include suport pentru PDF-uri (Factură SmartBill)
  * ============================================================
  */
-export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
+export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invoiceBuffer = null) {
   try {
-    // 0. Standardizăm produsele și denumirile
     const products = (orderData.cartItems || orderData.items || []).map(i => ({
       ...i,
       displayName: i.productName || i.name || "Produs/Serviciu Karix"
     }));
 
-    // Verificăm dacă este Oradea
     const isOradea = orderData.pickupType === "KarixPersonal" || 
                      orderData.client?.city?.toLowerCase().includes("oradea");
     
-    // 1. Detectăm tipul de conținut (Prioritizăm flag-ul isServiceOrder trimis din rute)
     const hasService = orderData.isServiceOrder === true || products.some(i => i.isServiceItem === true || i.category === 'service');
     const hasPC = products.some(i => !i.isServiceItem && i.category !== 'service');
 
-    // LOG DE DEBUG (Apare în pm2 logs) - Verifică asta dacă mai ai probleme!
     console.log(`[MAIL SYSTEM] #${orderData.orderId}: hasService=${hasService}, hasPC=${hasPC}, isOradea=${isOradea}`);
 
-    // 2. Alegem Template-ul și Subiectul
-    let templateName = "orderPlaced.html"; // Default: Doar PC
+    let templateName = "orderPlaced.html"; 
     let subject = isAdmin ? "🟢 VÂNZARE NOUĂ" : "Confirmare Comandă - Karix Computers";
 
     if (hasService) {
       if (hasPC) {
-        // MIXED (PC + Service)
         templateName = isOradea ? "oradeaHybridOrder.html" : "serviceOradeaNotification.html";
         subject = isAdmin ? "🟣 MIXED ORDER" : "Confirmare Comandă Mix (PC + Service) - Karix Computers";
       } else {
-        // DOAR SERVICE
         templateName = isOradea ? "oradeaPickup.html" : "servicePlaced.html";
         subject = isAdmin ? "🛠️ SERVICE NOU" : "Instrucțiuni Expediere Service - Karix Computers";
       }
     } else if (isOradea && hasPC) {
-      // Doar PC, dar în Oradea
       templateName = "oradeaDeliveryPC.html";
       subject = isAdmin ? "🟢 VÂNZARE PC (Oradea)" : "Livrare Personală în Oradea - Karix Computers";
     }
 
-    // Dacă e mail pentru Admin, suprascriem template-ul dar păstrăm subiectul
     if (isAdmin) {
       templateName = "adminOrderNotification.html";
       subject = `${subject} #${orderData.id || orderData.orderId}`;
     }
 
-    // 3. Generăm lista de produse HTML unificată
     const itemsHtml = products.map(item => {
-      const s = item.specs || {}; 
-      // Verificăm dacă e hardware sau serviciu pentru designul rândului
       const isActuallyService = item.isServiceItem || item.category === 'service';
       
       let details = !isActuallyService 
@@ -136,7 +122,6 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
       `;
     }).join("");
 
-    // 4. Secțiune Date B2B (PJ)
     let billingHtml = "";
     if (orderData.client?.isCompany) {
       billingHtml = `
@@ -148,7 +133,6 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
       `;
     }
 
-    // 5. Discount Calculation
     let discountSectionHtml = "";
     const totalCents = orderData.total || orderData.totalCents || 0;
     if (orderData.couponCode) {
@@ -187,11 +171,23 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
       accountUrl: `https://karixcomputers.ro/orders`
     });
 
-    await sendHtmlMail({ 
+    const mailOptions = { 
         to: isAdmin ? (process.env.ADMIN_EMAIL || "karixcomputers@gmail.com") : to, 
         subject, 
-        html 
-    });
+        html,
+        attachments: []
+    };
+
+    // ATAȘĂM FACTURA SMARTBILL DACA EXISTĂ!
+    if (invoiceBuffer) {
+        mailOptions.attachments.push({
+            filename: `Factura_Karix_${orderData.id || orderData.orderId}.pdf`,
+            content: invoiceBuffer,
+            contentType: 'application/pdf'
+        });
+    }
+
+    await sendHtmlMail(mailOptions);
 
   } catch (err) {
     console.error("❌ Eroare sendUnifiedOrderEmail:", err);
@@ -199,18 +195,16 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false) {
 }
 
 /**
- * Confirmare comandă principală (Factura) - PĂSTRATĂ INTACTĂ
+ * Confirmare comandă principală
  */
 export async function sendOrderPlaced(to, orderData, isAdmin = false) {
   const templateName = isAdmin ? "adminOrderNotification.html" : "orderPlaced.html";
   const tpl = loadTemplate(templateName);
 
-  // 1. Identificăm produsele (Frontend: cartItems | Backend: items)
   const products = orderData.cartItems || orderData.items || [];
 
   const itemsHtml = products.map(item => {
     const borderColor = "#1e293b";
-    // Căutăm specificațiile (item.specs sau direct pe item)
     const s = item.specs || item; 
     const isHardwarePC = s.cpu || s.gpu || s.ram;
 
@@ -231,7 +225,6 @@ export async function sendOrderPlaced(to, orderData, isAdmin = false) {
       `;
     }
 
-    // REPARAȚIE PREȚ: Căutăm orice variantă de preț vine din DB/Frontend
     const rawPrice = item.priceCentsAtBuy || item.priceCents || item.price || 0;
     const priceFormatted = (rawPrice / 100).toFixed(2);
 
@@ -249,7 +242,6 @@ export async function sendOrderPlaced(to, orderData, isAdmin = false) {
     `;
   }).join("");
 
-  // 2. Secțiunea de Discount
   let discountSectionHtml = "";
   const totalCents = orderData.total || orderData.totalCents || 0;
   
@@ -274,12 +266,10 @@ export async function sendOrderPlaced(to, orderData, isAdmin = false) {
     }
   }
 
-  // 3. Extragere date client (Fallback total)
   const name = orderData.client?.name || orderData.customerName || orderData.shippingName || "Client Karix";
   const phone = orderData.client?.phone || orderData.phone || orderData.shippingPhone || "Nespecificat";
   const address = orderData.shippingAddress || (orderData.client ? `${orderData.client.addressDetails}, ${orderData.client.city}, ${orderData.client.county}` : "Nespecificată");
 
-  // 4. Render cu TOATE cheile posibile (ca să nu mai apară {{placeholder}})
   const finalTotalFormatted = (totalCents / 100).toFixed(2);
 
   const html = render(tpl, {
@@ -289,7 +279,6 @@ export async function sendOrderPlaced(to, orderData, isAdmin = false) {
     phone: phone,
     itemsList: itemsHtml,
     discountSection: discountSectionHtml,
-    // Trimitem ambele variante de cheie ca să fim siguri
     total: finalTotalFormatted, 
     finalTotal: finalTotalFormatted, 
     accountUrl: `https://karixcomputers.ro/orders`,
@@ -310,8 +299,9 @@ export async function sendOrderPlaced(to, orderData, isAdmin = false) {
 }
 
 /**
- * Service: Comandă plasată (Notificare Client) - PĂSTRATĂ INTACTĂ
+ * Toate funcțiile de Service, Oradea, Refund, Tickete rămân identice mai jos
  */
+
 export async function sendServiceOrderPlaced(to, data) {
   try {
     const tpl = loadTemplate("servicePlaced.html");
@@ -334,9 +324,6 @@ export async function sendServiceOrderPlaced(to, data) {
   }
 }
 
-/**
- * Service: Am intrat în posesia device-ului - PĂSTRATĂ INTACTĂ
- */
 export async function sendServiceInPossessionEmail(to, data) {
   try {
     const tpl = loadTemplate("serviceInPossession.html");
@@ -353,9 +340,6 @@ export async function sendServiceInPossessionEmail(to, data) {
   } catch (err) { console.error("Error sendServiceInPossessionEmail:", err); }
 }
 
-/**
- * Service: Reparat / Finalizat - PĂSTRATĂ INTACTĂ
- */
 export async function sendServiceFinishedEmail(to, data) {
   try {
     const tpl = loadTemplate("serviceFinished.html");
@@ -373,9 +357,6 @@ export async function sendServiceFinishedEmail(to, data) {
   } catch (err) { console.error("Error sendServiceFinishedEmail:", err); }
 }
 
-/**
- * Service: Expediat înapoi spre client (Retur) - PĂSTRATĂ INTACTĂ
- */
 export async function sendServiceShippedBackEmail(to, data) {
   try {
     const tpl = loadTemplate("serviceShippedBack.html");
@@ -393,9 +374,6 @@ export async function sendServiceShippedBackEmail(to, data) {
   } catch (err) { console.error("Error sendServiceShippedBackEmail:", err); }
 }
 
-/**
- * Oradea Logic - PĂSTRATĂ INTACTĂ
- */
 export async function sendOradeaPickupEmail(to, data) {
   try {
     const products = data.cartItems || data.items || [];
@@ -436,9 +414,6 @@ export async function sendOradeaPickupEmail(to, data) {
   }
 }
 
-/**
- * Status: Gata de livrare (PC-uri) - PĂSTRATĂ INTACTĂ
- */
 export async function sendOrderReadyEmail(to, data) {
   try {
     const tpl = loadTemplate("orderready.html");
@@ -451,9 +426,6 @@ export async function sendOrderReadyEmail(to, data) {
   } catch (err) { console.error(err); }
 }
 
-/**
- * Status: Predat curier (PC-uri) - PĂSTRATĂ INTACTĂ
- */
 export async function sendOrderShippedEmail(to, data) {
   try {
     const tpl = loadTemplate("ordershipped.html");
@@ -467,9 +439,6 @@ export async function sendOrderShippedEmail(to, data) {
   } catch (err) { console.error(err); }
 }
 
-/**
- * Status: Comandă Anulată (Refund) - PĂSTRATĂ INTACTĂ
- */
 export async function sendOrderCanceledEmail(to, data) {
   try {
     const tpl = loadTemplate("orderCanceled.html");
@@ -508,9 +477,6 @@ export async function sendResetPassword(to, resetUrl, name = "client") {
   await sendHtmlMail({ to, subject: "Resetare parolă Karix Computers", html });
 }
 
-/**
- * Service: Ireparabil - PĂSTRATĂ INTACTĂ
- */
 export async function sendServiceUnrepairableEmail(to, data) {
   try {
     const tpl = loadTemplate("serviceUnrepairable.html");
@@ -528,9 +494,6 @@ export async function sendServiceUnrepairableEmail(to, data) {
   } catch (err) { console.error("Error sendServiceUnrepairableEmail:", err); }
 }
 
-/**
- * TICKET: Client - Confirmare deschidere - PĂSTRATĂ INTACTĂ
- */
 export async function sendTicketOpenedEmail(to, data) {
   const tpl = loadTemplate("ticketOpened.html");
   const html = render(tpl, {
@@ -542,9 +505,6 @@ export async function sendTicketOpenedEmail(to, data) {
   await sendHtmlMail({ to, subject: `🎫 Tichet deschis: ${data.subject} (#${data.ticketId})`, html });
 }
 
-/**
- * TICKET: Admin - Notificare tichet nou - PĂSTRATĂ INTACTĂ
- */
 export async function sendAdminTicketAlert(data) {
   try {
     const tpl = loadTemplate("adminNewTicket.html");
@@ -569,9 +529,6 @@ export async function sendAdminTicketAlert(data) {
   }
 }
 
-/**
- * TICKET: Răspuns nou - PĂSTRATĂ INTACTĂ
- */
 export async function sendTicketResponseEmail(to, data) {
   const tpl = loadTemplate("ticketResponse.html");
   const html = render(tpl, {
@@ -583,9 +540,6 @@ export async function sendTicketResponseEmail(to, data) {
   await sendHtmlMail({ to, subject: `💬 Răspuns nou la tichetul #${data.ticketId}`, html });
 }
 
-/**
- * TICKET: Rezolvat - PĂSTRATĂ INTACTĂ
- */
 export async function sendTicketResolvedEmail(to, data) {
   const tpl = loadTemplate("ticketResolved.html");
   const html = render(tpl, {
@@ -594,8 +548,6 @@ export async function sendTicketResolvedEmail(to, data) {
   });
   await sendHtmlMail({ to, subject: `✅ Tichet rezolvat #${data.ticketId}`, html });
 }
-
-/* --- FUNCTII NOI SERVICE (ALERTE ADMIN - RAUL) --- PĂSTRATE INTACTE */
 
 export async function sendAdminServiceCourierAlert(data) {
   try {
@@ -642,9 +594,6 @@ export async function sendAdminServiceOradeaAlert(data) {
   }
 }
 
-/**
- * RETUR: Confirmare către Client (Bani + Ambalare) - PĂSTRATĂ INTACTĂ
- */
 export async function sendReturnConfirmation(to, data) {
   try {
     const templateFile = data.method === 'personal' 
@@ -674,9 +623,6 @@ export async function sendReturnConfirmation(to, data) {
   }
 }
 
-/**
- * RETUR: Alertă către Admin (Tine) - PĂSTRATĂ INTACTĂ
- */
 export async function sendAdminReturnAlert(data) {
   try {
     const tpl = loadTemplate("adminReturnAlert.html");
@@ -702,9 +648,6 @@ export async function sendAdminReturnAlert(data) {
   }
 }
 
-/**
- * RETUR: Recepționat OK - Totul e bine (Client) - PĂSTRATĂ INTACTĂ
- */
 export async function sendReturnReceivedOkEmail(to, data) {
   try {
     const tpl = loadTemplate("return-received-ok.html");
@@ -720,9 +663,6 @@ export async function sendReturnReceivedOkEmail(to, data) {
   } catch (err) { console.error("Eroare sendReturnReceivedOkEmail:", err); }
 }
 
-/**
- * RETUR: Recepționat cu Probleme - PĂSTRATĂ INTACTĂ
- */
 export async function sendReturnReceivedIssuesEmail(to, data) {
   try {
     const tpl = loadTemplate("return-received-issues.html");
@@ -742,9 +682,6 @@ export async function sendReturnReceivedIssuesEmail(to, data) {
   } catch (err) { console.error("Eroare sendReturnReceivedIssuesEmail:", err); }
 }
 
-/**
- * RETUR: Banii au fost plătiți (Client) - PĂSTRATĂ INTACTĂ
- */
 export async function sendReturnPaidEmail(to, data) {
   try {
     const tpl = loadTemplate("return-paid.html");
@@ -776,9 +713,6 @@ export async function sendReturnRejectedEmail(to, data) {
   } catch (err) { console.error("Error sendReturnRejectedEmail:", err); }
 }
 
-/**
- * VARIANTA 2: Expediat înapoi spre client (cea cu AWB și template nou) - PĂSTRATĂ INTACTĂ
- */
 export async function sendServiceShippedWithAwbEmail(to, data) {
   try {
     const tpl = loadTemplate("serviceShippedBackAwb.html");
@@ -800,9 +734,6 @@ export async function sendServiceShippedWithAwbEmail(to, data) {
   }
 }
 
-/**
- * Retur Respins: Trimitere AWB de înapoiere către client - PĂSTRATĂ INTACTĂ
- */
 export async function sendReturnRejectedAwbEmail(to, data) {
   try {
     const tpl = loadTemplate("returnRejectedAwb.html");
@@ -887,7 +818,6 @@ export const sendConfiguratorEmail = async (data) => {
     }
 };
 
-// Funcția pentru mail-ul de Bun Venit (Sincronizată cu restul sistemului) - PĂSTRATĂ INTACTĂ
 export const sendWelcomeEmail = async (email, customerName) => {
   try {
     const tpl = loadTemplate("welcome.html");
