@@ -11,15 +11,15 @@ export const createSmartBillInvoice = async (order) => {
         
         const products = (order.items || []).map(item => ({
             name: item.productName || "Produs Karix",
-            code: item.productId ? String(item.productId) : "SKU-00",
+            code: item.productId ? String(item.productId) : "SKU",
             isDiscount: false,
             measuringUnitName: "buc",
             currency: "RON",
             quantity: item.qty || 1,
-            price: ((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2),
-            isTaxIncluded: true,
-            taxName: "Scutita", 
-            taxPercentage: 0    
+            // AICI E REZOLVAREA 1: Fără toFixed, ca să rămână număr, nu string!
+            price: (item.priceCentsAtBuy || item.priceCents || 0) / 100,
+            isTaxIncluded: true
+            // AICI E REZOLVAREA 2: Am sters taxName si taxPercentage. SmartBill va pune automat ce ai setat in cont (probabil "Neplatitor").
         }));
 
         const payload = {
@@ -37,14 +37,10 @@ export const createSmartBillInvoice = async (order) => {
                 saveToDb: true
             },
             issueDate: new Date().toISOString().split("T")[0],
-            seriesName: process.env.SMARTBILL_SERIA,
+            seriesName: process.env.SMARTBILL_SERIA, // Trebuie sa fie KRXCOMP in .env
             isDraft: false,
             dueDate: new Date().toISOString().split("T")[0],
-
-            // --- AM SCOS TOTUL DE AICI ---
-            isCollecting: false, // Nu mai emite chitanță automat
-            // -----------------------------
-
+            isCollecting: false,
             observations: "FACTURĂ ACHITATĂ ONLINE CU CARDUL (NETOPIA). NU MAI NECESITĂ PLATĂ.",
             products: products
         };
@@ -79,7 +75,6 @@ export const getSmartBillPdf = async (seriesName, number) => {
         const authHeader = getAuthHeader();
         const cui = process.env.SMARTBILL_CUI;
         
-        // Folosim SBIT (endpoint-ul corect pentru facturi)
         const url = `https://ws.smartbill.ro/SBIT/api/invoice/pdf?cui=${cui}&series=${seriesName}&number=${number}`;
         
         const response = await fetch(url, {
