@@ -2,7 +2,7 @@ import fetch from "node-fetch";
 
 export const createSmartBillInvoice = async (order) => {
     try {
-        console.log("=== 1. START SMARTBILL ===");
+        console.log("=== 1. START SMARTBILL (Pe SBORO) ===");
         const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
         
         const products = (order.items || []).map(item => ({
@@ -14,7 +14,7 @@ export const createSmartBillInvoice = async (order) => {
             quantity: item.qty || 1,
             price: (item.priceCentsAtBuy || item.priceCents || 0) / 100,
             isService: false,
-            vatRate: 19 // ATENȚIE: Dacă ești neplătitor de TVA, pune 0 aici!
+            vatRate: 19 // ATENȚIE: Pune 0 aici dacă ești firmă neplătitoare de TVA!
         }));
 
         const payload = {
@@ -35,12 +35,13 @@ export const createSmartBillInvoice = async (order) => {
             seriesName: process.env.SMARTBILL_SERIA, // Trebuie să fie KRXCOMP
             isDraft: false,
             dueDate: new Date().toISOString().split("T")[0],
-            isCollecting: false, // Fără chitanță
+            isCollecting: false, 
             observations: "ACHITAT ONLINE CU CARDUL (NETOPIA). NU MAI NECESITĂ PLATĂ.",
             products: products
         };
 
-        const response = await fetch("https://ws.smartbill.ro/SBIT/api/invoice", {
+        // AM PUS SBORO - AICI E CONTUL TĂU
+        const response = await fetch("https://ws.smartbill.ro/SBORO/api/invoice", {
             method: "POST",
             headers: {
                 "Authorization": `Basic ${auth}`,
@@ -64,7 +65,7 @@ export const createSmartBillInvoice = async (order) => {
         return data;
 
     } catch (error) {
-        console.log("=== CRASH IN COD (Ex: date lipsa din env) ===", error.message);
+        console.log("=== CRASH IN COD ===", error.message);
         return null;
     }
 };
@@ -73,7 +74,9 @@ export const getSmartBillPdf = async (seriesName, number) => {
     try {
         const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
         const cui = process.env.SMARTBILL_CUI;
-        const url = `https://ws.smartbill.ro/SBIT/api/invoice/pdf?cui=${cui}&series=${seriesName}&number=${number}`;
+        
+        // AM PUS SBORO ȘI PARAMETRII CORECȚI (cif și seriesname)
+        const url = `https://ws.smartbill.ro/SBORO/api/invoice/pdf?cif=${cui}&seriesname=${seriesName}&number=${number}`;
         
         const response = await fetch(url, {
             method: "GET",
