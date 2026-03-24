@@ -1,102 +1,121 @@
 import fetch from "node-fetch";
 
+const getAuthHeader = () => {
+    const credentials = `${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`;
+    return `Basic ${Buffer.from(credentials).toString("base64")}`;
+};
+
 export const createSmartBillInvoice = async (order) => {
     try {
-        console.log("=== 1. START SMARTBILL (Ultra-Safe) ===");
-        const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
+        const authHeader = getAuthHeader();
         
-        const products = (order.items || []).map(item => ({
-            name: item.productName || "Produs Karix",
-            code: String(item.productId || "SKU"),
-            measuringUnitName: "buc",
-            currency: "RON",
-            quantity: item.qty || 1,
-            price: Number(((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2)), 
-            isTaxIncluded: true,
-            taxPercentage: 0 // Cel mai sigur mod pentru neplătitori/scutiți
-        }));
+        // Formatăm produsele pentru SmartBill
+        const products = (order.items || []).map(item => {
+            return {
+                name: item.productName || "Produs Karix",
+                code: item.productId ? String(item.productId) : "SKU-00",
+                isDiscount: false,
+                measuringUnitName: "buc",
+                currency: "RON",
+                quantity: item.qty || 1,
+                price: ((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2),
+                isTaxIncluded: true,
+                taxName: "Scutita", // Pentru firme neplătitoare de TVA
+                taxPercentage: 0    // 0% TVA
+            };
+        });
 
-        // Construim clientul dinamic (nu trimitem câmpuri goale care dau eroare 500)
-        const clientObj = {
-            name: order.isCompany ? order.companyName : (order.shippingName || "Client Karix"),
-            address: order.shippingAddress || "România",
-            country: "Romania",
-            email: order.user?.email || "",
-            saveToDb: false // AICI ERA BUBUIUL! Nu mai forțăm salvarea în agenda lor.
-        };
-
-        if (order.isCompany) {
-            clientObj.vatCode = order.cui;
-            clientObj.isTaxPayer = true;
-            if (order.regCom) clientObj.regCom = order.regCom; // Îl trimitem doar dacă există
-        } else {
-            clientObj.isTaxPayer = false;
+        // Fallback în caz că nu există produse explicite
+        if (products.length === 0) {
+            products.push({
+                name: `Comanda Karix #${order.id}`,
+                code: "CMD",
+                isDiscount: false,
+                measuringUnitName: "buc",
+                currency: "RON",
+                quantity: 1,
+                price: ((order.totalCents || 0) / 100).toFixed(2),
+                isTaxIncluded: true,
+                taxName: "Scutita",
+                taxPercentage: 0
+            });
         }
 
         const payload = {
             companyVatCode: process.env.SMARTBILL_CUI,
-            client: clientObj,
-            issueDate: new Date().toISOString().split("T")[0],
+            client: {
+                name: order.isCompany ? order.companyName : (order.shippingName || "Client Karix"),
+                vatCode: order.isCompany ? order.cui : "",
+                regCom: order.isCompany ? order.regCom : "",
+                address: order.shippingAddress || "Adresa nespecificata",
+                isTaxPayer: !!order.isCompany,
+                city: "Oradea", 
+                county: "Bihor",
+                country: "Romania",
+                email: order.user?.email || "client@karix.ro",
+                saveToDb: true
+            },
+issueDate: new Date().toISOString().split("T")[0],
             seriesName: process.env.SMARTBILL_SERIA,
-            isDraft: false,
+            isDraft: false, 
             dueDate: new Date().toISOString().split("T")[0],
-            isCollecting: false, 
-            observations: "ACHITAT ONLINE CU CARDUL (NETOPIA). NU MAI NECESITA PLATA.", // Fără diacritice, just in case
+
+            // --- CELE 4 LINII PENTRU ACHITARE AUTOMATĂ ---
+            isCollecting: true,
+            collectingType: "Card",
+            collectingSeriesName: process.env.SMARTBILL_SERIA_CHITANTA, // <--- ADAUGĂ ACEASTĂ LINIE
+            observations: "Achitat online cu cardul (Netopia Payments).",
+            // ----------------------------------------------------
+
             products: products
         };
-
-        // Printăm exact ce trimitem ca să vedem dacă e curat
-        console.log("=== 2. DATE TRIMISE ===", JSON.stringify(payload));
 
         const response = await fetch("https://ws.smartbill.ro/SBORO/api/invoice", {
             method: "POST",
             headers: {
-                "Authorization": `Basic ${auth}`,
+                "Authorization": authHeader,
                 "Content-Type": "application/json",
                 "Accept": "application/json"
             },
             body: JSON.stringify(payload)
         });
 
-        const text = await response.text();
-        console.log("=== 3. RASPUNS SMARTBILL ===", text);
+        const data = await response.json();
+        
+        // Printează în consolă exact ce zice SmartBill (pentru control)
+        console.log("📄 Răspuns API SmartBill:", data);
 
         if (!response.ok) {
-            return null;
+            throw new Error(data.errorText || "Eroare la crearea facturii în SmartBill");
         }
 
-        const data = JSON.parse(text);
-        console.log("=== 4. FACTURA CREATA ===", data.series, data.number);
-        return data;
+        return data; 
 
     } catch (error) {
-        console.log("=== CRASH ===", error.message);
+        console.error("❌ Eroare SmartBill API:", error.message);
         return null;
     }
 };
 
 export const getSmartBillPdf = async (seriesName, number) => {
     try {
-        const auth = Buffer.from(`${process.env.SMARTBILL_USER}:${process.env.SMARTBILL_TOKEN}`).toString("base64");
+        const authHeader = getAuthHeader();
         const cui = process.env.SMARTBILL_CUI;
         
-        const url = `https://ws.smartbill.ro/SBORO/api/invoice/pdf?cif=${cui}&seriesname=${seriesName}&number=${number}`;
-        
-        const response = await fetch(url, {
+        const response = await fetch(`https://ws.smartbill.ro/SBORO/api/invoice/pdf?cif=${cui}&seriesname=${seriesName}&number=${number}`, {
             method: "GET",
             headers: {
-                "Authorization": `Basic ${auth}`,
+                "Authorization": authHeader,
                 "Accept": "application/octet-stream"
             }
         });
 
-        if (!response.ok) {
-            return null;
-        }
+        if (!response.ok) throw new Error("Nu am putut descărca PDF-ul facturii.");
 
         const arrayBuffer = await response.arrayBuffer();
         return Buffer.from(arrayBuffer); 
     } catch (error) {
+        console.error("❌ Eroare Descărcare PDF SmartBill:", error.message);
         return null;
-    } 
+    }
 };
