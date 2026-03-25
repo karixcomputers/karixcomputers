@@ -141,7 +141,7 @@ export default function ResetPassword() {
                 Contul tău Karix a fost securizat cu noua parolă. Acum te poți autentifica.
               </p>
 
-              <Link to="/login" className="block w-full py-5 rounded-[20px] font-black text-[#0b1020] bg-white hover:bg-emerald-400 hover:text-white transition-all uppercase tracking-widest text-[11px] shadow-xl active:scale-95">
+              <Link to="/auth/login" className="block w-full py-5 rounded-[20px] font-black text-[#0b1020] bg-white hover:bg-emerald-400 hover:text-white transition-all uppercase tracking-widest text-[11px] shadow-xl active:scale-95">
                 Mergi la Login
               </Link>
             </div>
