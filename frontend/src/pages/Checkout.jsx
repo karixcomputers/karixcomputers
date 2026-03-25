@@ -359,7 +359,7 @@ export default function Checkout() {
       // 2. Logică separată de acțiune în funcție de metoda de plată
       if (paymentMethod === "online") {
         // Dacă s-a ales plata cu cardul, cerem datele de plată de la backend
-        // NU apelăm Discord, NU golim coșul încă!
+        // NU apelăm Discord, NU golim coșul încă! (Coșul se va goli după confirmarea plății)
         const paymentResponse = await fetch(`https://api.karixcomputers.ro/api/payments/netopia/pay/${data.orderId}`, {
           method: "POST",
           headers: { 
@@ -374,9 +374,6 @@ export default function Checkout() {
         if (!paymentResponse.ok) {
           throw new Error(paymentData.error || "Eroare la inițierea plății Netopia. Te rugăm să reîncerci.");
         }
-
-        // Totul e ok cu Netopia, abia ACUM golim coșul și redirecționăm
-        if (clearCart) clearCart();
 
         // Construim un formular ascuns pentru a trimite clientul la Netopia
         const form = document.createElement("form");
