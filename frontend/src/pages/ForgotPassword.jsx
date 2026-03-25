@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
+// IMPORTĂM COMPONENTA SEO
+import SEO from "../components/SEO";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -29,84 +31,90 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen pt-40 pb-24 px-4 relative flex justify-center bg-transparent">
-      
-      {/* Glow-uri de fundal */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-indigo-500/10 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-pink-500/10 blur-[120px] rounded-full animate-pulse" />
-      </div>
+    <>
+      {/* SEO: CONFIGURARE PENTRU PAGINA DE RECUPERARE PAROLĂ */}
+      <SEO 
+        title="Recuperare Parolă" 
+        description="Ai uitat parola contului tău Karix Computers? Introdu adresa de email pentru a primi un link securizat de resetare și a recăpăta accesul la comenzile și garanțiile tale."
+      />
 
-      <div className="max-w-md w-full mx-auto relative z-10 animate-in fade-in zoom-in duration-500">
-        {/* REPARAȚIE: Am mărit padding-ul de jos (pb-16) și am scos overflow-hidden pentru a nu tăia textul la colțuri */}
-        <div className="p-10 sm:p-12 pb-16 sm:pb-20 rounded-[50px] bg-[#161e31]/95 border border-white/10 backdrop-blur-3xl text-center shadow-3xl">
-          
-          {!success ? (
-            <>
-              <div className="h-16 w-16 rounded-[24px] bg-gradient-to-br from-indigo-500 to-pink-500 mx-auto mb-6 flex items-center justify-center text-2xl shadow-2xl">
-                🔐
-              </div>
-              
-              <h1 className="text-3xl font-black text-white tracking-tighter mb-2 italic uppercase drop-shadow-lg">
-                Recuperare <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Parolă</span>
-              </h1>
-              
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-8 italic px-4 leading-relaxed">
-                Introdu adresa de email asociată contului.
-              </p>
+      <div className="min-h-screen pt-40 pb-24 px-4 relative flex justify-center bg-transparent">
+        
+        {/* Glow-uri de fundal */}
+        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+          <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-indigo-500/10 blur-[120px] rounded-full animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-pink-500/10 blur-[120px] rounded-full animate-pulse" />
+        </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <input 
-                  required 
-                  type="email" 
-                  className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-5 text-white outline-none focus:border-indigo-500/50 transition-all text-sm font-bold tracking-wider text-center placeholder:text-xs" 
-                  placeholder="Email" 
-                  value={email} 
-                  onChange={(e) => setEmail(e.target.value)} 
-                />
+        <div className="max-w-md w-full mx-auto relative z-10 animate-in fade-in zoom-in duration-500">
+          <div className="p-10 sm:p-12 pb-16 sm:pb-20 rounded-[50px] bg-[#161e31]/95 border border-white/10 backdrop-blur-3xl text-center shadow-3xl">
+            
+            {!success ? (
+              <>
+                <div className="h-16 w-16 rounded-[24px] bg-gradient-to-br from-indigo-500 to-pink-500 mx-auto mb-6 flex items-center justify-center text-2xl shadow-2xl">
+                  🔐
+                </div>
+                
+                <h1 className="text-3xl font-black text-white tracking-tighter mb-2 italic uppercase drop-shadow-lg text-center">
+                  Recuperare <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Parolă</span>
+                </h1>
+                
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-8 italic px-4 leading-relaxed text-center">
+                  Introdu adresa de email asociată contului.
+                </p>
 
-                {error && (
-                  <p className="text-[10px] text-pink-500 font-bold uppercase tracking-tighter mt-2">{error}</p>
-                )}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <input 
+                    required 
+                    type="email" 
+                    className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-5 text-white outline-none focus:border-indigo-500/50 transition-all text-sm font-bold tracking-wider text-center placeholder:text-xs" 
+                    placeholder="Email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                  />
 
-                <button 
-                  disabled={loading || !email} 
-                  className="w-full py-5 rounded-[20px] font-black text-white bg-indigo-600 hover:bg-indigo-500 transition-all uppercase tracking-widest text-[11px] mt-4 shadow-lg shadow-indigo-600/20 active:scale-[0.98] disabled:opacity-50"
-                >
-                  {loading ? "Se Trimite..." : "Trimite Link"}
-                </button>
-              </form>
+                  {error && (
+                    <p className="text-[10px] text-pink-500 font-bold uppercase tracking-tighter mt-2">{error}</p>
+                  )}
 
-              {/* REPARAȚIE: Am ajustat marginile aici pentru a urca textul deasupra curbei colțului */}
-              <div className="mt-10 pt-6 border-t border-white/5">
-                <Link to="/auth/login" className="text-[10px] text-gray-500 hover:text-white font-black uppercase tracking-widest transition-colors italic">
-                  ← Înapoi la Autentificare
+                  <button 
+                    disabled={loading || !email} 
+                    className="w-full py-5 rounded-[20px] font-black text-white bg-indigo-600 hover:bg-indigo-500 transition-all uppercase tracking-widest text-[11px] mt-4 shadow-lg shadow-indigo-600/20 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {loading ? "Se Trimite..." : "Trimite Link"}
+                  </button>
+                </form>
+
+                <div className="mt-10 pt-6 border-t border-white/5 text-center">
+                  <Link to="/auth/login" className="text-[10px] text-gray-500 hover:text-white font-black uppercase tracking-widest transition-colors italic">
+                    ← Înapoi la Autentificare
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <div className="animate-in fade-in zoom-in duration-300">
+                <div className="h-20 w-20 rounded-[30px] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-6 shadow-inner shadow-emerald-500/20">
+                  <span className="text-4xl drop-shadow-lg">✉️</span>
+                </div>
+                
+                <h2 className="text-2xl font-black text-white tracking-tighter mb-4 italic uppercase drop-shadow-lg text-center">
+                  Verifică <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Email-ul</span>
+                </h2>
+                
+                <p className="text-gray-300 font-medium tracking-tight text-sm leading-relaxed mb-8 px-2 text-center">
+                  Am trimis un link de resetare a parolei către <br/>
+                  <span className="text-white font-bold">{email}</span>
+                </p>
+
+                <Link to="/auth/login" className="block w-full py-5 rounded-[20px] font-black text-[#0b1020] bg-white hover:bg-emerald-400 hover:text-white transition-all uppercase tracking-widest text-[11px] shadow-xl active:scale-95 text-center">
+                  Întoarce-te la Login
                 </Link>
               </div>
-            </>
-          ) : (
-            <div className="animate-in fade-in zoom-in duration-300">
-              <div className="h-20 w-20 rounded-[30px] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-6 shadow-inner shadow-emerald-500/20">
-                <span className="text-4xl drop-shadow-lg">✉️</span>
-              </div>
-              
-              <h2 className="text-2xl font-black text-white tracking-tighter mb-4 italic uppercase drop-shadow-lg">
-                Verifică <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Email-ul</span>
-              </h2>
-              
-              <p className="text-gray-300 font-medium tracking-tight text-sm leading-relaxed mb-8 px-2">
-                Am trimis un link de resetare a parolei către <br/>
-                <span className="text-white font-bold">{email}</span>
-              </p>
+            )}
 
-              <Link to="/auth/login" className="block w-full py-5 rounded-[20px] font-black text-[#0b1020] bg-white hover:bg-emerald-400 hover:text-white transition-all uppercase tracking-widest text-[11px] shadow-xl active:scale-95">
-                Întoarce-te la Login
-              </Link>
-            </div>
-          )}
-
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

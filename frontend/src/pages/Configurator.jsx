@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
+// IMPORTĂM COMPONENTA SEO
+import SEO from "../components/SEO";
 
 export default function Configurator() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(null); 
   const [extraInfo, setExtraInfo] = useState("");
   const [contactEmail, setContactEmail] = useState("");
-  const [caseText, setCaseText] = useState(""); // State pentru textul de la carcasă
+  const [caseText, setCaseText] = useState(""); 
 
-  // State pentru componentele încărcate dinamic
   const [dbComponents, setDbComponents] = useState({
     cpu: [], gpu: [], ram: [], storage: [], motherboard: [], cooler: [], psu: []
   });
@@ -30,7 +31,7 @@ export default function Configurator() {
   useEffect(() => {
     const fetchConfigComponents = async () => {
       try {
-        const res = await apiFetch("/adminconfigurator");
+        const res = await apiFetch("/api/adminconfigurator");
         if (res.ok) {
           const items = await res.json();
           const grouped = { cpu: [], gpu: [], ram: [], storage: [], motherboard: [], cooler: [], psu: [] };
@@ -67,13 +68,13 @@ export default function Configurator() {
         motherboard: selected.motherboard?.name || "Neselectat",
         cooler: selected.cooler?.name || "Neselectat",
         psu: selected.psu?.name || "Neselectat",
-        case: caseText || "Neselectat", // Trimitem textul scris de user
+        case: caseText || "Neselectat", 
       },
       extra_info: extraInfo || "Fără detalii suplimentare",
     };
 
     try {
-      const response = await fetch("http://192.168.0.162:4000/api/configurator/send", {
+      const response = await fetch("https://api.karixcomputers.ro/api/configurator/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -148,200 +149,205 @@ export default function Configurator() {
   );
 
   return (
-    <div className="min-h-screen pt-32 pb-20 px-4 sm:px-6 bg-transparent relative overflow-hidden font-sans">
-      
-      <div className="absolute inset-0 pointer-events-none z-0">
-        <div className="absolute top-1/4 -left-20 w-[600px] h-[600px] bg-indigo-500/10 blur-[120px] rounded-full animate-blob" />
-        <div className="absolute bottom-1/4 -right-20 w-[600px] h-[600px] bg-pink-500/10 blur-[120px] rounded-full animate-blob animation-delay-2000" />
-      </div>
+    <>
+      {/* SEO: CONFIGURATOR PC */}
+      <SEO 
+        title="Configurator PC Custom"
+        description="Construiește-ți propriul PC de gaming sau workstation cu Karix Computers. Alege componentele, iar noi ne ocupăm de asamblare profesională, wire-management și testare."
+      />
 
-      <div className="max-w-6xl mx-auto relative z-10">
-        <header className="mb-12">
-          <h1 className="text-5xl md:text-6xl font-black text-white italic tracking-tighter uppercase mb-2">
-            Custom <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500">Build</span>
-          </h1>
-          <p className="text-gray-500 text-[10px] font-bold uppercase tracking-[0.3em]">Configurează sistemul tău de performanță</p>
-        </header>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-          
-          <div className="lg:col-span-8 space-y-16 text-left">
-            <section>
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-2xl">🧠</span>
-                <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Procesor</h2>
-              </div>
-              <BrandSwitcher current={cpuBrand} setBrand={setCpuBrand} options={["Intel", "AMD"]} />
-              {renderComponentList("cpu", cpuBrand)}
-            </section>
-
-            <section>
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-2xl">🎮</span>
-                <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Placă Video</h2>
-              </div>
-              <BrandSwitcher current={gpuBrand} setBrand={setGpuBrand} options={["Nvidia", "AMD"]} />
-              {renderComponentList("gpu", gpuBrand)}
-            </section>
-
-            <section>
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-2xl">⚡</span>
-                <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Memorie RAM</h2>
-              </div>
-              {renderComponentList("ram")}
-            </section>
-
-            <section>
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-2xl">💾</span>
-                <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Stocare SSD</h2>
-              </div>
-              {renderComponentList("storage")}
-            </section>
-
-            {/* SECȚIUNE NOUĂ: PLACĂ DE BAZĂ */}
-            <section>
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-2xl">🧩</span>
-                <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Placă de bază</h2>
-              </div>
-              {renderComponentList("motherboard")}
-            </section>
-
-            {/* SECȚIUNE NOUĂ: COOLER */}
-            <section>
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-2xl">❄️</span>
-                <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Sistem de răcire</h2>
-              </div>
-              {renderComponentList("cooler")}
-            </section>
-
-            <section>
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-2xl">🔌</span>
-                <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Sursă Alimentare</h2>
-              </div>
-              {renderComponentList("psu")}
-            </section>
-
-            {/* SECȚIUNE NOUĂ: CARCASĂ (CU TEXT) */}
-            <section>
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-2xl">📦</span>
-                <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Carcasă</h2>
-              </div>
-              <div className="p-1 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md">
-                <textarea 
-                  value={caseText}
-                  onChange={(e) => setCaseText(e.target.value)}
-                  placeholder="Introdu numele carcasei dorite sau un link către ea..."
-                  className="w-full h-24 bg-transparent border-none p-4 text-xs text-white placeholder:text-gray-600 focus:ring-0 resize-none"
-                />
-              </div>
-              <p className="text-[9px] text-gray-500 uppercase mt-2 ml-1">Vom verifica compatibilitatea carcasei cu restul componentelor alese.</p>
-            </section>
-          </div>
-
-          <aside className="lg:col-span-4 sticky top-28 text-left">
-            <div className="p-8 rounded-[32px] bg-white/[0.03] border border-white/10 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full" />
-              
-              <h3 className="text-lg font-black text-white uppercase italic tracking-tighter mb-6 border-b border-white/5 pb-4">
-                Configurația Ta
-              </h3>
-              
-              <div className="space-y-4 mb-8">
-                {[
-                  { label: "Procesor", val: selected.cpu },
-                  { label: "Placă Video", val: selected.gpu },
-                  { label: "RAM", val: selected.ram },
-                  { label: "Stocare", val: selected.storage },
-                  { label: "Placă Bază", val: selected.motherboard },
-                  { label: "Cooler", val: selected.cooler },
-                  { label: "Sursă", val: selected.psu },
-                  { label: "Carcasă", val: caseText ? { name: caseText } : null },
-                ].map((item, i) => (
-                  <div key={i} className="flex justify-between items-start text-[11px]">
-                    <span className="text-gray-600 uppercase font-bold tracking-widest shrink-0 mr-4">{item.label}:</span>
-                    <span className={item.val ? "text-indigo-400 font-bold text-right break-words max-w-[150px]" : "text-gray-800 italic"}>
-                      {item.val ? item.val.name : "Neselectat"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3 ml-1">Email de contact</label>
-                <input 
-                  type="email"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="client@gmail.com"
-                  className="w-full bg-white/[0.05] border border-white/10 rounded-xl p-4 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all backdrop-blur-md"
-                />
-              </div>
-
-              <div className="mb-8">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3 ml-1">Detalii suplimentare</label>
-                <textarea 
-                  value={extraInfo}
-                  onChange={(e) => setExtraInfo(e.target.value)}
-                  placeholder="Utilizare, buget, etc ..."
-                  className="w-full h-32 bg-white/[0.05] border border-white/10 rounded-2xl p-4 text-xs text-white placeholder:text-gray-700 focus:outline-none focus:border-indigo-500/50 transition-all resize-none backdrop-blur-md"
-                />
-              </div>
-
-              <div className="pt-6 border-t border-white/5 text-center">
-                <button 
-                  onClick={handleSendOffer}
-                  disabled={!selected.cpu || !selected.gpu || loading}
-                  className={`w-full py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] italic transition-all flex items-center justify-center gap-3 ${
-                    status === "success" 
-                      ? "bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]" 
-                      : "bg-white text-black hover:bg-indigo-600 hover:text-white hover:shadow-[0_0_30px_rgba(79,70,229,0.4)]"
-                  } disabled:opacity-5`}
-                >
-                  {loading ? (
-                    <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  ) : status === "success" ? (
-                    "CERERE TRIMISĂ!"
-                  ) : (
-                    "SOLICITĂ OFERTĂ"
-                  )}
-                </button>
-
-                {status === "error" && (
-                  <p className="text-pink-500 text-[10px] mt-4 font-bold uppercase tracking-widest">Eroare server.</p>
-                )}
-                
-                <p className="text-[9px] text-gray-600 mt-6 leading-relaxed italic uppercase tracking-wider">
-                  {status === "success" 
-                    ? "Te vom contacta în cel mai scurt timp!"
-                    : "Analizăm configurația și revenim cu prețul final."
-                  }
-                </p>
-              </div>
-            </div>
-          </aside>
+      <div className="min-h-screen pt-32 pb-20 px-4 sm:px-6 bg-transparent relative overflow-hidden font-sans text-left">
+        
+        <div className="absolute inset-0 pointer-events-none z-0">
+          <div className="absolute top-1/4 -left-20 w-[600px] h-[600px] bg-indigo-500/10 blur-[120px] rounded-full animate-blob" />
+          <div className="absolute bottom-1/4 -right-20 w-[600px] h-[600px] bg-pink-500/10 blur-[120px] rounded-full animate-blob animation-delay-2000" />
         </div>
-      </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
-        .animate-blob {
-          animation: blob 12s infinite alternate ease-in-out;
-        }
-        .animation-delay-2000 {
-          animation-delay: 4s;
-        }
-      `}} />
-    </div>
-  );
+        <div className="max-w-6xl mx-auto relative z-10">
+          <header className="mb-12">
+            <h1 className="text-5xl md:text-6xl font-black text-white italic tracking-tighter uppercase mb-2">
+              Custom <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500">Build</span>
+            </h1>
+            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-[0.3em]">Configurează sistemul tău de performanță</p>
+          </header>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            
+            <div className="lg:col-span-8 space-y-16">
+              <section>
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-2xl">🧠</span>
+                  <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Procesor</h2>
+                </div>
+                <BrandSwitcher current={cpuBrand} setBrand={setCpuBrand} options={["Intel", "AMD"]} />
+                {renderComponentList("cpu", cpuBrand)}
+              </section>
+
+              <section>
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-2xl">🎮</span>
+                  <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Placă Video</h2>
+                </div>
+                <BrandSwitcher current={gpuBrand} setBrand={setGpuBrand} options={["Nvidia", "AMD"]} />
+                {renderComponentList("gpu", gpuBrand)}
+              </section>
+
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-2xl">⚡</span>
+                  <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Memorie RAM</h2>
+                </div>
+                {renderComponentList("ram")}
+              </section>
+
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-2xl">💾</span>
+                  <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Stocare SSD</h2>
+                </div>
+                {renderComponentList("storage")}
+              </section>
+
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-2xl">🧩</span>
+                  <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Placă de bază</h2>
+                </div>
+                {renderComponentList("motherboard")}
+              </section>
+
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-2xl">❄️</span>
+                  <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Sistem de răcire</h2>
+                </div>
+                {renderComponentList("cooler")}
+              </section>
+
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-2xl">🔌</span>
+                  <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Sursă Alimentare</h2>
+                </div>
+                {renderComponentList("psu")}
+              </section>
+
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-2xl">📦</span>
+                  <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Carcasă</h2>
+                </div>
+                <div className="p-1 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md">
+                  <textarea 
+                    value={caseText}
+                    onChange={(e) => setCaseText(e.target.value)}
+                    placeholder="Introdu numele carcasei dorite sau un link către ea..."
+                    className="w-full h-24 bg-transparent border-none p-4 text-xs text-white placeholder:text-gray-600 focus:ring-0 resize-none"
+                  />
+                </div>
+                <p className="text-[9px] text-gray-500 uppercase mt-2 ml-1">Vom verifica compatibilitatea carcasei cu restul componentelor alese.</p>
+              </section>
+            </div>
+
+            <aside className="lg:col-span-4 sticky top-28">
+              <div className="p-8 rounded-[32px] bg-white/[0.03] border border-white/10 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full" />
+                
+                <h3 className="text-lg font-black text-white uppercase italic tracking-tighter mb-6 border-b border-white/5 pb-4">
+                  Configurația Ta
+                </h3>
+                
+                <div className="space-y-4 mb-8">
+                  {[
+                    { label: "Procesor", val: selected.cpu },
+                    { label: "Placă Video", val: selected.gpu },
+                    { label: "RAM", val: selected.ram },
+                    { label: "Stocare", val: selected.storage },
+                    { label: "Placă Bază", val: selected.motherboard },
+                    { label: "Cooler", val: selected.cooler },
+                    { label: "Sursă", val: selected.psu },
+                    { label: "Carcasă", val: caseText ? { name: caseText } : null },
+                  ].map((item, i) => (
+                    <div key={i} className="flex justify-between items-start text-[11px]">
+                      <span className="text-gray-600 uppercase font-bold tracking-widest shrink-0 mr-4">{item.label}:</span>
+                      <span className={item.val ? "text-indigo-400 font-bold text-right break-words max-w-[150px]" : "text-gray-800 italic"}>
+                        {item.val ? item.val.name : "Neselectat"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3 ml-1">Email de contact</label>
+                  <input 
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="client@gmail.com"
+                    className="w-full bg-white/[0.05] border border-white/10 rounded-xl p-4 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all backdrop-blur-md"
+                  />
+                </div>
+
+                <div className="mb-8">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3 ml-1">Detalii suplimentare</label>
+                  <textarea 
+                    value={extraInfo}
+                    onChange={(e) => setExtraInfo(e.target.value)}
+                    placeholder="Utilizare, buget, etc ..."
+                    className="w-full h-32 bg-white/[0.05] border border-white/10 rounded-2xl p-4 text-xs text-white placeholder:text-gray-700 focus:outline-none focus:border-indigo-500/50 transition-all resize-none backdrop-blur-md"
+                  />
+                </div>
+
+                <div className="pt-6 border-t border-white/5 text-center">
+                  <button 
+                    onClick={handleSendOffer}
+                    disabled={!selected.cpu || !selected.gpu || loading}
+                    className={`w-full py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] italic transition-all flex items-center justify-center gap-3 ${
+                      status === "success" 
+                        ? "bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]" 
+                        : "bg-white text-black hover:bg-indigo-600 hover:text-white hover:shadow-[0_0_30px_rgba(79,70,229,0.4)]"
+                    } disabled:opacity-5`}
+                  >
+                    {loading ? (
+                      <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : status === "success" ? (
+                      "CERERE TRIMISĂ!"
+                    ) : (
+                      "SOLICITĂ OFERTĂ"
+                    )}
+                  </button>
+
+                  {status === "error" && (
+                    <p className="text-pink-500 text-[10px] mt-4 font-bold uppercase tracking-widest">Eroare server.</p>
+                  )}
+                  
+                  <p className="text-[9px] text-gray-600 mt-6 leading-relaxed italic uppercase tracking-wider">
+                    {status === "success" 
+                      ? "Te vom contacta în cel mai scurt timp!"
+                      : "Analizăm configurația și revenim cu prețul final."
+                    }
+                  </p>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <style dangerouslySetInnerHTML={{ __html: `
+          @keyframes blob {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0px, 0px) scale(1); }
+          }
+          .animate-blob {
+            animation: blob 12s infinite alternate ease-in-out;
+          }
+          .animation-delay-2000 {
+            animation-delay: 4s;
+          }
+        `}} />
+      </div>
+    </>
+  ); 
 }

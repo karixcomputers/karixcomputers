@@ -3,6 +3,8 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { formatRON } from "../utils/money";
+// IMPORTĂM COMPONENTA SEO
+import SEO from "../components/SEO";
 
 const JUDETE = [
   "Alba", "Arad", "Argeș", "Bacău", "Bihor", "Bistrița-Năsăud", "Botoșani", "Brașov", "Brăila", "București", 
@@ -30,14 +32,14 @@ const parseAnafAddress = (rawAddress, judeteList) => {
     const judMatch = addr.match(/JUD\.\s*([^,]+)/);
     if (judMatch) {
       county = judMatch[1].trim();
-      addr = addr.replace(judMatch[0], ''); // Ștergem județul din adresă
+      addr = addr.replace(judMatch[0], ''); 
     }
 
     // 3. Extragere Oraș / Localitate
     const cityMatch = addr.match(/(?:MUN\.|OR[ŞS]\.|COM\.|SAT)\s*([^,]+)/);
     if (cityMatch) {
       city = cityMatch[1].trim();
-      addr = addr.replace(cityMatch[0], ''); // Ștergem orașul din adresă
+      addr = addr.replace(cityMatch[0], ''); 
     }
   }
 
@@ -142,19 +144,16 @@ export default function Checkout() {
 
   const appliedCoupon = location.state?.coupon || null;
 
-  // Analiza superioară a coșului
   const cartAnalysis = useMemo(() => {
     const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie'];
     
     const hasPC = items.some(item => {
       const name = (item.productName || item.name || "").toLowerCase();
-      // Un produs e considerat PC dacă are category='pc', sau specs de cpu/gpu
       return (item.specs && (item.specs.cpu || item.specs.gpu)) || item.category === 'pc';
     });
 
     const hasService = items.some(item => {
       const name = (item.productName || item.name || "").toLowerCase();
-      // E serviciu fie din categorie, fie din titlu (dacă n-avem categorie setată)
       return item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => name.includes(kw)));
     });
 
@@ -224,22 +223,15 @@ export default function Checkout() {
   }, [appliedCoupon, currentSubtotal]);
 
   const shippingCents = useMemo(() => {
-    // 1. REGELE: Peste 1000 RON (100000 cenți), este automat Gratuit
     if (currentSubtotal >= 100000) {
       return 0; 
     }
-    
-    // 2. Sub 1000 RON: Dacă există un serviciu în coș, taxa e 30 RON tur-retur (indiferent de Oradea sau nu)
     if (cartAnalysis.hasService) {
       return 3000; 
     }
-    
-    // 3. Sub 1000 RON: Dacă NU are serviciu (e produs) și alege ridicare personală în Oradea
     if (pickupByKarix) {
       return 0; 
     }
-    
-    // 4. Sub 1000 RON: Livrare standard curier produse fizice
     return 2500; 
   }, [cartAnalysis.hasService, currentSubtotal, pickupByKarix]);
 
@@ -276,11 +268,9 @@ export default function Checkout() {
 
       if (data && data.found && data.found.length > 0) {
         const companyData = data.found[0].date_generale || data.found[0];
-        
         const numeFirma = companyData.denumire || "";
         const registruComertului = companyData.nrRegCom || "";
         const telefonFirma = companyData.telefon || "";
-        
         const parsedAddress = parseAnafAddress(companyData.adresa || "", JUDETE);
 
         const isBihor = parsedAddress.county?.toLowerCase() === "bihor";
@@ -367,7 +357,6 @@ export default function Checkout() {
     };
 
     try {
-      // 1. Salvăm comanda în baza de date
       const response = await fetch("https://api.karixcomputers.ro/api/orders", {
         method: "POST",
         headers: { 
@@ -381,7 +370,6 @@ export default function Checkout() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Eroare la procesarea comenzii.");
       
-      // 2. Logică separată de acțiune în funcție de metoda de plată
       if (paymentMethod === "online") {
         const paymentResponse = await fetch(`https://api.karixcomputers.ro/api/payments/netopia/pay/${data.orderId}`, {
           method: "POST",
@@ -432,278 +420,279 @@ export default function Checkout() {
   };
 
   return (
-    <div className="min-h-screen pt-32 pb-24 px-4 sm:px-6 relative overflow-hidden bg-transparent text-left font-sans">
-      <div className="absolute top-1/4 -left-20 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-20 w-[500px] h-[500px] bg-pink-500/5 blur-[120px] rounded-full pointer-events-none" />
+    <>
+      <SEO 
+        title="Finalizare Comandă"
+        description="Ești la un pas de a deține un sistem Karix sau de a-ți repara echipamentul. Finalizează comanda acum pentru livrare rapidă și suport tehnic de elită."
+      />
 
-      <div className="max-w-6xl mx-auto relative z-10">
-        <div className="flex items-center gap-4 mb-12">
-          <Link to="/cart" className="p-3 rounded-2xl bg-white/5 border border-white/10 text-gray-400 hover:text-white backdrop-blur-md transition-all group shadow-xl">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <h1 className="text-4xl font-black text-white tracking-tight italic drop-shadow-2xl uppercase">
-            Finalizare <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Comandă</span>
-          </h1>
-        </div>
+      <div className="min-h-screen pt-32 pb-24 px-4 sm:px-6 relative overflow-hidden bg-transparent text-left font-sans">
+        <div className="absolute top-1/4 -left-20 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-1/4 -right-20 w-[500px] h-[500px] bg-pink-500/5 blur-[120px] rounded-full pointer-events-none" />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          
-          <div className="lg:col-span-7 space-y-6">
-            
-            {/* 1. Date de Contact & Tip Facturare */}
-            <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">1. Date Facturare</h2>
-                
-                {/* SELECTOR PF / PJ */}
-                <div className="flex p-1 bg-black/20 rounded-xl border border-white/5 w-full sm:w-fit">
-                  <button 
-                    onClick={handleSwitchToPerson}
-                    className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${!shipping.isCompany ? 'bg-white text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}
-                  >
-                    Pers. Fizică
-                  </button>
-                  <button 
-                    onClick={handleSwitchToCompany}
-                    className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${shipping.isCompany ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}
-                  >
-                    Firmă (B2B)
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {!shipping.isCompany ? (
-                  <>
-                    <div className="md:col-span-2 space-y-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Nume și Prenume</label>
-                      <input 
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
-                        value={shipping.name} 
-                        onChange={e => setShipping(s => ({ ...s, name: e.target.value }))} 
-                        placeholder="Nume și Prenume complet" 
-                      />
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Număr de Telefon</label>
-                      <input 
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
-                        value={shipping.phone} 
-                        onChange={e => setShipping(s => ({ ...s, phone: e.target.value }))} 
-                        placeholder="Număr de Telefon de contact" 
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="space-y-2 md:col-span-2 relative">
-                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">CUI / CIF</label>
-                      <input 
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
-                        value={shipping.cui} 
-                        onChange={e => setShipping(s => ({ ...s, cui: e.target.value }))} 
-                        onBlur={(e) => fetchCompanyData(e.target.value)}
-                        placeholder="Introduceți CUI / CIF" 
-                      />
-                    </div>
-                    
-                    <div className="md:col-span-2 space-y-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Denumire Societate</label>
-                      <input 
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
-                        value={shipping.companyName} 
-                        onChange={e => setShipping(s => ({ ...s, companyName: e.target.value }))} 
-                        placeholder="Denumire Societate (ex: Karix Tech S.R.L.)" 
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Nr. Reg. Comerțului</label>
-                      <input 
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
-                        value={shipping.regCom} 
-                        onChange={e => setShipping(s => ({ ...s, regCom: e.target.value }))} 
-                        placeholder="Nr. Reg. Comerțului (ex: J05/123/2026)" 
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Număr de Telefon (Firmă)</label>
-                      <input 
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
-                        value={shipping.phone} 
-                        onChange={e => setShipping(s => ({ ...s, phone: e.target.value }))} 
-                        placeholder="Număr de Telefon contact" 
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* 2. Detalii Livrare */}
-            <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
-              <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">2. Detalii Livrare / Ridicare</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                <div className="md:col-span-2 mb-4">
-                  <button type="button" onClick={() => setPickupByKarix(!pickupByKarix)} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${pickupByKarix ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
-                      {cartAnalysis.hasPC ? "🚀" : "🏠"}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-white font-black text-xs uppercase tracking-wider">{pickupLabel}</h4>
-                      <p className="text-gray-400 text-[10px]">{pickupDescription}</p>
-                    </div>
-                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${pickupByKarix ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
-                      {pickupByKarix && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
-                    </div>
-                  </button>
-                </div>
-
-                <div className="space-y-2 relative" ref={dropdownRef}>
-                  <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
-                  <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} placeholder="Scrie județul..." value={shipping.county} onFocus={() => !pickupByKarix && setShowJudete(true)} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, county: e.target.value }))} readOnly={pickupByKarix} />
-                  {showJudete && !pickupByKarix && filteredJudete.length > 0 && (
-                    <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
-                      {filteredJudete.map(j => (
-                        <button key={j} className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}>{j}</button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș</label>
-                  <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} value={shipping.city} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, city: e.target.value }))} placeholder="Orașul tău" readOnly={pickupByKarix} />
-                </div>
-
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
-                  <textarea className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc, Apartament..." />
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Metodă de Plată */}
-            <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
-              <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">3. Metodă de Plată</h2>
-              <div className="flex flex-col gap-4">
-                
-                <button 
-                  type="button" 
-                  onClick={() => setPaymentMethod("ramburs")} 
-                  className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${paymentMethod === "ramburs" ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}
-                >
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${paymentMethod === "ramburs" ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
-                    💵
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-white font-black text-xs uppercase tracking-wider">Numerar la Livrare (Ramburs)</h4>
-                    <p className="text-gray-400 text-[10px]">Plătești direct la curier când primești comanda.</p>
-                  </div>
-                  <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "ramburs" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
-                    {paymentMethod === "ramburs" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
-                  </div>
-                </button>
-
-                {/* Buton NETOPIA */}
-                <button 
-                  type="button" 
-                  onClick={() => setPaymentMethod("online")}
-                  className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${paymentMethod === "online" ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}
-                >
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${paymentMethod === "online" ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
-                    💳
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-white font-black text-xs uppercase tracking-wider">Plată Online cu Cardul</h4>
-                    <p className="text-gray-400 text-[10px]">Plată securizată 100% prin Netopia Payments.</p>
-                  </div>
-                  <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "online" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
-                    {paymentMethod === "online" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
-                  </div>
-                </button>
-
-              </div>
-            </div>
-
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="flex items-center gap-4 mb-12">
+            <Link to="/cart" className="p-3 rounded-2xl bg-white/5 border border-white/10 text-gray-400 hover:text-white backdrop-blur-md transition-all group shadow-xl">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+            <h1 className="text-4xl font-black text-white tracking-tight italic drop-shadow-2xl uppercase">
+              Finalizare <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Comandă</span>
+            </h1>
           </div>
 
-          {/* Sumar Comandă Final */}
-          <div className="lg:col-span-5">
-            <div className="p-8 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-2xl sticky top-32 shadow-2xl">
-              <h2 className="text-xl font-bold text-white mb-8 tracking-tight italic drop-shadow-md text-left uppercase">Sumar Final</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            
+            <div className="lg:col-span-7 space-y-6">
               
-              <div className="space-y-4 mb-10">
-                <div className="flex justify-between text-gray-400 font-medium text-sm">
-                  <span>Subtotal Produse</span>
-                  <span className="text-white font-bold">{formatRON(currentSubtotal)}</span>
-                </div>
-
-                {appliedCoupon && (
-                  <div className="flex justify-between text-emerald-400 font-bold text-sm italic">
-                    <span>Reducere ({appliedCoupon.code})</span>
-                    <span>-{formatRON(discountCents)}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between text-gray-400 font-medium text-sm">
-                  {/* Text Inteligent pentru Logistică */}
-                  <span>{cartAnalysis.hasService ? "Transport Service (Tur-Retur)" : "Logistică"}</span>
+              {/* 1. Date de Contact & Tip Facturare */}
+              <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                  <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">1. Date Facturare</h2>
                   
-                  {/* Preț Inteligent pentru Logistică */}
-                  <span className={shippingCents === 0 ? "text-emerald-400 font-black text-[10px] uppercase tracking-widest" : "text-white font-bold"}>
-                    {shippingCents === 0 
-                      ? (pickupByKarix ? "Karix Express (Gratuit)" : "Gratuit") 
-                      : formatRON(shippingCents)}
-                  </span>
+                  <div className="flex p-1 bg-black/20 rounded-xl border border-white/5 w-full sm:w-fit">
+                    <button 
+                      onClick={handleSwitchToPerson}
+                      className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${!shipping.isCompany ? 'bg-white text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}
+                    >
+                      Pers. Fizică
+                    </button>
+                    <button 
+                      onClick={handleSwitchToCompany}
+                      className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${shipping.isCompany ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}
+                    >
+                      Firmă (B2B)
+                    </button>
+                  </div>
                 </div>
 
-                <div className="h-px bg-white/10 w-full my-6" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {!shipping.isCompany ? (
+                    <>
+                      <div className="md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Nume și Prenume</label>
+                        <input 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
+                          value={shipping.name} 
+                          onChange={e => setShipping(s => ({ ...s, name: e.target.value }))} 
+                          placeholder="Nume și Prenume complet" 
+                        />
+                      </div>
+                      <div className="md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Număr de Telefon</label>
+                        <input 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
+                          value={shipping.phone} 
+                          onChange={e => setShipping(s => ({ ...s, phone: e.target.value }))} 
+                          placeholder="Număr de Telefon de contact" 
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-2 md:col-span-2 relative">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">CUI / CIF</label>
+                        <input 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
+                          value={shipping.cui} 
+                          onChange={e => setShipping(s => ({ ...s, cui: e.target.value }))} 
+                          onBlur={(e) => fetchCompanyData(e.target.value)}
+                          placeholder="Introduceți CUI / CIF" 
+                        />
+                      </div>
+                      
+                      <div className="md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Denumire Societate</label>
+                        <input 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
+                          value={shipping.companyName} 
+                          onChange={e => setShipping(s => ({ ...s, companyName: e.target.value }))} 
+                          placeholder="Denumire Societate (ex: Karix Tech S.R.L.)" 
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Nr. Reg. Comerțului</label>
+                        <input 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
+                          value={shipping.regCom} 
+                          onChange={e => setShipping(s => ({ ...s, regCom: e.target.value }))} 
+                          placeholder="Nr. Reg. Comerțului (ex: J05/123/2026)" 
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Număr de Telefon (Firmă)</label>
+                        <input 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
+                          value={shipping.phone} 
+                          onChange={e => setShipping(s => ({ ...s, phone: e.target.value }))} 
+                          placeholder="Număr de Telefon contact" 
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. Detalii Livrare */}
+              <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
+                <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">2. Detalii Livrare / Ridicare</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  <div className="md:col-span-2 mb-4">
+                    <button type="button" onClick={() => setPickupByKarix(!pickupByKarix)} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
+                      <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${pickupByKarix ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
+                        {cartAnalysis.hasPC ? "🚀" : "🏠"}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-white font-black text-xs uppercase tracking-wider">{pickupLabel}</h4>
+                        <p className="text-gray-400 text-[10px]">{pickupDescription}</p>
+                      </div>
+                      <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${pickupByKarix ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
+                        {pickupByKarix && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 relative" ref={dropdownRef}>
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
+                    <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} placeholder="Scrie județul..." value={shipping.county} onFocus={() => !pickupByKarix && setShowJudete(true)} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, county: e.target.value }))} readOnly={pickupByKarix} />
+                    {showJudete && !pickupByKarix && filteredJudete.length > 0 && (
+                      <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
+                        {filteredJudete.map(j => (
+                          <button key={j} className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}>{j}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș</label>
+                    <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} value={shipping.city} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, city: e.target.value }))} placeholder="Orașul tău" readOnly={pickupByKarix} />
+                  </div>
+
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
+                    <textarea className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc, Apartament..." />
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Metodă de Plată */}
+              <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
+                <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">3. Metodă de Plată</h2>
+                <div className="flex flex-col gap-4">
+                  
+                  <button 
+                    type="button" 
+                    onClick={() => setPaymentMethod("ramburs")} 
+                    className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${paymentMethod === "ramburs" ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}
+                  >
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${paymentMethod === "ramburs" ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
+                      💵
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-black text-xs uppercase tracking-wider">Numerar la Livrare (Ramburs)</h4>
+                      <p className="text-gray-400 text-[10px]">Plătești direct la curier când primești comanda.</p>
+                    </div>
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "ramburs" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
+                      {paymentMethod === "ramburs" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                    </div>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => setPaymentMethod("online")}
+                    className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${paymentMethod === "online" ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}
+                  >
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${paymentMethod === "online" ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
+                      💳
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-black text-xs uppercase tracking-wider">Plată Online cu Cardul</h4>
+                      <p className="text-gray-400 text-[10px]">Plată securizată 100% prin Netopia Payments.</p>
+                    </div>
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "online" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
+                      {paymentMethod === "online" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                    </div>
+                  </button>
+
+                </div>
+              </div>
+
+            </div>
+
+            {/* Sumar Comandă Final */}
+            <div className="lg:col-span-5">
+              <div className="p-8 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-2xl sticky top-32 shadow-2xl">
+                <h2 className="text-xl font-bold text-white mb-8 tracking-tight italic drop-shadow-md text-left uppercase">Sumar Final</h2>
                 
-                <div className="flex justify-between items-baseline">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total de Plată</span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">{formatRON(totalCents).split(' ')[0]}</span>
-                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">RON</span>
+                <div className="space-y-4 mb-10">
+                  <div className="flex justify-between text-gray-400 font-medium text-sm">
+                    <span>Subtotal Produse</span>
+                    <span className="text-white font-bold">{formatRON(currentSubtotal)}</span>
+                  </div>
+
+                  {appliedCoupon && (
+                    <div className="flex justify-between text-emerald-400 font-bold text-sm italic">
+                      <span>Reducere ({appliedCoupon.code})</span>
+                      <span>-{formatRON(discountCents)}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between text-gray-400 font-medium text-sm">
+                    <span>{cartAnalysis.hasService ? "Transport Service (Tur-Retur)" : "Logistică"}</span>
+                    <span className={shippingCents === 0 ? "text-emerald-400 font-black text-[10px] uppercase tracking-widest" : "text-white font-bold"}>
+                      {shippingCents === 0 
+                        ? (pickupByKarix ? "Karix Express (Gratuit)" : "Gratuit") 
+                        : formatRON(shippingCents)}
+                    </span>
+                  </div>
+
+                  <div className="h-px bg-white/10 w-full my-6" />
+                  
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total de Plată</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">{formatRON(totalCents).split(' ')[0]}</span>
+                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">RON</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Bifa de Termeni și Condiții obligatorie */}
-              <div className="mb-6">
-                <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors">
-                  <div className="relative flex items-center mt-0.5">
-                    <input 
-                      type="checkbox" 
-                      required 
-                      checked={termsAccepted}
-                      onChange={(e) => setTermsAccepted(e.target.checked)}
-                      className="peer h-5 w-5 shrink-0 appearance-none rounded-md border-2 border-white/20 bg-transparent checked:border-indigo-500 checked:bg-indigo-500 focus:outline-none transition-all"
-                    />
-                    <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  </div>
-                  <span className="text-[10px] text-gray-400 font-medium leading-relaxed italic uppercase tracking-wider">
-                    Am citit și sunt de acord cu <Link to="/terms" target="_blank" className="text-white hover:text-indigo-300 font-black underline">Termenii și Condițiile</Link> și <Link to="/confidentialitate" target="_blank" className="text-white hover:text-indigo-300 font-black underline">Politica GDPR</Link>. Înțeleg că plasarea comenzii implică o obligație de plată.
+                <div className="mb-6">
+                  <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors">
+                    <div className="relative flex items-center mt-0.5">
+                      <input 
+                        type="checkbox" 
+                        required 
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        className="peer h-5 w-5 shrink-0 appearance-none rounded-md border-2 border-white/20 bg-transparent checked:border-indigo-500 checked:bg-indigo-500 focus:outline-none transition-all"
+                      />
+                      <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </div>
+                    <span className="text-[10px] text-gray-400 font-medium leading-relaxed italic uppercase tracking-wider">
+                      Am citit și sunt de acord cu <Link to="/terms" target="_blank" className="text-white hover:text-indigo-300 font-black underline">Termenii și Condițiile</Link> și <Link to="/confidentialitate" target="_blank" className="text-white hover:text-indigo-300 font-black underline">Politica GDPR</Link>. Înțeleg că plasarea comenzii implică o obligație de plată.
+                    </span>
+                  </label>
+                </div>
+
+                <button 
+                  onClick={handlePlaceOrder} 
+                  disabled={loading || items.length === 0} 
+                  className="group relative w-full py-6 rounded-[25px] font-black text-white overflow-hidden transition-all active:scale-[0.98] shadow-2xl disabled:opacity-50"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 group-hover:scale-105 transition-transform duration-500" />
+                  <span className="relative z-10 text-lg uppercase tracking-widest italic drop-shadow-md">
+                    {loading 
+                      ? "Se procesează..." 
+                      : (paymentMethod === "online" ? "Plătește Acum →" : "Plasează Comanda →")}
                   </span>
-                </label>
+                </button>
               </div>
-
-              <button 
-                onClick={handlePlaceOrder} 
-                disabled={loading || items.length === 0} 
-                className="group relative w-full py-6 rounded-[25px] font-black text-white overflow-hidden transition-all active:scale-[0.98] shadow-2xl disabled:opacity-50"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 group-hover:scale-105 transition-transform duration-500" />
-                <span className="relative z-10 text-lg uppercase tracking-widest italic drop-shadow-md">
-                  {loading 
-                    ? "Se procesează..." 
-                    : (paymentMethod === "online" ? "Plătește Acum →" : "Plasează Comanda →")}
-                </span>
-              </button>
             </div>
           </div>
         </div>
@@ -726,6 +715,6 @@ export default function Checkout() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
       `}</style>
-    </div>
+    </>
   );
 }

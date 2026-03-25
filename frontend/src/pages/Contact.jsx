@@ -1,4 +1,7 @@
 import React from "react";
+import { Link } from "react-router-dom";
+// IMPORTĂM COMPONENTA SEO
+import SEO from "../components/SEO";
 
 const SOCIAL_PLATFORMS = [
   {
@@ -53,80 +56,88 @@ const SOCIAL_PLATFORMS = [
 
 export default function Contact() {
   return (
-    <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent">
-      
-      {/* Glows */}
-      <div className="absolute top-1/4 -left-20 w-[600px] h-[600px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-20 w-[600px] h-[600px] bg-pink-500/5 blur-[120px] rounded-full pointer-events-none" />
+    <>
+      {/* SEO: CONTACT & SOCIAL MEDIA */}
+      <SEO 
+        title="Contact & Support Oradea"
+        description="Ai nevoie de asistență tehnică, un build PC personalizat sau service profesional în Oradea? Contactează echipa Karix Computers prin WhatsApp, Instagram, Discord sau Email."
+      />
 
-      <div className="max-w-6xl mx-auto relative z-10">
-        <div className="text-center mb-20">
-          <h1 className="text-6xl md:text-7xl font-black text-white tracking-tighter mb-4 italic uppercase">
-            Let's <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Connect</span>
-          </h1>
-          <p className="text-gray-400 text-lg max-w-2xl mx-auto font-medium italic">
-            Suntem online și gata să îți punem setup-ul pe picioare.
-          </p>
-        </div>
+      <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent">
+        
+        {/* Glows */}
+        <div className="absolute top-1/4 -left-20 w-[600px] h-[600px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-1/4 -right-20 w-[600px] h-[600px] bg-pink-500/5 blur-[120px] rounded-full pointer-events-none" />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
-          {/* INFO CONTACT */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="grid grid-cols-1 gap-4">
-              {[
-                { label: "Email Oficial", val: "contact@karixcomputers.ro", icon: "📧", color: "indigo" },
-                { label: "Suport Telefon", val: "0770 619 935", icon: "📞", color: "pink" },
-                { label: "Sediu", val: "Oradea, Bihor, România", icon: "📍", color: "emerald" }
-              ].map((item, idx) => (
-                <div key={idx} className="p-6 rounded-[24px] bg-white/[0.03] border border-white/10 backdrop-blur-xl flex items-center gap-5 group hover:bg-white/[0.06] transition-all">
-                  <div className={`h-14 w-14 rounded-2xl bg-${item.color}-500/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform`}>{item.icon}</div>
-                  <div>
-                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">{item.label}</p>
-                    <p className="text-white font-bold text-lg">{item.val}</p>
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="text-center mb-20">
+            <h1 className="text-6xl md:text-7xl font-black text-white tracking-tighter mb-4 italic uppercase">
+              Let's <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Connect</span>
+            </h1>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto font-medium italic">
+              Suntem online și gata să îți punem setup-ul pe picioare.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            {/* INFO CONTACT */}
+            <div className="lg:col-span-5 space-y-6">
+              <div className="grid grid-cols-1 gap-4">
+                {[
+                  { label: "Email Oficial", val: "contact@karixcomputers.ro", icon: "📧", color: "indigo" },
+                  { label: "Suport Telefon", val: "0770 619 935", icon: "📞", color: "pink" },
+                  { label: "Sediu", val: "Oradea, Bihor, România", icon: "📍", color: "emerald" }
+                ].map((item, idx) => (
+                  <div key={idx} className="p-6 rounded-[24px] bg-white/[0.03] border border-white/10 backdrop-blur-xl flex items-center gap-5 group hover:bg-white/[0.06] transition-all">
+                    <div className={`h-14 w-14 rounded-2xl bg-${item.color}-500/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform`}>{item.icon}</div>
+                    <div className="text-left">
+                      <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">{item.label}</p>
+                      <p className="text-white font-bold text-lg">{item.val}</p>
+                    </div>
                   </div>
-                </div>
+                ))}
+              </div>
+            </div>
+
+            {/* SOCIAL MEDIA PLATFORMS */}
+            <div className="lg:col-span-7 space-y-5">
+              {SOCIAL_PLATFORMS.map((platform) => (
+                <a
+                  key={platform.name}
+                  href={platform.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center justify-between p-8 rounded-[32px] bg-white/[0.01] border backdrop-blur-sm transition-all duration-500 hover:scale-[1.02] group relative overflow-hidden ${platform.glassStyle}`}
+                >
+                  <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  
+                  <div className="flex items-center gap-6 relative z-10">
+                    <div className={`p-4 rounded-2xl bg-white/5 backdrop-blur-sm group-hover:scale-110 transition-transform duration-500 ${platform.iconColor}`}>
+                      {platform.icon}
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">
+                        {platform.name}
+                      </h3>
+                      <p className="text-gray-500 text-sm mt-1 font-medium tracking-tight">{platform.username}</p>
+                    </div>
+                  </div>
+
+                  <div className="relative z-10 hidden sm:block">
+                    <div className="h-12 w-12 rounded-full border border-white/10 flex items-center justify-center text-white/30 group-hover:text-white group-hover:border-white/40 transition-all duration-500">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </div>
+                  </div>
+                </a>
               ))}
             </div>
+
           </div>
-
-          {/* SOCIAL MEDIA PLATFORMS */}
-          <div className="lg:col-span-7 space-y-5">
-            {SOCIAL_PLATFORMS.map((platform) => (
-              <a
-                key={platform.name}
-                href={platform.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`flex items-center justify-between p-8 rounded-[32px] bg-white/[0.01] border backdrop-blur-sm transition-all duration-500 hover:scale-[1.02] group relative overflow-hidden ${platform.glassStyle}`}
-              >
-                <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                
-                <div className="flex items-center gap-6 relative z-10">
-                  <div className={`p-4 rounded-2xl bg-white/5 backdrop-blur-sm group-hover:scale-110 transition-transform duration-500 ${platform.iconColor}`}>
-                    {platform.icon}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">
-                      {platform.name}
-                    </h3>
-                    <p className="text-gray-500 text-sm mt-1 font-medium tracking-tight">{platform.username}</p>
-                  </div>
-                </div>
-
-                <div className="relative z-10 hidden sm:block">
-                  <div className="h-12 w-12 rounded-full border border-white/10 flex items-center justify-center text-white/30 group-hover:text-white group-hover:border-white/40 transition-all duration-500">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                  </div>
-                </div>
-              </a>
-            ))}
-          </div>
-
         </div>
       </div>
-    </div>
+    </>
   );
 }
