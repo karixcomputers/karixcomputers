@@ -104,7 +104,7 @@ export default function Footer() {
           </a>
 
           <a
-            href="https://www.tiktok.com/@karixcomputers"
+            href="https://www.tiktok.com/@karixcomputers.ro"
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-2.5 px-6 py-2.5 rounded-full bg-white/5 border border-white/10 text-[13px] text-gray-400 hover:text-white hover:bg-black transition-all"

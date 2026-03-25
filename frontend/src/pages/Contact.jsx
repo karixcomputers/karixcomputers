@@ -27,8 +27,8 @@ const SOCIAL_PLATFORMS = [
   },
   {
     name: "TikTok",
-    username: "@karixcomputers",
-    link: "https://www.tiktok.com/@karixcomputers",
+    username: "@karixcomputers.ro",
+    link: "https://www.tiktok.com/@karixcomputers.ro",
     glassStyle: "border-white/20 hover:bg-white/5 shadow-white/5",
     iconColor: "text-white",
     icon: (
