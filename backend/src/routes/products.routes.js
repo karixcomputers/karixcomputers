@@ -4,31 +4,29 @@ import { requireAuth } from "../middleware/auth.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+// IMPORTĂM UTILITARUL DE OPTIMIZARE
+import { optimizeImage } from "../utils/imageOptimizer.js";
 
 const prisma = new PrismaClient();
 const router = express.Router();
 
 // --- CONFIGURARE MULTER PENTRU UPLOAD IMAGINI ---
 
-// Ne asigurăm că folderul 'uploads' există pe server
 const uploadDir = 'uploads/';
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Setăm unde se salvează fișierele și cum se numesc
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // Generăm un nume unic: produs-timestamp-random.extensie
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, 'produs-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 
-// Filtru pentru a accepta doar imagini
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
@@ -40,13 +38,12 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({ 
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 50 * 1024 * 1024 } // Limită de 5MB pe fișier
+  limits: { fileSize: 50 * 1024 * 1024 } // Am lăsat limita de 50MB pentru a permite upload-ul inițial, Sharp se ocupă de micșorare
 });
 
-// --- RUTA NOUĂ: POST UPLOAD (Folosită de Admin Inventory) ---
-// Această rută primește fișierul și returnează URL-ul final
+// --- RUTA MODIFICATĂ: POST UPLOAD (Cu Optimizare Sharp) ---
 router.post("/upload", requireAuth, (req, res) => {
-  upload.single('image')(req, res, (err) => {
+  upload.single('image')(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       return res.status(400).json({ error: "Eroare Multer: " + err.message });
     } else if (err) {
@@ -57,10 +54,20 @@ router.post("/upload", requireAuth, (req, res) => {
       return res.status(400).json({ error: "Te rugăm să selectezi un fișier." });
     }
 
-    // Returnăm URL-ul complet care va fi salvat în baza de date
-    // MODIFICAT: am adăugat /api în link
-    const imageUrl = `https://karixcomputers.ro/api/uploads/${req.file.filename}`;
-    res.json({ url: imageUrl });
+    try {
+      // ✨ MAGIA SHARP: Optimizăm imaginea înainte de a trimite răspunsul
+      // Funcția optimizeImage va returna noul nume de fișier cu extensia .webp
+      const optimizedFilename = await optimizeImage(req.file);
+
+      // Returnăm URL-ul final cu noul nume de fișier .webp
+      const imageUrl = `https://karixcomputers.ro/api/uploads/${optimizedFilename}`;
+      
+      console.log(`📸 Imagine optimizată: ${optimizedFilename}`);
+      res.json({ url: imageUrl });
+    } catch (optError) {
+      console.error("❌ Eroare la procesarea Sharp:", optError);
+      res.status(500).json({ error: "Eroare la optimizarea imaginii." });
+    }
   });
 });
 
@@ -143,7 +150,7 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
       cpuBrand, gpuBrand, ramGb, storageGb, motherboard, 
       case: caseBrand, cooler, psu, stock, category, 
       warrantyMonths, benchmarks, isVisible,
-      pcgarageWishlistId // <-- AM ADĂUGAT AICI
+      pcgarageWishlistId 
     } = req.body;
 
     const randomId = await generateUniqueProductId();
@@ -169,19 +176,16 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
         warrantyMonths: warrantyMonths ? parseInt(warrantyMonths) : 24,
         benchmarks: benchmarks || [],
         isVisible: isVisible !== undefined ? isVisible : true,
-        pcgarageWishlistId: pcgarageWishlistId || null // <-- AM ADĂUGAT AICI (Salvăm în DB)
+        pcgarageWishlistId: pcgarageWishlistId || null 
       },
     });
 
     res.status(201).json(newProduct);
   } catch (e) {
     console.error("PRISMA CREATE ERROR:", e);
-    
-    // Tratăm eroarea de unicitate (dacă un alt PC folosește deja acest wishlist)
     if (e.code === 'P2002' && e.meta?.target?.includes('pcgarageWishlistId')) {
       return res.status(400).json({ error: "Acest ID de wishlist este deja folosit la alt sistem PC!" });
     }
-    
     res.status(500).json({ error: "Eroare la salvarea produsului." });
   }
 });
@@ -197,7 +201,7 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
       cpuBrand, gpuBrand, ramGb, storageGb, motherboard, 
       case: caseBrand, cooler, psu, stock, category, 
       warrantyMonths, benchmarks, isVisible,
-      pcgarageWishlistId // <-- AM ADĂUGAT AICI
+      pcgarageWishlistId 
     } = req.body;
 
     const existing = await prisma.product.findUnique({ where: { id } });
@@ -224,20 +228,16 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
         warrantyMonths: warrantyMonths !== undefined ? parseInt(warrantyMonths) : undefined,
         benchmarks: benchmarks ?? undefined,
         isVisible: isVisible !== undefined ? isVisible : undefined,
-        // Daca trimitem empty string (""), îl transformăm în null în baza de date
-        pcgarageWishlistId: pcgarageWishlistId === "" ? null : pcgarageWishlistId // <-- AM ADĂUGAT AICI
+        pcgarageWishlistId: pcgarageWishlistId === "" ? null : pcgarageWishlistId 
       },
     });
 
     res.json(updatedProduct);
   } catch (e) {
     console.error("PRISMA UPDATE ERROR:", e);
-    
-    // Tratăm eroarea de unicitate
     if (e.code === 'P2002' && e.meta?.target?.includes('pcgarageWishlistId')) {
       return res.status(400).json({ error: "Acest ID de wishlist este deja folosit la alt sistem PC!" });
     }
-
     res.status(500).json({ error: "Nu s-a putut actualiza produsul." });
   }
 });
@@ -288,25 +288,21 @@ router.post("/:id/reviews", requireAuth, async (req, res, next) => {
 });
 
 /**
- * 8. POST: Sincronizare preț PC Garage (Apelat de scriptul de acasă)
+ * 8. POST: Sincronizare preț PC Garage
  */
 router.post("/update-pc-price", async (req, res, next) => {
   try {
     const { wishlistId, rawPrice, secretKey } = req.body;
 
-    // Verificăm parola secretă ca să nu ne modifice hackerii prețurile
-    // Poți schimba "karix_secret_123" cu orice parolă vrei tu
     if (secretKey !== (process.env.SCRAPER_SECRET || "karix_secret_123")) {
       return res.status(401).json({ error: "Parolă secretă incorectă!" });
     }
 
-    // FORMULA KARIX
     const manopera = 300;
-    const adaosPercent = 1.03; // 10%
+    const adaosPercent = 1.03; 
     let calculated = (rawPrice * adaosPercent) + manopera;
     let finalPrice = Math.ceil(calculated / 10) * 10 - 1;
 
-    // ATENȚIE: În baza ta de date prețul este salvat în bani (priceCents), deci înmulțim cu 100
     await prisma.product.update({
       where: { pcgarageWishlistId: wishlistId },
       data: { priceCents: finalPrice * 100 } 
