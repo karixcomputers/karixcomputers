@@ -26,8 +26,9 @@ export default function Cart() {
 
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, itemId: null, itemName: "" });
 
-  // --- GOOGLE AUTH STATE PENTRU MODAL ---
+  // --- GOOGLE AUTH STATE ---
   const [isCompletingProfile, setIsCompletingProfile] = useState(false);
+  const [isGoogleProcessing, setIsGoogleProcessing] = useState(false); // NOU: Stare pentru animația de loading
   const [tempToken, setTempToken] = useState("");
   const [profileData, setProfileData] = useState({ name: "", email: "", avatar: "", phone: "" });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -59,13 +60,13 @@ export default function Cart() {
   // --- LOGICĂ GOOGLE AUTH INTERCEPT ---
   useEffect(() => {
     const hash = window.location.hash;
-    // Interceptăm tokenul doar dacă a fost declanșat din coș
     if (hash && sessionStorage.getItem("cartGoogleAuth") === "true") {
       const params = new URLSearchParams(hash.substring(1));
       const accessToken = params.get("access_token");
 
       if (accessToken) {
-        setShowLoginModal(true); // Redeschidem modalul automat
+        setIsGoogleProcessing(true); // Setăm pe "loading" imediat, ca să nu apară formularul
+        setShowLoginModal(true); 
         handleBackendLogin(accessToken);
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -78,7 +79,6 @@ export default function Cart() {
     try {
       const res = await axios.post(`${API_URL}/auth/google`, { token });
       
-      // Dacă e client NOU
       if (res.status === 202 && res.data.require_profile_completion) {
         setTempToken(res.data.tempToken);
         setProfileData({
@@ -89,7 +89,6 @@ export default function Cart() {
         });
         setIsCompletingProfile(true); 
       } else if (res.data && res.data.accessToken) {
-        // Dacă e client VECHI
         loginWithGoogle(res.data);
         sessionStorage.removeItem("cartGoogleAuth");
         setShowLoginModal(false);
@@ -100,6 +99,7 @@ export default function Cart() {
       setError("Sincronizarea cu Google a eșuat.");
     } finally {
       setLoading(false);
+      setIsGoogleProcessing(false); // Oprim loading-ul indiferent de rezultat
     }
   };
 
@@ -147,8 +147,8 @@ export default function Cart() {
       setError("Eroare: Configurare Google lipsă.");
       return;
     }
-    sessionStorage.setItem("cartGoogleAuth", "true"); // Flag ca să știm că vine din coș
-    const redirectUri = "https://karixcomputers.ro/cart"; // Se va întoarce fix în coș!
+    sessionStorage.setItem("cartGoogleAuth", "true"); 
+    const redirectUri = "https://karixcomputers.ro/cart"; 
     const scope = "email profile";
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}`;
     
@@ -224,10 +224,10 @@ export default function Cart() {
     setDeleteConfirm({ show: false, itemId: null, itemName: "" });
   };
 
-  // Curățăm flag-ul dacă clientul închide manual modalul
   const handleCloseModal = () => {
     setShowLoginModal(false);
     setIsCompletingProfile(false);
+    setIsGoogleProcessing(false);
     setError("");
     sessionStorage.removeItem("cartGoogleAuth");
   };
@@ -309,7 +309,6 @@ export default function Cart() {
                     
                     <button onClick={() => removeFromCart(item.id)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-500 hover:text-pink-500 transition-colors h-8 w-8 flex items-center justify-center rounded-full hover:bg-pink-500/10 z-20">✕</button>
 
-                    {/* BLOC MOBIL: Poza + Titlu */}
                     <div className="flex items-center gap-4 w-full sm:w-auto pr-8 sm:pr-0">
                       <div className={`h-20 w-20 sm:h-24 sm:w-24 rounded-2xl sm:rounded-3xl flex items-center justify-center border shrink-0 transition-all duration-500 overflow-hidden ${isPC ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-pink-500/10 border-pink-500/20'}`}>
                         {imgUrl ? (
@@ -470,6 +469,20 @@ export default function Cart() {
         )}
       </div>
 
+      {/* MODAL CONFIRMARE STERGERE PRODUS */}
+      {deleteConfirm.show && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 backdrop-blur-md bg-black/60">
+          <div className="relative w-full max-w-sm bg-[#161e31]/90 backdrop-blur-2xl border border-pink-500/20 p-10 rounded-[40px] text-center shadow-2xl animate-in zoom-in">
+            <h2 className="text-2xl font-black text-white mb-2 italic uppercase">Eliminare Produs</h2>
+            <p className="text-gray-400 text-sm mb-8 leading-relaxed font-medium italic">Ești sigur că vrei să ștergi <span className="text-white font-bold">{deleteConfirm.itemName}</span> din coș?</p>
+            <div className="flex gap-4">
+              <button onClick={() => setDeleteConfirm({ show: false, itemId: null, itemName: "" })} className="flex-1 py-4 rounded-2xl font-black text-gray-400 bg-white/5 hover:bg-white/10 uppercase tracking-widest text-[10px] transition-all">Anulează</button>
+              <button onClick={confirmDelete} className="flex-1 py-4 rounded-2xl font-black text-white bg-pink-600 hover:bg-pink-500 uppercase tracking-widest text-[10px] shadow-lg shadow-pink-600/20 transition-all">Șterge</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL EROARE LOGISTICA */}
       {showErrorModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 backdrop-blur-md bg-black/60">
@@ -482,14 +495,23 @@ export default function Cart() {
         </div>
       )}
 
-      {/* MODAL LOGIN / COMPLETARE PROFIL (PENTRU CHECKOUT) */}
+      {/* MODAL LOGIN / COMPLETARE PROFIL */}
       {showLoginModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-xl bg-black/70">
           <div className="relative w-full max-w-md bg-[#161e31]/95 backdrop-blur-3xl border border-white/10 p-10 sm:p-12 rounded-[50px] shadow-3xl text-center">
             
             <button onClick={handleCloseModal} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-colors h-8 w-8 bg-white/5 rounded-full flex items-center justify-center">✕</button>
             
-            {isCompletingProfile ? (
+            {isGoogleProcessing ? (
+              // --- STAREA NOUĂ: LOADING GOOGLE ---
+              <div className="animate-in fade-in duration-500 flex flex-col items-center justify-center py-10">
+                <div className="h-16 w-16 mb-6">
+                  <div className="w-full h-full border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin shadow-[0_0_15px_rgba(99,102,241,0.5)]"></div>
+                </div>
+                <h2 className="text-2xl font-black text-white uppercase italic drop-shadow-lg mb-2">Conectare...</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest italic">Sincronizare cu Google</p>
+              </div>
+            ) : isCompletingProfile ? (
               // --- PASUL 2 GOOGLE: COMPLETARE DATE ---
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <header className="mb-8 text-center">
