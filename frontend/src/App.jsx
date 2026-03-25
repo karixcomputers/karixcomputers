@@ -91,6 +91,7 @@ export default function App() {
                 <Route path="/suport" element={<Suport />} />
                 <Route path="/wishlist" element={<Wishlist />} />
                 <Route path="/configurator" element={<Configurator />} />
+                <Route path="*" element={<NotFound />} />
                 
                 <Route path="/product/:id" element={<ProductDetails />} />
 
