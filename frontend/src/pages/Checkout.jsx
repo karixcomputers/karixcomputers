@@ -217,7 +217,7 @@ export default function Checkout() {
     return appliedCoupon.discountValue; 
   }, [appliedCoupon, currentSubtotal]);
 
-const shippingCents = useMemo(() => {
+  const shippingCents = useMemo(() => {
     // 1. REGELE: Indiferent de produs sau serviciu, dacă totalul e peste 1000 RON (100000 cenți), e gratuit!
     if (currentSubtotal >= 100000) {
       return 0; 
@@ -235,7 +235,6 @@ const shippingCents = useMemo(() => {
     
     // 4. Livrare standard prin curier pentru produse sub 1000 RON
     return 2500; 
-  }, [cartAnalysis.hasService, currentSubtotal, pickupByKarix]);
   }, [cartAnalysis.hasService, currentSubtotal, pickupByKarix]);
   const totalCents = Math.max(0, currentSubtotal - discountCents + shippingCents);
 
@@ -650,11 +649,9 @@ const shippingCents = useMemo(() => {
                 )}
 
                 <div className="flex justify-between text-gray-400 font-medium text-sm">
-                  <span>{cartAnalysis.hasService ? "Transport Service (Preluare & Retur)" : "Logistică"}</span>
-                  <span className={shippingCents === 0 ? "text-emerald-400 font-black text-[10px] uppercase tracking-widest" : "text-white font-bold"}>
-                    {shippingCents === 0 
-                      ? (pickupByKarix ? "Karix Express (Gratuit)" : "Gratuit") 
-                      : formatRON(shippingCents)}
+                  <span>Logistică</span>
+                  <span className={shippingCents === 0 ? "text-emerald-400 font-black text-[10px] uppercase tracking-widest" : "text-white"}>
+                    {pickupByKarix ? "Karix Express (Gratuit)" : (shippingCents === 0 ? "Gratuit" : formatRON(shippingCents))}
                   </span>
                 </div>
 
