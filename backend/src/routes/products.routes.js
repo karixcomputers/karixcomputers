@@ -302,7 +302,7 @@ router.post("/update-pc-price", async (req, res, next) => {
 
     // FORMULA KARIX
     const manopera = 300;
-    const adaosPercent = 1.01; // 10%
+    const adaosPercent = 1.03; // 10%
     let calculated = (rawPrice * adaosPercent) + manopera;
     let finalPrice = Math.ceil(calculated / 10) * 10 - 1;
 
