@@ -17,18 +17,16 @@ export default function AdminInventory() {
     motherboard: "", case: "", cooler: "", psu: "", 
     warrantyMonths: "24",
     benchmarks: [],
-    isVisible: true 
+    isVisible: true,
+    pcgarageWishlistId: "" // <-- Câmp nou adăugat în state
   });
 
-  // State pentru animația de upload
   const [isUploading, setIsUploading] = useState(false);
 
-  // --- FUNCȚIE NOUĂ: UPLOAD IMAGINE PE SERVER ---
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Verificare rapidă format
     if (!file.type.startsWith('image/')) {
       setStatusModal({ show: true, message: "Te rugăm să alegi o imagine validă!", type: "error" });
       return;
@@ -39,7 +37,6 @@ export default function AdminInventory() {
 
     setIsUploading(true);
     try {
-      // Preluăm token-ul pentru autentificare
       const token = localStorage.getItem("accessToken");
       
       const res = await fetch("https://karixcomputers.ro/api/products/upload", {
@@ -53,7 +50,6 @@ export default function AdminInventory() {
       const data = await res.json();
 
       if (res.ok && data.url) {
-        // Punem URL-ul primit de la server direct în formular
         setForm(prev => ({ ...prev, imageUrl: data.url }));
         setStatusModal({ show: true, message: "Imagine salvată pe server!", type: "success" });
       } else {
@@ -126,7 +122,9 @@ export default function AdminInventory() {
         psu: form.psu || null,      
         warrantyMonths: form.category === "pc" ? parseInt(form.warrantyMonths, 10) : 0,
         benchmarks: form.benchmarks,
-        isVisible: form.isVisible 
+        isVisible: form.isVisible,
+        // Trimitem ID-ul către backend doar dacă e setat și e în categoria PC
+        pcgarageWishlistId: (form.category === "pc" && form.pcgarageWishlistId) ? form.pcgarageWishlistId : null
       };
 
       const method = editingId ? "PUT" : "POST";
@@ -149,7 +147,8 @@ export default function AdminInventory() {
       imageUrl: "", cpuBrand: "", gpuBrand: "", ramGb: "", storageGb: "",
       motherboard: "", case: "", cooler: "", psu: "", warrantyMonths: "24",
       benchmarks: [],
-      isVisible: true
+      isVisible: true,
+      pcgarageWishlistId: ""
     });
     setEditingId(null);
   };
@@ -173,7 +172,8 @@ export default function AdminInventory() {
       psu: p.psu || "",      
       warrantyMonths: (p.warrantyMonths || 24).toString(),
       benchmarks: p.benchmarks || [],
-      isVisible: p.isVisible !== undefined ? p.isVisible : true 
+      isVisible: p.isVisible !== undefined ? p.isVisible : true,
+      pcgarageWishlistId: p.pcgarageWishlistId || "" // Preluăm ID-ul dacă există
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -214,12 +214,33 @@ export default function AdminInventory() {
             </div>
 
             <input type="text" placeholder="Nume Produs" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500 transition-all" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
-            <input type="number" step="0.01" placeholder="Preț (RON)" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500" value={form.priceRon} onChange={e => setForm({...form, priceRon: e.target.value})} required />
             
+            {/* AM MODIFICAT AICI: Câmpul de categorie */}
             <select className="bg-[#0b1020] border border-white/10 p-4 rounded-2xl outline-none text-sm font-bold" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
               <option value="pc">Sistem PC</option>
               <option value="service">Serviciu / Mentenanță</option>
             </select>
+
+            <input type="number" step="0.01" placeholder="Preț curent (RON)" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500" value={form.priceRon} onChange={e => setForm({...form, priceRon: e.target.value})} required />
+            
+            {/* AM ADAUGAT AICI: Câmpul pentru Wishlist ID (Apare doar dacă e PC) */}
+            {form.category === "pc" && (
+              <div className="md:col-span-3 bg-indigo-500/5 border border-indigo-500/20 p-4 rounded-2xl flex flex-col md:flex-row items-center gap-4">
+                 <div className="flex-1 w-full">
+                    <label className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest mb-2 block">ID Wishlist PC Garage (Pentru Sync Auto)</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ex: 6151169" 
+                      className="w-full bg-white/5 border border-white/10 p-3 rounded-xl outline-none focus:border-indigo-500 transition-all text-sm font-mono placeholder:text-gray-600" 
+                      value={form.pcgarageWishlistId} 
+                      onChange={e => setForm({...form, pcgarageWishlistId: e.target.value})} 
+                    />
+                 </div>
+                 <div className="text-[9px] text-gray-400 italic max-w-xs leading-relaxed">
+                    Pune aici <strong>DOAR CIFRELE</strong> de la finalul link-ului de PC Garage. Lasă gol dacă nu vrei sincronizare automată de preț pentru acest produs.
+                 </div>
+              </div>
+            )}
 
             {/* SECTIUNE IMAGINE CU UPLOAD DIN PC */}
             <div className="md:col-span-2 flex flex-col sm:flex-row gap-3">
@@ -311,6 +332,10 @@ export default function AdminInventory() {
                   )}
                 </div>
                 <p className="text-[11px] text-indigo-400 font-black">{(p.priceCents/100).toFixed(2)} RON <span className="text-gray-600 font-normal ml-2">#{p.id}</span></p>
+                {/* Afișăm un mic indicator dacă produsul are ID de wishlist salvat */}
+                {p.pcgarageWishlistId && (
+                  <p className="text-[9px] text-gray-500 font-mono mt-1">🔄 Sync: {p.pcgarageWishlistId}</p>
+                )}
               </div>
 
               <div className="flex gap-2">

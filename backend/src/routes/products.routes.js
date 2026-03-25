@@ -59,7 +59,7 @@ router.post("/upload", requireAuth, (req, res) => {
 
     // Returnăm URL-ul complet care va fi salvat în baza de date
     // MODIFICAT: am adăugat /api în link
-const imageUrl = `https://karixcomputers.ro/api/uploads/${req.file.filename}`;
+    const imageUrl = `https://karixcomputers.ro/api/uploads/${req.file.filename}`;
     res.json({ url: imageUrl });
   });
 });
@@ -142,7 +142,8 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
       name, priceCents, description, longDescription, images, 
       cpuBrand, gpuBrand, ramGb, storageGb, motherboard, 
       case: caseBrand, cooler, psu, stock, category, 
-      warrantyMonths, benchmarks, isVisible 
+      warrantyMonths, benchmarks, isVisible,
+      pcgarageWishlistId // <-- AM ADĂUGAT AICI
     } = req.body;
 
     const randomId = await generateUniqueProductId();
@@ -167,13 +168,20 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
         stock: stock ? parseInt(stock) : 1,
         warrantyMonths: warrantyMonths ? parseInt(warrantyMonths) : 24,
         benchmarks: benchmarks || [],
-        isVisible: isVisible !== undefined ? isVisible : true
+        isVisible: isVisible !== undefined ? isVisible : true,
+        pcgarageWishlistId: pcgarageWishlistId || null // <-- AM ADĂUGAT AICI (Salvăm în DB)
       },
     });
 
     res.status(201).json(newProduct);
   } catch (e) {
     console.error("PRISMA CREATE ERROR:", e);
+    
+    // Tratăm eroarea de unicitate (dacă un alt PC folosește deja acest wishlist)
+    if (e.code === 'P2002' && e.meta?.target?.includes('pcgarageWishlistId')) {
+      return res.status(400).json({ error: "Acest ID de wishlist este deja folosit la alt sistem PC!" });
+    }
+    
     res.status(500).json({ error: "Eroare la salvarea produsului." });
   }
 });
@@ -188,7 +196,8 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
       name, priceCents, description, longDescription, images, 
       cpuBrand, gpuBrand, ramGb, storageGb, motherboard, 
       case: caseBrand, cooler, psu, stock, category, 
-      warrantyMonths, benchmarks, isVisible 
+      warrantyMonths, benchmarks, isVisible,
+      pcgarageWishlistId // <-- AM ADĂUGAT AICI
     } = req.body;
 
     const existing = await prisma.product.findUnique({ where: { id } });
@@ -214,13 +223,21 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
         stock: stock ? parseInt(stock) : undefined,
         warrantyMonths: warrantyMonths !== undefined ? parseInt(warrantyMonths) : undefined,
         benchmarks: benchmarks ?? undefined,
-        isVisible: isVisible !== undefined ? isVisible : undefined
+        isVisible: isVisible !== undefined ? isVisible : undefined,
+        // Daca trimitem empty string (""), îl transformăm în null în baza de date
+        pcgarageWishlistId: pcgarageWishlistId === "" ? null : pcgarageWishlistId // <-- AM ADĂUGAT AICI
       },
     });
 
     res.json(updatedProduct);
   } catch (e) {
     console.error("PRISMA UPDATE ERROR:", e);
+    
+    // Tratăm eroarea de unicitate
+    if (e.code === 'P2002' && e.meta?.target?.includes('pcgarageWishlistId')) {
+      return res.status(400).json({ error: "Acest ID de wishlist este deja folosit la alt sistem PC!" });
+    }
+
     res.status(500).json({ error: "Nu s-a putut actualiza produsul." });
   }
 });
