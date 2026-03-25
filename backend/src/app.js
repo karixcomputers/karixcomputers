@@ -4,7 +4,8 @@ import helmet from "helmet";
 import cors from "cors";
 
 import { env } from "./config/env.js";
-import { rateLimiter } from "./middleware/rateLimit.js";
+// Am adăugat și authLimiter aici pentru protecția rutei de autentificare
+import { rateLimiter, authLimiter } from "./middleware/rateLimit.js"; 
 import { errorHandler } from "./middleware/error.js";
 
 // Import rute
@@ -33,37 +34,30 @@ app.use("/api/webhooks", webhooksRoutes);
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
-    // Dezactivăm complet COOP pentru a opri erorile window.closed
     crossOriginOpenerPolicy: false, 
-    // Permitem browserului să încarce scripturile Google
     contentSecurityPolicy: false, 
   })
 );
 
-// 3. RATE LIMITER
+// 3. RATE LIMITER GENERAL (Scutul anti-flood de bază)
 app.use(rateLimiter);
 
 // 4. CONFIGURARE CORS DINAMICĂ
 const allowedOrigins = [
-  env.CLIENT_URL,                    // Adresa ta oficială (ex: https://karixcomputers.ro)
-  "https://karixcomputers.ro",       // Hardcoded ca siguranță
+  env.CLIENT_URL,
+  "https://karixcomputers.ro",
   "https://www.karixcomputers.ro",
-  "http://localhost:5173",           // Vite default
+  "http://localhost:5173",
   "http://127.0.0.1:5173",
-  "http://192.168.0.162:5173",       // IP-ul tău local de rețea
-  "https://claude.ai",               // Permitem testele din Claude
+  "http://192.168.0.162:5173",
+  "https://claude.ai",
   "https://mirror.claude.ai"
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // 1. Permitem cererile fără origine (Postman, server-to-server)
     if (!origin) return callback(null, true);
-
-    // 2. Dacă originea e în listă, o permitem
     const isAllowed = allowedOrigins.includes(origin);
-    
-    // 3. Permitem orice în modul 'development' sau dacă e în whitelist
     if (isAllowed || process.env.NODE_ENV === 'development') {
       return callback(null, true);
     } else {
@@ -85,7 +79,9 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.get("/health", (req, res) => res.json({ ok: true, timestamp: new Date() }));
 
 // 7. RUTE API
-app.use("/api/auth", authRoutes);
+// Am pus authLimiter aici ca să blocăm atacurile de tip brute-force pe conturi
+app.use("/api/auth", authLimiter, authRoutes); 
+
 app.use("/api/products", productsRoutes);
 app.use("/api/orders", ordersRoutes);
 app.use("/api/payments/netopia", paymentsRoutes);
