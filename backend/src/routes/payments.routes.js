@@ -215,7 +215,7 @@ const confirmPayment = async (req, res) => {
             
             // Trimitem mail admin-ului (cu PDF dacă există)
             const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
-            await sendUnifiedOrderEmail(adminEmail, commonMailData, true, invoicePdfBuffer).catch(e => console.error(e));
+            await sendUnifiedOrderEmail(adminEmail, commonMailData, true, null).catch(e => console.error(e));
         }
 
         res.set('Content-Type', 'text/xml');
