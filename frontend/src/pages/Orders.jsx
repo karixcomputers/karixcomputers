@@ -71,6 +71,33 @@ function StatusBadge({ status, isService, isOradea }) {
   );
 }
 
+// NOU: Helper Payment Status Badge
+function PaymentBadge({ paymentMethod, status }) {
+  let label = "💵 Ramburs";
+  let color = "text-gray-400 border-gray-500/20 bg-gray-500/5";
+
+  if (paymentMethod === "online") {
+    // Dacă e online dar comanda e "în așteptare", considerăm că plata a eșuat sau e nefinalizată.
+    // În arhitectura ta, "in_procesare" indică succesul plății Netopia.
+    if (status === "in_asteptare") {
+        label = "⏳ Plată În Așteptare";
+        color = "text-amber-400 border-amber-500/20 bg-amber-500/5";
+    } else if (status === "anulat") {
+        label = "❌ Plată Anulată";
+        color = "text-rose-500 border-rose-500/20 bg-rose-500/5";
+    } else {
+        label = "💳 Plătit Online";
+        color = "text-emerald-400 border-emerald-500/20 bg-emerald-500/5";
+    }
+  }
+
+  return (
+    <span className={`px-2 py-1 ml-3 rounded text-[8px] font-bold uppercase tracking-wider border backdrop-blur-sm inline-flex items-center ${color}`}>
+      {label}
+    </span>
+  );
+}
+
 // Helper Return Request Status
 function ReturnRequestStatus({ status }) {
   const config = {
@@ -93,6 +120,15 @@ export default function Orders() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("orders");
   const [cancelModal, setCancelModal] = useState({ open: false, orderId: null });
+  
+  // NOU: State pentru gestionarea descărcărilor
+  const [downloadingId, setDownloadingId] = useState(null);
+  const [toastMsg, setToastMsg] = useState("");
+
+  const showToast = (msg) => {
+      setToastMsg(msg);
+      setTimeout(() => setToastMsg(""), 4000);
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["myOrders"],
@@ -132,6 +168,45 @@ export default function Orders() {
       isExpired,
       expiryDate: expiryDate.toLocaleDateString('ro-RO', { day: 'numeric', month: 'long' })
     };
+  };
+
+  // NOU: Funcția de descărcare factură
+  const handleDownloadInvoice = async (orderId) => {
+    setDownloadingId(orderId);
+    try {
+        // Asumăm că vei crea această rută în backend pentru descărcare
+        const response = await apiFetch(`/api/orders/${orderId}/invoice`, {
+            method: 'GET'
+        });
+
+        if (!response.ok) {
+            throw new Error('Factura nu este încă disponibilă sau a apărut o eroare.');
+        }
+
+        const blob = await response.blob();
+        
+        // Dacă fișierul descărcat este prea mic, probabil a returnat JSON cu eroare (nu PDF real)
+        if (blob.size < 100) {
+             throw new Error('Factura generată este invalidă.');
+        }
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `Factura_Karix_${orderId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+    } catch (error) {
+        console.error("Download invoice error:", error);
+        showToast(error.message || "Eroare la descărcarea facturii.");
+    } finally {
+        setDownloadingId(null);
+    }
   };
 
   const allReturns = data?.flatMap(order => 
@@ -214,15 +289,42 @@ export default function Orders() {
                             </span>
                           )}
                         </div>
-                        <div className="text-2xl font-black text-white italic drop-shadow-md">#{String(o.id).slice(-8).toUpperCase()}</div>
+                        <div className="text-2xl font-black text-white italic drop-shadow-md flex items-center">
+                            #{String(o.id).slice(-8).toUpperCase()}
+                            {/* NOU: Adăugare Payment Badge */}
+                            <PaymentBadge paymentMethod={o.paymentMethod} status={o.status} />
+                        </div>
                         <div className="text-xs text-gray-400 font-medium italic">Plasată pe {new Date(o.createdAt).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                       </div>
-                      <div className="text-left md:text-right">
+                      
+                      <div className="text-left md:text-right flex flex-col items-start md:items-end">
                         <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Valoare Totală</div>
                         <div className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">{formatRON(o.totalCents)}</div>
-                        {canCancel(o) && (
-                            <button onClick={() => setCancelModal({ open: true, orderId: o.id })} className="mt-4 px-4 py-2 rounded-xl border border-rose-500/30 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-rose-500/10">Anulează Comanda</button>
-                        )}
+                        
+                        <div className="flex gap-2 mt-4">
+                            {/* NOU: Buton Descărcare Factură */}
+                            {/* Am pus o condiție simplă ca să nu apară la comenzile nou-plasate online care încă așteaptă plata */}
+                            {!(o.paymentMethod === 'online' && o.status === 'in_asteptare') && (
+                                <button 
+                                    onClick={() => handleDownloadInvoice(o.id)} 
+                                    disabled={downloadingId === o.id}
+                                    className="px-4 py-2 rounded-xl border border-indigo-500/30 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-lg shadow-indigo-500/10 disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    {downloadingId === o.id ? (
+                                        <>
+                                            <div className="w-3 h-3 border-2 border-indigo-200 border-t-transparent rounded-full animate-spin"></div>
+                                            Se descarcă...
+                                        </>
+                                    ) : (
+                                        <>📄 Descarcă Factura</>
+                                    )}
+                                </button>
+                            )}
+
+                            {canCancel(o) && (
+                                <button onClick={() => setCancelModal({ open: true, orderId: o.id })} className="px-4 py-2 rounded-xl border border-rose-500/30 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-rose-500/10">Anulează</button>
+                            )}
+                        </div>
                       </div>
                     </div>
 
@@ -365,6 +467,16 @@ export default function Orders() {
           </div>
         )}
       </div>
+
+      {/* TOAST EROARE DOWNLOAD FACTURĂ */}
+      {toastMsg && (
+        <div className="fixed bottom-10 right-10 z-[100] animate-in slide-in-from-right duration-300">
+          <div className="rounded-3xl border border-pink-500/30 bg-[#1a2236]/90 p-6 shadow-3xl flex items-center gap-5 backdrop-blur-2xl">
+            <div className="h-12 w-12 rounded-2xl bg-pink-500/10 flex items-center justify-center text-xl font-bold text-pink-400 shadow-lg">!</div>
+            <div className="flex-1 text-sm font-bold text-white drop-shadow-md">{toastMsg}</div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL ANULARE */}
       {cancelModal.open && (
