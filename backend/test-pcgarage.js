@@ -3,50 +3,71 @@ import puppeteer from 'puppeteer';
 const WISHLIST_ID = "6151169"; 
 
 async function testScraper() {
-  console.log(`🚀 Pornire test cu BROWSER real pentru Wishlist: ${WISHLIST_ID}...`);
+  console.log(`🚀 Pornire test avansat pentru Wishlist: ${WISHLIST_ID}...`);
   
-  // Lansăm browserul în mod "headless" (fără interfață grafică)
   const browser = await puppeteer.launch({
     headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox'] // Necesar pentru rulare pe VPS/Linux
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
   });
 
   try {
     const page = await browser.newPage();
     
-    // Setăm un User-Agent de om, nu de robot
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    // Ne dăm drept un browser foarte comun
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
 
     console.log("🌐 Navigăm către PC Garage...");
     await page.goto(`https://www.pcgarage.ro/vizualizare-wishlist/${WISHLIST_ID}/`, {
-      waitUntil: 'networkidle2', // Așteptăm să se încarce toate scripturile
+      waitUntil: 'networkidle0', 
       timeout: 60000
     });
 
-    // Luăm prețul folosind selectorul de clasa
+    // Așteptăm 3 secunde extra să fim siguri că s-au încărcat prețurile dinamice
+    console.log("⏳ Așteptăm încărcarea prețurilor...");
+    await new Promise(r => setTimeout(r, 3000));
+
+    // Încercăm să găsim prețul în mai multe locuri
     const priceRaw = await page.evaluate(() => {
-      const el = document.querySelector('.price_format');
-      return el ? el.innerText : null;
+      // Selectori posibili pentru prețul total
+      const selectors = [
+        '.price_format', 
+        '#wishlist_total', 
+        '.total_price',
+        '.cart-total .price'
+      ];
+      
+      for (let s of selectors) {
+        const el = document.querySelector(s);
+        if (el && el.innerText.trim().length > 0) return el.innerText;
+      }
+      return null;
     });
 
     if (!priceRaw) {
-      console.log("❌ Nu am găsit prețul. S-ar putea ca pagina să arate diferit.");
-      // Facem un screenshot ca să vedem ce vede "robotul" (opțional)
-      await page.screenshot({ path: 'error_screenshot.png' });
-      console.log("📸 Am salvat error_screenshot.png pentru investigații.");
+      console.log("❌ Tot nu am găsit prețul.");
+      // Salvăm un screenshot ca să vezi EXACT ce a văzut robotul (poți descărca fișierul din VPS să-l vezi)
+      await page.screenshot({ path: 'debug_pcgarage.png' });
+      console.log("📸 Am salvat debug_pcgarage.png. Verifică-l să vezi dacă apare Cloudflare.");
     } else {
-      console.log(`🔎 Preț brut găsit: ${priceRaw}`);
+      console.log(`🔎 Preț brut găsit în pagină: ${priceRaw}`);
 
+      // Curățăm textul: eliminăm tot ce nu e cifră
       const cleanPrice = parseInt(priceRaw.replace(/\./g, "").replace(/[^0-9]/g, ""));
+      
+      if (isNaN(cleanPrice)) {
+          console.log("❌ Prețul găsit nu este un număr valid.");
+          return;
+      }
+
       const manopera = 200;
       const adaosPercent = 1.10;
-      
       let calculated = (cleanPrice * adaosPercent) + manopera;
       let finalPrice = Math.ceil(calculated / 10) * 10 - 1;
 
       console.log("--------------------------------------");
-      console.log(`✅ SUCCES PRIN BROWSER!`);
-      console.log(`💰 Pret PC Garage: ${cleanPrice} RON`);
+      console.log(`✅ SUCCES!`);
+      console.log(`💰 Pret Wishlist: ${cleanPrice} RON`);
+      console.log(`🛠️ Manopera: ${manopera} RON`);
       console.log(`💎 PRET FINAL KARIX: ${finalPrice} RON`);
       console.log("--------------------------------------");
     }
