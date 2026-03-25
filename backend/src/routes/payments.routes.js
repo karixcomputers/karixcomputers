@@ -202,7 +202,7 @@ const confirmPayment = async (req, res) => {
                 cartItems: updatedOrder.items.map(item => ({
                     ...item, 
                     name: item.productName, 
-                    isServiceItem: serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
+                    isServiceItem: item.status === 'in_asteptare_ridicare' || serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
                     qty: item.qty || 1, 
                     priceCentsAtBuy: item.priceCentsAtBuy || item.priceCents
                 }))
