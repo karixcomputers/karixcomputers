@@ -41,12 +41,11 @@ export default function Servicii() {
   }, []);
 
   const handleAddToCart = (service) => {
-    // MODIFICAT: Trimitem productName pentru a fi recunoscut de backend/email
     addItem({
       id: service.id,
-      productName: service.name, // <--- REPARAT (era 'name')
+      productName: service.name, 
       priceCents: service.priceCents, 
-      image: getImageUrl(service.images?.[0]), // <--- REPARAT (helper imagini)
+      image: getImageUrl(service.images?.[0]), 
       category: 'service'
     });
 
@@ -123,16 +122,37 @@ export default function Servicii() {
           </div>
         )}
 
-        <div className="mt-20 p-8 md:p-12 rounded-[40px] bg-white/5 border border-white/10 text-center max-w-4xl mx-auto backdrop-blur-xl shadow-2xl">
-          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10">
-              <div className="text-5xl animate-bounce drop-shadow-lg">🚚</div>
-              <div className="text-center md:text-left">
-                <h3 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tighter">Procesul Door-to-Door Karix</h3>
+        <div className="mt-20 flex flex-col gap-6 max-w-4xl mx-auto">
+          
+          {/* SECȚIUNE NOUĂ: Ridicare Oradea */}
+          <div className="p-8 md:p-12 rounded-[40px] bg-gradient-to-br from-indigo-900/40 to-[#0b1020] border border-indigo-500/30 text-center md:text-left backdrop-blur-xl shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[80px] rounded-full group-hover:bg-indigo-500/20 transition-all duration-700 pointer-events-none" />
+            <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10 relative z-10">
+              <div className="text-6xl drop-shadow-xl animate-in zoom-in duration-500">🚗</div>
+              <div>
+                <h3 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tighter">
+                  Ești din <span className="text-indigo-400">Oradea</span>? Venim noi la tine!
+                </h3>
                 <p className="text-gray-300 font-medium leading-relaxed text-sm md:text-base">
-                    După plasarea comenzii, vom trimite un curier la ușa ta în 24-48h. Tu doar ambalează produsul, de restul ne ocupăm noi. Diagnosticarea și reparația se fac în laboratorul nostru specializat.
+                  Dacă ești din municipiul Oradea sau zonele limitrofe, nu mai trebuie să te complici cu firmele de curierat. Venim personal să ridicăm echipamentul de la domiciliul tău și ți-l aducem înapoi reparat pentru doar <strong className="text-white">25 RON</strong>.
                 </p>
               </div>
+            </div>
           </div>
+
+          {/* SECȚIUNEA VECHE: Door to Door Național */}
+          <div className="p-8 md:p-12 rounded-[40px] bg-white/5 border border-white/10 text-center md:text-left backdrop-blur-xl shadow-2xl">
+            <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10">
+                <div className="text-5xl drop-shadow-lg opacity-80 hover:opacity-100 transition-opacity cursor-default">🚚</div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-200 mb-2 uppercase italic tracking-tighter">Procesul Door-to-Door Național</h3>
+                  <p className="text-gray-400 font-medium leading-relaxed text-sm">
+                      Pentru restul țării, după plasarea comenzii vom trimite un curier la ușa ta în 24-48h. Tu doar ambalează produsul în cutia originală sau într-una rezistentă, de transport ne ocupăm noi. Diagnosticarea și reparația se fac în siguranță în laboratorul nostru specializat.
+                  </p>
+                </div>
+            </div>
+          </div>
+
         </div>
 
       </div>

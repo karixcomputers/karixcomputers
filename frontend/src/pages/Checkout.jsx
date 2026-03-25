@@ -217,7 +217,26 @@ export default function Checkout() {
     return appliedCoupon.discountValue; 
   }, [appliedCoupon, currentSubtotal]);
 
-  const shippingCents = currentSubtotal >= 500000 || pickupByKarix ? 0 : 2500;
+const shippingCents = useMemo(() => {
+    // 1. REGELE: Indiferent de produs sau serviciu, dacă totalul e peste 1000 RON (100000 cenți), e gratuit!
+    if (currentSubtotal >= 100000) {
+      return 0; 
+    }
+    
+    // 2. Dacă e sub 1000 RON și are un serviciu în coș, taxa e fixă 30 RON
+    if (cartAnalysis.hasService) {
+      return 3000; 
+    }
+    
+    // 3. Dacă e sub 1000 RON, e produs fizic și clientul din Oradea alege Ridicare Personală, e gratuit
+    if (pickupByKarix) {
+      return 0; 
+    }
+    
+    // 4. Livrare standard prin curier pentru produse sub 1000 RON
+    return 2500; 
+  }, [cartAnalysis.hasService, currentSubtotal, pickupByKarix]);
+  }, [cartAnalysis.hasService, currentSubtotal, pickupByKarix]);
   const totalCents = Math.max(0, currentSubtotal - discountCents + shippingCents);
 
   const handleSwitchToCompany = () => {
@@ -631,9 +650,11 @@ export default function Checkout() {
                 )}
 
                 <div className="flex justify-between text-gray-400 font-medium text-sm">
-                  <span>Logistică</span>
-                  <span className={shippingCents === 0 ? "text-emerald-400 font-black text-[10px] uppercase tracking-widest" : "text-white"}>
-                    {pickupByKarix ? "Karix Express (Gratuit)" : (shippingCents === 0 ? "Gratuit" : formatRON(shippingCents))}
+                  <span>{cartAnalysis.hasService ? "Transport Service (Preluare & Retur)" : "Logistică"}</span>
+                  <span className={shippingCents === 0 ? "text-emerald-400 font-black text-[10px] uppercase tracking-widest" : "text-white font-bold"}>
+                    {shippingCents === 0 
+                      ? (pickupByKarix ? "Karix Express (Gratuit)" : "Gratuit") 
+                      : formatRON(shippingCents)}
                   </span>
                 </div>
 

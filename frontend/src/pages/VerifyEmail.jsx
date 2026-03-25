@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { verifyWithCodeApi, resendVerificationApi } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
-  const email = searchParams.get("email") || "";
+  const email = searchParams.get("email"); // Scoatem fallback-ul || "" pentru a verifica exact dacă există
   const nav = useNavigate();
   const { setUser } = useAuth();
 
@@ -13,6 +13,14 @@ export default function VerifyEmail() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  // --- PROTECȚIE PAGINĂ ---
+  // Dacă nu avem email în URL (ex: a intrat direct pe /verify-email), îl dăm afară
+  useEffect(() => {
+    if (!email) {
+      nav("/auth/register", { replace: true }); // replace: true șterge pagina din istoricul de navigare
+    }
+  }, [email, nav]);
 
   async function handleVerify(e) {
     e.preventDefault();
@@ -40,14 +48,16 @@ export default function VerifyEmail() {
     setError("");
     try {
       await resendVerificationApi(email);
-      setError("Un cod nou a fost trimis!"); // Notificare temporară
+      setError("Un cod nou a fost trimis!"); 
     } catch (err) {
       setError("Eroare la retrimitere. Încearcă mai târziu.");
     }
   }
 
+  // Dacă nu avem email, nu randăm nimic pentru o fracțiune de secundă cât face redirectul
+  if (!email) return null;
+
   return (
-    // pt-12 urcă chenarul aproape de header, conform cerinței tale
     <div className="min-h-screen pt-12 pb-24 px-4 relative overflow-hidden flex justify-center">
       
       {/* Glow-uri de fundal Karix */}
@@ -84,7 +94,6 @@ export default function VerifyEmail() {
                   type="text"
                   maxLength="6"
                   placeholder="000000"
-                  // tracking-[0.5em] pentru spațiere profesională între cifre
                   className="w-full bg-white/[0.05] border border-white/10 rounded-2xl p-5 text-center text-4xl font-black tracking-[0.5em] text-white focus:border-indigo-500 outline-none transition-all placeholder:text-gray-800"
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ""))}
