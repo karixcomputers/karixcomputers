@@ -142,16 +142,22 @@ export default function Checkout() {
 
   const appliedCoupon = location.state?.coupon || null;
 
+  // Analiza superioară a coșului
   const cartAnalysis = useMemo(() => {
     const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie'];
+    
     const hasPC = items.some(item => {
       const name = (item.productName || item.name || "").toLowerCase();
-      return (item.specs && (item.specs.cpu || item.specs.gpu)) || item.category === 'pc' || !isServiceKeywords.some(kw => name.includes(kw));
+      // Un produs e considerat PC dacă are category='pc', sau specs de cpu/gpu
+      return (item.specs && (item.specs.cpu || item.specs.gpu)) || item.category === 'pc';
     });
+
     const hasService = items.some(item => {
       const name = (item.productName || item.name || "").toLowerCase();
-      return !item.specs && isServiceKeywords.some(kw => name.includes(kw));
+      // E serviciu fie din categorie, fie din titlu (dacă n-avem categorie setată)
+      return item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => name.includes(kw)));
     });
+
     return { hasPC, hasService };
   }, [items]);
 
@@ -218,24 +224,25 @@ export default function Checkout() {
   }, [appliedCoupon, currentSubtotal]);
 
   const shippingCents = useMemo(() => {
-    // 1. REGELE: Indiferent de produs sau serviciu, dacă totalul e peste 1000 RON (100000 cenți), e gratuit!
+    // 1. REGELE: Peste 1000 RON (100000 cenți), este automat Gratuit
     if (currentSubtotal >= 100000) {
       return 0; 
     }
     
-    // 2. Dacă e sub 1000 RON și are un serviciu în coș, taxa e fixă 30 RON
+    // 2. Sub 1000 RON: Dacă există un serviciu în coș, taxa e 30 RON tur-retur (indiferent de Oradea sau nu)
     if (cartAnalysis.hasService) {
       return 3000; 
     }
     
-    // 3. Dacă e sub 1000 RON, e produs fizic și clientul din Oradea alege Ridicare Personală, e gratuit
+    // 3. Sub 1000 RON: Dacă NU are serviciu (e produs) și alege ridicare personală în Oradea
     if (pickupByKarix) {
       return 0; 
     }
     
-    // 4. Livrare standard prin curier pentru produse sub 1000 RON
+    // 4. Sub 1000 RON: Livrare standard curier produse fizice
     return 2500; 
   }, [cartAnalysis.hasService, currentSubtotal, pickupByKarix]);
+
   const totalCents = Math.max(0, currentSubtotal - discountCents + shippingCents);
 
   const handleSwitchToCompany = () => {
@@ -376,8 +383,6 @@ export default function Checkout() {
       
       // 2. Logică separată de acțiune în funcție de metoda de plată
       if (paymentMethod === "online") {
-        // Dacă s-a ales plata cu cardul, cerem datele de plată de la backend
-        // NU apelăm Discord, NU golim coșul încă! (Coșul se va goli după confirmarea plății)
         const paymentResponse = await fetch(`https://api.karixcomputers.ro/api/payments/netopia/pay/${data.orderId}`, {
           method: "POST",
           headers: { 
@@ -388,12 +393,10 @@ export default function Checkout() {
 
         const paymentData = await paymentResponse.json();
 
-        // Dacă generarea plății eșuează, aruncăm eroarea (coșul rămâne intact)
         if (!paymentResponse.ok) {
           throw new Error(paymentData.error || "Eroare la inițierea plății Netopia. Te rugăm să reîncerci.");
         }
 
-        // Construim un formular ascuns pentru a trimite clientul la Netopia
         const form = document.createElement("form");
         form.setAttribute("method", "POST");
         form.setAttribute("action", paymentData.paymentUrl);
@@ -412,11 +415,10 @@ export default function Checkout() {
 
         document.body.appendChild(form);
         sessionStorage.setItem("orderJustPlaced", "true");
-        form.submit(); // Redirecționare automată către pagina securizată Netopia
+        form.submit(); 
         return; 
 
       } else {
-        // Dacă este plată RAMBURS, procesul este clasic: notificăm, golim coșul și trimitem pe succes
         await notifyDiscord(orderData, appliedCoupon);
         if (clearCart) clearCart();
         sessionStorage.setItem("orderJustPlaced", "true");
@@ -649,9 +651,14 @@ export default function Checkout() {
                 )}
 
                 <div className="flex justify-between text-gray-400 font-medium text-sm">
-                  <span>Logistică</span>
-                  <span className={shippingCents === 0 ? "text-emerald-400 font-black text-[10px] uppercase tracking-widest" : "text-white"}>
-                    {pickupByKarix ? "Karix Express (Gratuit)" : (shippingCents === 0 ? "Gratuit" : formatRON(shippingCents))}
+                  {/* Text Inteligent pentru Logistică */}
+                  <span>{cartAnalysis.hasService ? "Transport Service (Tur-Retur)" : "Logistică"}</span>
+                  
+                  {/* Preț Inteligent pentru Logistică */}
+                  <span className={shippingCents === 0 ? "text-emerald-400 font-black text-[10px] uppercase tracking-widest" : "text-white font-bold"}>
+                    {shippingCents === 0 
+                      ? (pickupByKarix ? "Karix Express (Gratuit)" : "Gratuit") 
+                      : formatRON(shippingCents)}
                   </span>
                 </div>
 
