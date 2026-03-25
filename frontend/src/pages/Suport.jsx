@@ -8,7 +8,7 @@ export default function Support() {
 const faqs = [
     {
       question: "Cât durează asamblarea și livrarea unui sistem Karix?",
-      answer: "Asamblarea profesională, cable management-ul și testele de stres durează de obicei 2-3 zile lucrătoare. Livrarea se face prin curier rapid în 24-48h."
+      answer: "Asamblarea profesională, cable management-ul și testele de stres durează de obicei 3-5 zile lucrătoare. Livrarea se face prin curier rapid în 24-48h."
     },
     {
       question: "Garanția este valabilă dacă îmi fac singur upgrade la componente?",
@@ -17,10 +17,6 @@ const faqs = [
     {
       question: "Componentele folosite sunt noi sau utilizate?",
       answer: "Karix Computers utilizează EXCLUSIV componente noi, sigilate, achiziționate de la furnizori autorizați. Fiecare piesă beneficiază de garanția producătorului, pe lângă garanția oferită de noi pentru întreg sistemul."
-    },
-    {
-      question: "De ce memoria RAM nu rulează la frecvența maximă specificată?",
-      answer: "Pentru a atinge frecvența maximă (ex: 6000MHz), trebuie activat profilul XMP (Intel) sau EXPO (AMD) din BIOS. Noi facem acest lucru înainte de livrare, dar după un update de BIOS, setarea poate reveni la auto."
     },
     {
       question: "Oferiți servicii de mentenanță pentru laptopuri și console?",
@@ -44,15 +40,15 @@ const faqs = [
     },
     {
       question: "Ce teste de performanță faceți înainte de livrare?",
-      answer: "Fiecare PC trece prin 12 ore de teste de stres: Cinebench (CPU), FurMark (GPU), MemTest86 (RAM) și CrystalDiskInfo (SSD) pentru a ne asigura că temperaturile și stabilitatea sunt optime."
+      answer: "Fiecare PC trece prin ore de teste de stres pentru a ne asigura că temperaturile și stabilitatea sunt optime."
     },
     {
       question: "Cum mă ajutați să aleg componentele ideale pentru un PC custom?",
-      answer: "Dacă nu ești sigur ce să alegi în Configurator, echipa noastră îți oferă consultanță gratuită. Analizăm bugetul tău și jocurile/aplicațiile pe care le folosești pentru a echilibra perfect performanța procesorului cu cea a plăcii video."
+      answer: "Dacă nu ești sigur ce să alegi în Configurator, echipa noastră îți oferă consultanță gratuită. Analizăm bugetul tău și jocurile/aplicațiile pe care le folosești pentru a echilibra perfect performanța procesorului cu cea a plăcii video. Ne poți contacta la secțiunea: Contact . "
     },
     {
       question: "Cum este protejat PC-ul pe durata transportului?",
-      answer: "Folosim spumă expandabilă Instapak la interior pentru a imobiliza placa video și cooler-ul, iar la exterior cutie dublă cu polistiren gros. PC-ul ajunge la tine intact, garantat."
+      answer: "Folosim folie cu bule la interior pentru a imobiliza placa video și cooler-ul, iar la exterior cutie dublă cu polistiren gros. PC-ul ajunge la tine intact, garantat."
     },
     {
       question: "Acceptați plata în rate?",
@@ -60,7 +56,7 @@ const faqs = [
     },
     {
       question: "Cum pot urmări livrarea?",
-      answer: "Expediem exclusiv prin curierat rapid. Imediat ce PC-ul tău părăsește laboratorul Karix, vei primi prin email cu codul de AWB pentru a urmări traseul coletului în timp real până la ușa ta."
+      answer: "Expediem exclusiv prin curierat rapid. Imediat ce PC-ul tău părăsește laboratorul nostru, vei primi prin email cu codul de AWB pentru a urmări traseul coletului în timp real până la ușa ta."
     },
     {
       question: "Locuiesc în Oradea. Cum se procedează cu livrarea?",
