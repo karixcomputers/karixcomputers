@@ -340,12 +340,17 @@ router.post("/forgot-password", async (req, res, next) => {
   try {
     const { email } = req.body;
     const user = await prisma.user.findUnique({ where: { email } });
+    
     if (user) {
-      // 5m = 5 minute de valabilitate. Asta e setarea corectă.
-      const resetToken = jwt.sign({ sub: user.id }, env.JWT_ACCESS_SECRET, { expiresIn: "5m" });
+      // TRUCUL: Creăm un secret unic pentru el, combinând secretul serverului cu parola LUI actuală.
+      const secret = env.JWT_ACCESS_SECRET + user.passwordHash;
+      
+      const resetToken = jwt.sign({ sub: user.id }, secret, { expiresIn: "5m" });
       const resetUrl = `${env.CLIENT_URL}/auth/reset?token=${encodeURIComponent(resetToken)}`;
       await sendResetPassword(email, resetUrl);
     }
+    
+    // Răspundem mereu cu "ok" ca să nu dezvăluim hackerilor dacă emailul există sau nu în baza de date
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -355,22 +360,35 @@ router.post("/reset-password", async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
     
-    // Verificăm manual token-ul, fără să aruncăm imediat eroarea în catch-ul mare
-    let payload;
-    try {
-      payload = jwt.verify(token, env.JWT_ACCESS_SECRET);
-    } catch (err) {
-      if (err.name === 'TokenExpiredError') {
-        return res.status(400).json({ error: "Link-ul de resetare a expirat (valabilitate 5 minute). Te rugăm să ceri altul." });
-      }
-      if (err.name === 'JsonWebTokenError') {
-         return res.status(400).json({ error: "Link invalid sau corupt." });
-      }
-      throw err; // Aruncăm mai departe dacă e o eroare necunoscută
+    // 1. Decodăm token-ul (doar îl citim, nu îl și validăm încă) pentru a afla ID-ul userului
+    const decoded = jwt.decode(token);
+    if (!decoded || !decoded.sub) {
+      return res.status(400).json({ error: "Link invalid sau corupt." });
     }
 
+    // 2. Căutăm utilizatorul în baza de date
+    const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
+    if (!user) {
+      return res.status(404).json({ error: "Utilizatorul nu a fost găsit." });
+    }
+
+    // 3. Recreăm secretul folosind parola LUI ACTUALĂ
+    const secret = env.JWT_ACCESS_SECRET + user.passwordHash;
+
+    // 4. Validăm token-ul oficial. Aici pică dacă a expirat SAU dacă parola a fost deja schimbată
+    try {
+      jwt.verify(token, secret);
+    } catch (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.status(400).json({ error: "Link-ul de resetare a expirat (maxim 5 minute)." });
+      }
+      // Dacă ajunge aici, înseamnă că semnătura nu se potrivește (deci linkul a mai fost folosit)
+      return res.status(400).json({ error: "Acest link a fost deja folosit și nu mai este valabil." });
+    }
+
+    // 5. Dacă totul e perfect, îi schimbăm parola
     const passwordHash = await hashPassword(newPassword);
-    await prisma.user.update({ where: { id: payload.sub }, data: { passwordHash } });
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
     
     res.json({ ok: true });
   } catch (e) { 
