@@ -416,10 +416,6 @@ export default function Cart() {
                     </div>
                   )}
 
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400 font-medium italic">Livrare</span>
-                    <span className="text-emerald-400 uppercase text-[10px] font-black tracking-widest">Gratuit</span>
-                  </div>
                   
                   <div className="pt-6 border-t border-white/5">
                     <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3 italic text-left">Cod Reducere / Voucher</p>
