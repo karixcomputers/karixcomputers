@@ -133,9 +133,17 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invo
       `;
     }
 
-    // --- LOGICĂ LIVRARE / LOGISTICĂ ---
-    const shippingCents = orderData.shippingCents ?? 0;
-    const shippingValue = shippingCents === 0 ? "GRATUIT" : `${(shippingCents / 100).toFixed(2)} RON`;
+    // --- REPARAȚIE LOGICĂ MATEMATICĂ (TOTAL VS SUBTOTAL) ---
+    const totalCents = orderData.total || orderData.totalCents || 0;
+    const subtotalCents = products.reduce((acc, i) => acc + ((i.priceCentsAtBuy || i.priceCents || 0) * (i.qty || 1)), 0);
+    
+    // Luăm shipping-ul din baza de date, dar dacă e 0 și Totalul e mai mare, calculăm diferența
+    let realShippingCents = orderData.shippingCents ?? 0;
+    if (realShippingCents === 0 && totalCents > subtotalCents) {
+        realShippingCents = totalCents - subtotalCents;
+    }
+
+    const shippingValue = realShippingCents <= 0 ? "GRATUIT" : `${(realShippingCents / 100).toFixed(2)} RON`;
     const shippingSectionHtml = `
       <tr>
         <td align="right" style="padding: 15px 12px; border-bottom: 1px solid #1e293b !important;">
@@ -148,10 +156,9 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invo
     `;
 
     let discountSectionHtml = "";
-    const totalCents = orderData.total || orderData.totalCents || 0;
     if (orderData.couponCode) {
-      const subtotal = products.reduce((acc, i) => acc + ((i.priceCentsAtBuy || i.priceCents || 0) * (i.qty || 1)), 0);
-      const discountAmount = (subtotal + shippingCents) - totalCents;
+      // Calculăm discount-ul folosind valoarea logistică reală pentru a păstra balanța
+      const discountAmount = (subtotalCents + realShippingCents) - totalCents;
       if (discountAmount > 0) {
         discountSectionHtml = `
           <tr>
