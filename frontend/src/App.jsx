@@ -1,6 +1,5 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-// --- IMPORT NOU PENTRU GOOGLE ---
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Componente globale
@@ -56,13 +55,15 @@ import ProductDetails from "./pages/ProductDetails";
 import AdminReviews from "./pages/AdminReviews";
 import AdminConfigurator from "./pages/AdminConfigurator.jsx";
 
+// IMPORT NOU PENTRU PAGINA 404
+import NotFound from "./pages/NotFound.jsx"; 
+
 // Context
 import { WishlistProvider } from "./context/WishlistContext";
 
 export default function App() {
   return (
     <WishlistProvider>
-      {/* --- WRAPPER GOOGLE ADĂUGAT AICI --- */}
       <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
         
         <div className="bg-[#0b1020] text-gray-200 min-h-screen flex flex-col relative overflow-x-hidden">
@@ -91,8 +92,6 @@ export default function App() {
                 <Route path="/suport" element={<Suport />} />
                 <Route path="/wishlist" element={<Wishlist />} />
                 <Route path="/configurator" element={<Configurator />} />
-                <Route path="*" element={<NotFound />} />
-                
                 <Route path="/product/:id" element={<ProductDetails />} />
 
                 {/* Rute Legale */}
@@ -116,8 +115,9 @@ export default function App() {
                 <Route path="/service-request" element={<ProtectedRoute><ServiceRequest /></ProtectedRoute>} />
                 <Route path="/tickets" element={<ProtectedRoute><Tickets /></ProtectedRoute>} />
                 <Route path="/tickets/:id" element={<ProtectedRoute><TicketDetail /></ProtectedRoute>} />
+                <Route path="/return-request" element={<ProtectedRoute><ReturnRequest /></ProtectedRoute>} />
 
-                {/* Rute Administrare */}
+                {/* Rute Administrare (Toate securizate cu requireAdmin) */}
                 <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
                 <Route path="/admin/history" element={<ProtectedRoute requireAdmin><AdminHistory /></ProtectedRoute>} />
                 <Route path="/admin/inventory" element={<ProtectedRoute requireAdmin><AdminInventory /></ProtectedRoute>} />
@@ -127,11 +127,13 @@ export default function App() {
                 <Route path="/admin/returns" element={<ProtectedRoute requireAdmin><AdminReturns /></ProtectedRoute>} />
                 <Route path="/admin/service/history" element={<ProtectedRoute requireAdmin><AdminServiceHistory /></ProtectedRoute>} />
                 <Route path="/admin/coupons" element={<ProtectedRoute requireAdmin><AdminCoupons /></ProtectedRoute>} />
-                <Route path="/admin/reviews" element={<ProtectedRoute><AdminReviews /></ProtectedRoute>} />
-                <Route path="/admin/configurator" element={<ProtectedRoute><AdminConfigurator /></ProtectedRoute>} />
+                <Route path="/admin/reviews" element={<ProtectedRoute requireAdmin><AdminReviews /></ProtectedRoute>} />
+                <Route path="/admin/configurator" element={<ProtectedRoute requireAdmin><AdminConfigurator /></ProtectedRoute>} />
 
                 <Route path="/order-canceled" element={<OrderCanceled />} />
-                <Route path="/return-request" element={<ProtectedRoute><ReturnRequest /></ProtectedRoute>} />
+
+                {/* ULTIMA RUTĂ: Catch-all pentru 404 */}
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
             
