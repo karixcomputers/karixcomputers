@@ -40,7 +40,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({ 
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // Limită de 5MB pe fișier
+  limits: { fileSize: 50 * 1024 * 1024 } // Limită de 5MB pe fișier
 });
 
 // --- RUTA NOUĂ: POST UPLOAD (Folosită de Admin Inventory) ---
