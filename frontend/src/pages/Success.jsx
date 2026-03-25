@@ -1,39 +1,35 @@
 import React, { useEffect, useState } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams, Navigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 
 export default function Success() {
   const [sp] = useSearchParams();
   const sessionId = sp.get("session_id");
   const { clearCart } = useCart();
-  const nav = useNavigate();
   
-  // Citim biletul o singură dată, chiar când se construiește pagina
+  // Citim biletul o singură dată
   const [isValid] = useState(() => {
     return sessionStorage.getItem("orderJustPlaced") === "true";
   });
 
   useEffect(() => {
-    // Dacă nu are biletul (a tastat manual /success), îl dăm afară spre Home
-    if (!isValid) {
-      nav("/");
-      return;
+    if (isValid && clearCart) {
+      // Golim coșul cu o mică întârziere (100ms) ca să nu blocăm încărcarea vizuală a paginii
+      setTimeout(() => {
+        clearCart();
+      }, 100);
     }
 
-    // Dacă e valid, îi golim coșul
-    if (clearCart) {
-      clearCart();
-    }
-
-    // AICI E MAGIA: "Rupem" biletul abia când PLEACĂ de pe pagină (se distruge componenta).
-    // Asta rezolvă bug-ul cu fracțiunea de secundă.
+    // Rupem biletul la plecare
     return () => {
       sessionStorage.removeItem("orderJustPlaced");
     };
-  }, [isValid, clearCart, nav]);
+  }, [isValid, clearCart]);
 
-  // Dacă nu e valid, nu afișăm nimic (nici măcar o fracțiune de secundă)
-  if (!isValid) return null;
+  // Metoda NATIVĂ și sigură din React Router pentru a redirecționa intrusii (fără să blocheze aplicația)
+  if (!isValid) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent flex items-center justify-center">
@@ -67,10 +63,11 @@ export default function Success() {
           )}
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/orders" className="px-8 py-5 rounded-2xl font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 backdrop-blur-md transition-all uppercase tracking-widest text-[10px] shadow-lg">
+            {/* Am adăugat 'reloadDocument' pe butoane. Forțează schimbarea paginii și repară blocajul vizual! */}
+            <Link to="/orders" reloadDocument className="px-8 py-5 rounded-2xl font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 backdrop-blur-md transition-all uppercase tracking-widest text-[10px] shadow-lg">
               Comenzile mele
             </Link>
-            <Link to="/shop" className="px-8 py-5 rounded-2xl font-black text-[#0b1020] bg-white hover:bg-emerald-400 hover:text-white transition-all uppercase tracking-widest text-[10px] shadow-2xl shadow-emerald-500/20 active:scale-95">
+            <Link to="/shop" reloadDocument className="px-8 py-5 rounded-2xl font-black text-[#0b1020] bg-white hover:bg-emerald-400 hover:text-white transition-all uppercase tracking-widest text-[10px] shadow-2xl shadow-emerald-500/20 active:scale-95">
               Înapoi la Magazin
             </Link>
           </div>
