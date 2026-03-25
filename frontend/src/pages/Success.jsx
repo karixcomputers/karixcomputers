@@ -1,24 +1,42 @@
-import React, { useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-// 1. Importăm useCart
+import React, { useEffect, useState } from "react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom"; // Am adăugat useNavigate
 import { useCart } from "../context/CartContext";
 
 export default function Success() {
   const [sp] = useSearchParams();
   const sessionId = sp.get("session_id");
-  
-  // 2. Extragem funcția clearCart din context
   const { clearCart } = useCart();
+  const nav = useNavigate();
+  
+  // State pentru a nu randa pagina până nu facem verificarea
+  const [isValid, setIsValid] = useState(false);
 
-  // 3. Golim coșul automat când se încarcă pagina
   useEffect(() => {
+    // 1. Verificăm dacă clientul are biletul VIP primit de la Checkout
+    const justPlaced = sessionStorage.getItem("orderJustPlaced");
+
+    if (!justPlaced) {
+      // Dacă nu are biletul (a tastat manual /success), îl dăm afară spre Home
+      nav("/");
+      return;
+    }
+
+    // 2. Dacă are biletul, "îl rupem" ca să nu poată da refresh la nesfârșit
+    sessionStorage.removeItem("orderJustPlaced");
+    
+    // 3. Îi dăm voie să vadă pagina
+    setIsValid(true);
+
+    // 4. Îi golim coșul
     if (clearCart) {
       clearCart();
     }
-  }, [clearCart]);
+  }, [clearCart, nav]);
+
+  // Cât timp face verificarea sau dacă îl dă afară, nu afișăm nimic pe ecran
+  if (!isValid) return null;
 
   return (
-    /* Modificat: bg-[#0b1020] eliminat pentru transparență totală */
     <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent flex items-center justify-center">
       
       {/* Glow-uri de succes discrete peste animație */}
@@ -28,10 +46,8 @@ export default function Success() {
       </div>
 
       <div className="max-w-2xl w-full mx-auto relative z-10 animate-in fade-in zoom-in duration-500">
-        {/* Cardul principal cu efect intens de blur */}
         <div className="p-12 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-3xl text-center shadow-2xl">
           
-          {/* Iconiță Succes stilizată */}
           <div className="h-24 w-24 rounded-[30px] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-8 shadow-inner shadow-emerald-500/20">
             <span className="text-5xl drop-shadow-lg">✅</span>
           </div>
