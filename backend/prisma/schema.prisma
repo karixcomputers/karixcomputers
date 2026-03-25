@@ -65,6 +65,7 @@ model Product {
   reviews         Review[]      
   benchmarks      Json? // Stochează: [{ "game": "CS2", "fps": "500", "color": "blue" }, ...] 
   isVisible       Boolean  @default(true)
+  pcgarageWishlistId  String?  @unique
 }
 
 model Review {
