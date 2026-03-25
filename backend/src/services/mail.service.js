@@ -133,12 +133,25 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invo
       `;
     }
 
+    // --- LOGICĂ LIVRARE / LOGISTICĂ ---
+    const shippingCents = orderData.shippingCents ?? 0;
+    const shippingValue = shippingCents === 0 ? "GRATUIT" : `${(shippingCents / 100).toFixed(2)} RON`;
+    const shippingSectionHtml = `
+      <tr>
+        <td align="right" style="padding: 15px 12px; border-bottom: 1px solid #1e293b !important;">
+          <span style="color: #94a3b8 !important; text-transform: uppercase; font-size: 10px; letter-spacing: 1px;">Logistică:</span>
+        </td>
+        <td align="right" style="padding: 15px 12px; border-bottom: 1px solid #1e293b !important;">
+          <strong style="color: #ffffff !important; font-size: 14px;">${shippingValue}</strong>
+        </td>
+      </tr>
+    `;
+
     let discountSectionHtml = "";
     const totalCents = orderData.total || orderData.totalCents || 0;
     if (orderData.couponCode) {
       const subtotal = products.reduce((acc, i) => acc + ((i.priceCentsAtBuy || i.priceCents || 0) * (i.qty || 1)), 0);
-      const shipping = (subtotal >= 500000 || isOradea) ? 0 : 2500;
-      const discountAmount = (subtotal + shipping) - totalCents;
+      const discountAmount = (subtotal + shippingCents) - totalCents;
       if (discountAmount > 0) {
         discountSectionHtml = `
           <tr>
@@ -165,6 +178,7 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invo
       itemsList: itemsHtml,
       billingSection: billingHtml,
       discountSection: discountSectionHtml,
+      shippingSection: shippingSectionHtml,
       total: (totalCents / 100).toFixed(2),
       finalTotal: (totalCents / 100).toFixed(2),
       date: new Date().toLocaleString('ro-RO'),
@@ -178,7 +192,6 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invo
         attachments: []
     };
 
-    // ATAȘĂM FACTURA SMARTBILL DACA EXISTĂ!
     if (invoiceBuffer) {
         mailOptions.attachments.push({
             filename: `Factura_Karix_${orderData.id || orderData.orderId}.pdf`,
@@ -242,13 +255,26 @@ export async function sendOrderPlaced(to, orderData, isAdmin = false) {
     `;
   }).join("");
 
+  // Secțiune Logistică
+  const shipCents = orderData.shippingCents || 0;
+  const shipText = shipCents === 0 ? "GRATUIT" : `${(shipCents / 100).toFixed(2)} RON`;
+  const shippingSectionHtml = `
+    <tr>
+      <td align="right" style="padding: 15px 12px; border-bottom: 1px solid #1e293b !important;">
+        <span style="color: #94a3b8 !important; text-transform: uppercase; font-size: 10px; letter-spacing: 1px;">Logistică:</span>
+      </td>
+      <td align="right" style="padding: 15px 12px; border-bottom: 1px solid #1e293b !important;">
+        <strong style="color: #ffffff !important; font-size: 14px;">${shipText}</strong>
+      </td>
+    </tr>
+  `;
+
   let discountSectionHtml = "";
   const totalCents = orderData.total || orderData.totalCents || 0;
   
   if (orderData.couponCode) {
     const subtotal = products.reduce((acc, i) => acc + ((i.priceCentsAtBuy || i.priceCents || 0) * (i.qty || 1)), 0);
-    const shipping = (subtotal >= 500000 || orderData.pickupType === "KarixPersonal") ? 0 : 2500;
-    const discountAmountCents = (subtotal + shipping) - totalCents;
+    const discountAmountCents = (subtotal + shipCents) - totalCents;
 
     if (discountAmountCents > 0) {
       discountSectionHtml = `
@@ -279,6 +305,7 @@ export async function sendOrderPlaced(to, orderData, isAdmin = false) {
     phone: phone,
     itemsList: itemsHtml,
     discountSection: discountSectionHtml,
+    shippingSection: shippingSectionHtml,
     total: finalTotalFormatted, 
     finalTotal: finalTotalFormatted, 
     accountUrl: `https://karixcomputers.ro/orders`,
@@ -297,10 +324,6 @@ export async function sendOrderPlaced(to, orderData, isAdmin = false) {
     console.error("Eroare mail:", err.message);
   }
 }
-
-/**
- * Toate funcțiile de Service, Oradea, Refund, Tickete rămân identice mai jos
- */
 
 export async function sendServiceOrderPlaced(to, data) {
   try {
