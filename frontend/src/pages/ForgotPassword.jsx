@@ -17,7 +17,6 @@ export default function ForgotPassword() {
     setSuccess(false);
 
     try {
-      // Verifică dacă ruta de backend pentru resetare parolă este aceasta:
       const res = await axios.post(`${API_URL}/auth/forgot-password`, { email });
       
       if (res.status === 200) {
@@ -31,7 +30,8 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent flex items-center justify-center">
+    // Am scos "items-center" ca să nu se mai centreze pe mijlocul ecranului, ci să stea sus (pt-40)
+    <div className="min-h-screen pt-40 pb-24 px-4 relative overflow-hidden bg-transparent flex justify-center">
       
       {/* Glow-uri de fundal */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -58,11 +58,12 @@ export default function ForgotPassword() {
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Am scos "uppercase" și am pus "text-sm" ca să fie ușor de citit cu litere mici */}
                 <input 
                   required 
                   type="email" 
-                  className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-5 text-white outline-none focus:border-indigo-500/50 transition-all text-xs font-bold uppercase tracking-wider text-center" 
-                  placeholder="EMAIL@EXEMPLU.RO" 
+                  className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-5 text-white outline-none focus:border-indigo-500/50 transition-all text-sm font-bold tracking-wider text-center placeholder:uppercase placeholder:text-xs" 
+                  placeholder="email@exemplu.ro" 
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                 />
