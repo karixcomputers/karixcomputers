@@ -116,9 +116,7 @@ export default function Header() {
 
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           
-          {/* LOGO KARIX COMPUTERS
-              Acum textul este vizibil permanent, inclusiv pe mobil.
-          */}
+          {/* LOGO KARIX COMPUTERS */}
           <div className="flex-1 flex justify-start">
             <Link 
               to="/" 
@@ -131,7 +129,6 @@ export default function Header() {
                 className="h-10 md:h-12 w-auto object-contain"
               />
               <div className="leading-none text-left flex flex-col justify-center">
-                {/* Font redus ușor pe mobil (text-base) pentru a nu aglomera header-ul */}
                 <div className="font-black tracking-tighter text-white text-base sm:text-lg uppercase">Karix</div>
                 <div className="text-[9px] sm:text-[11px] font-medium text-gray-400 tracking-[0.2em] mt-0.5 uppercase">Computers</div>
               </div>
@@ -200,6 +197,20 @@ export default function Header() {
               )}
             </div>
 
+            {/* COȘ DE CUMPĂRĂTURI (Mobil) - VIZIBIL MEREU LÂNGĂ BURGER */}
+            <Link 
+              to="/cart"
+              onClick={closeMenus}
+              className="md:hidden relative flex items-center justify-center p-3 rounded-xl bg-white/5 border border-white/10 text-white active:scale-95 transition-all shadow-lg"
+            >
+              <span className="text-lg leading-none">🛒</span>
+              {count > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center text-[10px] font-black h-5 w-5 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500 text-white border border-[#0b1020]">
+                  {count}
+                </span>
+              )}
+            </Link>
+
             {/* BUTON BURGER (Mobil) - Deschide Slide Drawer-ul */}
             <button 
               onClick={() => setMobileOpen(true)}
@@ -211,15 +222,12 @@ export default function Header() {
         </div>
       </header>
 
-      {/* MENIU MOBIL CU EFECT SLIDE (Sertar lateral)
-          AICI ESTE REPARAȚIA (Am adăugat pointer-events-none când e închis)
-      */}
+      {/* MENIU MOBIL CU EFECT SLIDE (Sertar lateral) */}
       <div 
         className={`fixed inset-0 z-[100] md:hidden transition-all duration-500 ${
           mobileOpen ? "visible pointer-events-auto" : "invisible pointer-events-none"
         }`}
       >
-        {/* FUNDAL ÎNTUNECAT (Backdrop) - Facilitează contrastul și concentrarea pe meniu */}
         <div 
           className={`absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity duration-500 ${
             mobileOpen ? "opacity-100" : "opacity-0"
@@ -227,13 +235,11 @@ export default function Header() {
           onClick={closeMenus}
         />
 
-        {/* PANOU LATERAL (Drawer) - Glisează din dreapta în stânga */}
         <div 
           className={`absolute top-0 right-0 h-full w-[80%] max-w-[320px] bg-[#0b1020] border-l border-white/10 shadow-[-20px_0_50px_rgba(0,0,0,0.5)] transition-transform duration-500 ease-in-out flex flex-col ${
             mobileOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          {/* Header Sertar: Include Logo și butonul de închidere (X) */}
           <div className="p-6 flex items-center justify-between border-b border-white/5">
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
@@ -247,7 +253,6 @@ export default function Header() {
             </button>
           </div>
 
-          {/* Conținut Navigare: Lista de link-uri și categorii */}
           <div className="flex-1 overflow-y-auto px-6 py-8 space-y-4">
             
             {isAdmin && (
@@ -269,29 +274,12 @@ export default function Header() {
 
               <div className="h-px bg-white/5 my-4" />
 
-              {/* Link Wishlist (Mobil) */}
-              <Link 
-                to="/wishlist" 
-                onClick={closeMenus} 
-                className="flex items-center justify-between p-4 rounded-xl bg-white/5 text-white font-bold "
-              >
-                <span>Produse Favorite</span>
-              </Link>
-
-              {/* Link Coș (Mobil) */}
-              <Link 
-                to="/cart" 
-                onClick={closeMenus} 
-                className="flex items-center justify-between p-4 rounded-xl bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-600/20"
-              >
-                <span>Coșul meu</span>
-                {count > 0 && <span className="h-6 w-6 rounded-full bg-white text-indigo-600 flex items-center justify-center text-[11px] font-black">{count}</span>}
-              </Link>
+              {/* Produse Favorite folosește acum componenta Item pentru un design uniform */}
+              <Item to="/wishlist" onClick={closeMenus}>Produse Favorite</Item>
             </nav>
 
             <div className="h-px bg-white/5 my-6" />
 
-            {/* Secțiune Cont Client: Logica de Logat vs Nelogat */}
             <div className="space-y-2">
               {user ? (
                 <>
@@ -320,7 +308,6 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Footer Drawer: Element decorativ */}
           <div className="p-8 border-t border-white/5 text-center">
             <p className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
               Built for Performance ⚡
