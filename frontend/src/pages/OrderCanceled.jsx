@@ -1,7 +1,24 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, Navigate } from "react-router-dom";
 
 export default function OrderCanceled() {
+  // 1. Verificăm biletul la încărcarea paginii
+  const [isValid] = useState(() => {
+    return sessionStorage.getItem("orderJustCanceled") === "true";
+  });
+
+  useEffect(() => {
+    // 2. Rupem biletul când pleacă de pe pagină
+    return () => {
+      sessionStorage.removeItem("orderJustCanceled");
+    };
+  }, []);
+
+  // 3. Dacă a intrat pe ușa din spate (tastând URL-ul), îl trimitem pe prima pagină
+  if (!isValid) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent flex items-center justify-center">
       
@@ -37,10 +54,11 @@ export default function OrderCanceled() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/orders" className="px-8 py-5 rounded-2xl font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 backdrop-blur-md transition-all uppercase tracking-widest text-[10px] shadow-lg">
+            {/* Am adăugat reloadDocument ca să își ia comenzile fresh din baza de date */}
+            <Link to="/orders" reloadDocument className="px-8 py-5 rounded-2xl font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 backdrop-blur-md transition-all uppercase tracking-widest text-[10px] shadow-lg">
               Înapoi la Comenzile mele
             </Link>
-            <Link to="/shop" className="px-8 py-5 rounded-2xl font-black text-[#0b1020] bg-white hover:bg-rose-500 hover:text-white transition-all uppercase tracking-widest text-[10px] shadow-2xl shadow-rose-500/20 active:scale-95">
+            <Link to="/shop" reloadDocument className="px-8 py-5 rounded-2xl font-black text-[#0b1020] bg-white hover:bg-rose-500 hover:text-white transition-all uppercase tracking-widest text-[10px] shadow-2xl shadow-rose-500/20 active:scale-95">
               Continuă Cumpărăturile
             </Link>
           </div>

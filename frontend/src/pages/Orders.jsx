@@ -147,6 +147,7 @@ export default function Orders() {
     onSuccess: () => {
       queryClient.invalidateQueries(["myOrders"]);
       setCancelModal({ open: false, orderId: null });
+      sessionStorage.setItem("orderJustCanceled", "true");
       navigate("/order-canceled"); 
     },
   });
