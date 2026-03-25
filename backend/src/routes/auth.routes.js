@@ -396,4 +396,34 @@ router.post("/reset-password", async (req, res, next) => {
   }
 });
 
+// 10. VERIFICARE TOKEN ÎNAINTE DE AFIȘARE FORMULAR
+router.post("/verify-reset-token", async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    // 1. Decodăm să vedem a cui e
+    const decoded = jwt.decode(token);
+    if (!decoded || !decoded.sub) {
+      return res.status(400).json({ valid: false });
+    }
+
+    // 2. Căutăm userul
+    const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
+    if (!user) {
+      return res.status(400).json({ valid: false });
+    }
+
+    // 3. Verificăm cu parola lui actuală
+    const secret = env.JWT_ACCESS_SECRET + user.passwordHash;
+    jwt.verify(token, secret); // Dacă a expirat sau a schimbat parola, dă eroare direct aici
+
+    // 4. Dacă ajunge aici, token-ul e 100% valid
+    res.json({ valid: true });
+  } catch (err) {
+    // Orice eroare (expirat, corupt, folosit)
+    res.status(400).json({ valid: false });
+  }
+});
+
+
 export default router;
