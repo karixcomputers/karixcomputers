@@ -18,7 +18,6 @@ export default function ForgotPassword() {
 
     try {
       const res = await axios.post(`${API_URL}/auth/forgot-password`, { email });
-      
       if (res.status === 200) {
         setSuccess(true);
       }
@@ -30,8 +29,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    // Am scos "items-center" ca să nu se mai centreze pe mijlocul ecranului, ci să stea sus (pt-40)
-    <div className="min-h-screen pt-40 pb-24 px-4 relative overflow-hidden bg-transparent flex justify-center">
+    <div className="min-h-screen pt-40 pb-24 px-4 relative flex justify-center bg-transparent">
       
       {/* Glow-uri de fundal */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -40,10 +38,10 @@ export default function ForgotPassword() {
       </div>
 
       <div className="max-w-md w-full mx-auto relative z-10 animate-in fade-in zoom-in duration-500">
-        <div className="p-10 sm:p-12 rounded-[50px] bg-[#161e31]/95 border border-white/10 backdrop-blur-3xl text-center shadow-3xl">
+        {/* REPARAȚIE: Am mărit padding-ul de jos (pb-16) și am scos overflow-hidden pentru a nu tăia textul la colțuri */}
+        <div className="p-10 sm:p-12 pb-16 sm:pb-20 rounded-[50px] bg-[#161e31]/95 border border-white/10 backdrop-blur-3xl text-center shadow-3xl">
           
           {!success ? (
-            // --- STAREA 1: FORMULARUL DE INTRODUCERE EMAIL ---
             <>
               <div className="h-16 w-16 rounded-[24px] bg-gradient-to-br from-indigo-500 to-pink-500 mx-auto mb-6 flex items-center justify-center text-2xl shadow-2xl">
                 🔐
@@ -53,17 +51,16 @@ export default function ForgotPassword() {
                 Recuperare <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Parolă</span>
               </h1>
               
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-8 italic">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-8 italic px-4 leading-relaxed">
                 Introdu adresa de email asociată contului.
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Am scos "uppercase" și am pus "text-sm" ca să fie ușor de citit cu litere mici */}
                 <input 
                   required 
                   type="email" 
-                  className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-5 text-white outline-none focus:border-indigo-500/50 transition-all text-sm font-bold tracking-wider text-center placeholder:uppercase placeholder:text-xs" 
-                  placeholder="email@exemplu.ro" 
+                  className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-5 text-white outline-none focus:border-indigo-500/50 transition-all text-sm font-bold tracking-wider text-center placeholder:text-xs" 
+                  placeholder="Email" 
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                 />
@@ -80,14 +77,14 @@ export default function ForgotPassword() {
                 </button>
               </form>
 
-              <div className="mt-8 pt-8 border-t border-white/5">
-                <Link to="/login" className="text-[10px] text-gray-500 hover:text-white font-black uppercase tracking-widest transition-colors italic">
+              {/* REPARAȚIE: Am ajustat marginile aici pentru a urca textul deasupra curbei colțului */}
+              <div className="mt-10 pt-6 border-t border-white/5">
+                <Link to="/auth/login" className="text-[10px] text-gray-500 hover:text-white font-black uppercase tracking-widest transition-colors italic">
                   ← Înapoi la Autentificare
                 </Link>
               </div>
             </>
           ) : (
-            // --- STAREA 2: SUCCES (EMAIL TRIMIS) ---
             <div className="animate-in fade-in zoom-in duration-300">
               <div className="h-20 w-20 rounded-[30px] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-6 shadow-inner shadow-emerald-500/20">
                 <span className="text-4xl drop-shadow-lg">✉️</span>
@@ -97,7 +94,7 @@ export default function ForgotPassword() {
                 Verifică <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Email-ul</span>
               </h2>
               
-              <p className="text-gray-300 font-medium tracking-tight text-sm leading-relaxed mb-8">
+              <p className="text-gray-300 font-medium tracking-tight text-sm leading-relaxed mb-8 px-2">
                 Am trimis un link de resetare a parolei către <br/>
                 <span className="text-white font-bold">{email}</span>
               </p>

@@ -70,7 +70,7 @@ export default function Register() {
                 <input
                   required
                   className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder:text-gray-600"
-                  placeholder="Popescu Ion"
+                  placeholder="Nume"
                   value={form.name}
                   onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
                 />
@@ -93,7 +93,7 @@ export default function Register() {
                   required
                   type="email"
                   className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder:text-gray-600"
-                  placeholder="email@exemplu.ro"
+                  placeholder="Email"
                   value={form.email}
                   onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
                 />
