@@ -291,9 +291,10 @@ export default function ProductDetails() {
             </div>
 
             {/* DESCRIERE DETALIATĂ */}
-            {product.longDescription && (
+              {product.longDescription && (
               <div className="p-8 rounded-[35px] bg-white/[0.02] border border-white/5 italic">
-                <p className="text-gray-400 text-sm leading-relaxed font-medium">
+                {/* AM ADĂUGAT whitespace-pre-line MAI JOS */}
+                <p className="whitespace-pre-line text-gray-400 text-sm leading-relaxed font-medium">
                   {product.longDescription}
                 </p>
               </div>
