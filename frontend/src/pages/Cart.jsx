@@ -1,14 +1,16 @@
-import React, { useState, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useMemo, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { formatRON } from "../utils/money";
 import { apiFetch } from "../api/client";
+import axios from "axios";
 
 export default function Cart() {
   const { items, removeFromCart, updateQty, clearCart, totalCents } = useCart();
-  const { user, login } = useAuth();
+  const { user, login, loginWithGoogle } = useAuth();
   const nav = useNavigate();
+  const location = useLocation();
 
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -23,6 +25,15 @@ export default function Cart() {
   const [isValidating, setIsValidating] = useState(false);
 
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, itemId: null, itemName: "" });
+
+  // --- GOOGLE AUTH STATE PENTRU MODAL ---
+  const [isCompletingProfile, setIsCompletingProfile] = useState(false);
+  const [tempToken, setTempToken] = useState("");
+  const [profileData, setProfileData] = useState({ name: "", email: "", avatar: "", phone: "" });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   const SERVICE_KEYWORDS = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'upgrade'];
 
@@ -45,6 +56,106 @@ export default function Cart() {
     }
   }, [totalCents, appliedCoupon]);
 
+  // --- LOGICĂ GOOGLE AUTH INTERCEPT ---
+  useEffect(() => {
+    const hash = window.location.hash;
+    // Interceptăm tokenul doar dacă a fost declanșat din coș
+    if (hash && sessionStorage.getItem("cartGoogleAuth") === "true") {
+      const params = new URLSearchParams(hash.substring(1));
+      const accessToken = params.get("access_token");
+
+      if (accessToken) {
+        setShowLoginModal(true); // Redeschidem modalul automat
+        handleBackendLogin(accessToken);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, []);
+
+  const handleBackendLogin = async (token) => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await axios.post(`${API_URL}/auth/google`, { token });
+      
+      // Dacă e client NOU
+      if (res.status === 202 && res.data.require_profile_completion) {
+        setTempToken(res.data.tempToken);
+        setProfileData({
+          name: res.data.profileData.name || "",
+          email: res.data.profileData.email || "",
+          avatar: res.data.profileData.avatar || "",
+          phone: ""
+        });
+        setIsCompletingProfile(true); 
+      } else if (res.data && res.data.accessToken) {
+        // Dacă e client VECHI
+        loginWithGoogle(res.data);
+        sessionStorage.removeItem("cartGoogleAuth");
+        setShowLoginModal(false);
+        nav("/checkout", { state: { coupon: appliedCoupon } });
+      }
+    } catch (err) {
+      console.error("Google Auth Error:", err);
+      setError("Sincronizarea cu Google a eșuat.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCompleteProfile = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    if (!acceptedTerms) {
+      setError("Trebuie să accepți Termenii și Condițiile.");
+      setLoading(false);
+      return;
+    }
+
+    if (!profileData.phone || profileData.phone.length < 9) {
+      setError("Te rugăm să introduci un număr de telefon valid.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await axios.post(`${API_URL}/auth/google-complete`, {
+        tempToken,
+        name: profileData.name,
+        phone: profileData.phone,
+        termsAccepted: true
+      });
+
+      if (res.data && res.data.accessToken) {
+        loginWithGoogle(res.data);
+        sessionStorage.removeItem("cartGoogleAuth");
+        setShowLoginModal(false);
+        setIsCompletingProfile(false);
+        nav("/checkout", { state: { coupon: appliedCoupon } });
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || "Eroare la finalizarea contului.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLoginInit = () => {
+    if (!GOOGLE_CLIENT_ID) {
+      setError("Eroare: Configurare Google lipsă.");
+      return;
+    }
+    sessionStorage.setItem("cartGoogleAuth", "true"); // Flag ca să știm că vine din coș
+    const redirectUri = "https://karixcomputers.ro/cart"; // Se va întoarce fix în coș!
+    const scope = "email profile";
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}`;
+    
+    window.location.href = authUrl;
+  };
+  // --- END GOOGLE AUTH ---
+
   const handleCheckoutClick = () => {
     if (hasMultipleServices && !singleDevice) {
       setShowErrorModal(true);
@@ -64,7 +175,7 @@ export default function Cart() {
     try {
       await login(loginForm.email, loginForm.password);
       setShowLoginModal(false);
-      nav("/checkout");
+      nav("/checkout", { state: { coupon: appliedCoupon } });
     } catch (err) {
       setError(err.message || "Autentificare eșuată");
     } finally {
@@ -111,6 +222,14 @@ export default function Cart() {
   const confirmDelete = () => {
     removeFromCart(deleteConfirm.itemId);
     setDeleteConfirm({ show: false, itemId: null, itemName: "" });
+  };
+
+  // Curățăm flag-ul dacă clientul închide manual modalul
+  const handleCloseModal = () => {
+    setShowLoginModal(false);
+    setIsCompletingProfile(false);
+    setError("");
+    sessionStorage.removeItem("cartGoogleAuth");
   };
 
   return (
@@ -200,7 +319,6 @@ export default function Cart() {
                         )}
                       </div>
                       
-                      {/* Titlu Doar pe Mobil (lângă poză) */}
                       <div className="flex-1 sm:hidden">
                         <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border mb-1.5 inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
                           {isPC ? 'Hardware' : 'Service'}
@@ -211,9 +329,7 @@ export default function Cart() {
                       </div>
                     </div>
                     
-                    {/* BLOC DETALII */}
                     <div className="flex-1 w-full pt-1 overflow-hidden">
-                      {/* Titlu Doar pe Desktop */}
                       <div className="hidden sm:block pr-8">
                         <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border mb-2 inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
                           {isPC ? 'Hardware' : 'Service'}
@@ -223,7 +339,6 @@ export default function Cart() {
                         </h3>
                       </div>
 
-                      {/* SPECIFICAȚII (Complet responsive, text integral) */}
                       {isPC && item.specs && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-3 sm:mt-4 opacity-90 w-full">
                           {[
@@ -247,7 +362,6 @@ export default function Cart() {
                         </div>
                       )}
 
-                      {/* Preț Desktop */}
                       <div className="hidden sm:flex items-center gap-4 mt-6">
                         <p className="text-white font-black text-lg drop-shadow-lg">{formatRON(itemPrice * quantity)}</p>
                         {item.warrantyMonths > 0 && (
@@ -258,7 +372,6 @@ export default function Cart() {
                       </div>
                     </div>
 
-                    {/* BLOC MOBIL: Preț + Control Cantitate */}
                     <div className="flex items-center justify-between sm:justify-center w-full sm:w-auto mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-white/5 sm:border-0 shrink-0">
                       
                       <div className="sm:hidden flex flex-col">
@@ -357,20 +470,6 @@ export default function Cart() {
         )}
       </div>
 
-      {/* MODAL CONFIRMARE STERGERE PRODUS */}
-      {deleteConfirm.show && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 backdrop-blur-md bg-black/60">
-          <div className="relative w-full max-w-sm bg-[#161e31]/90 backdrop-blur-2xl border border-pink-500/20 p-10 rounded-[40px] text-center shadow-2xl animate-in zoom-in">
-            <h2 className="text-2xl font-black text-white mb-2 italic uppercase">Eliminare Produs</h2>
-            <p className="text-gray-400 text-sm mb-8 leading-relaxed font-medium italic">Ești sigur că vrei să ștergi <span className="text-white font-bold">{deleteConfirm.itemName}</span> din coș?</p>
-            <div className="flex gap-4">
-              <button onClick={() => setDeleteConfirm({ show: false, itemId: null, itemName: "" })} className="flex-1 py-4 rounded-2xl font-black text-gray-400 bg-white/5 hover:bg-white/10 uppercase tracking-widest text-[10px] transition-all">Anulează</button>
-              <button onClick={confirmDelete} className="flex-1 py-4 rounded-2xl font-black text-white bg-pink-600 hover:bg-pink-500 uppercase tracking-widest text-[10px] shadow-lg shadow-pink-600/20 transition-all">Șterge</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* MODAL EROARE LOGISTICA */}
       {showErrorModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 backdrop-blur-md bg-black/60">
@@ -383,64 +482,115 @@ export default function Cart() {
         </div>
       )}
 
-      {/* MODAL LOGIN COMPLET REFĂCUT */}
+      {/* MODAL LOGIN / COMPLETARE PROFIL (PENTRU CHECKOUT) */}
       {showLoginModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-xl bg-black/70">
           <div className="relative w-full max-w-md bg-[#161e31]/95 backdrop-blur-3xl border border-white/10 p-10 sm:p-12 rounded-[50px] shadow-3xl text-center">
             
-            <button onClick={() => setShowLoginModal(false)} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-colors h-8 w-8 bg-white/5 rounded-full flex items-center justify-center">✕</button>
+            <button onClick={handleCloseModal} className="absolute top-8 right-8 text-gray-500 hover:text-white transition-colors h-8 w-8 bg-white/5 rounded-full flex items-center justify-center">✕</button>
             
-            <div className="h-16 w-16 rounded-[24px] bg-gradient-to-br from-indigo-500 to-pink-500 mx-auto mb-6 flex items-center justify-center text-2xl shadow-2xl">🔑</div>
-            <h2 className="text-3xl font-black text-white uppercase italic drop-shadow-lg mb-2">Autentificare</h2>
-            <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-8 italic">Pentru a finaliza comanda</p>
-            
-            <form onSubmit={handleInlineLogin} className="space-y-4">
-              <input required type="email" className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-5 text-white outline-none focus:border-indigo-500/50 transition-all text-xs font-bold uppercase tracking-wider" placeholder="EMAIL" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} />
-              
-              <div className="space-y-2">
-                 <input required type="password" className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-5 text-white outline-none focus:border-indigo-500/50 transition-all text-xs font-bold uppercase tracking-wider" placeholder="PAROLĂ" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} />
-                 <div className="flex justify-end px-2">
-                    <Link to="/forgot-password" onClick={() => setShowLoginModal(false)} className="text-[9px] text-gray-400 hover:text-pink-400 font-black uppercase tracking-widest transition-colors">Ai uitat parola?</Link>
-                 </div>
+            {isCompletingProfile ? (
+              // --- PASUL 2 GOOGLE: COMPLETARE DATE ---
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <header className="mb-8 text-center">
+                  <div className="relative inline-block mb-4">
+                    {profileData.avatar ? (
+                      <img src={profileData.avatar} alt="Profile" className="w-16 h-16 rounded-full border-2 border-indigo-500 shadow-lg object-cover" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full border-2 border-indigo-500 bg-indigo-500/20 flex items-center justify-center text-2xl">👋</div>
+                    )}
+                  </div>
+                  <h1 className="text-2xl font-black text-white tracking-tight uppercase italic">
+                    Aproape <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Gata!</span>
+                  </h1>
+                  <p className="text-xs text-gray-300 mt-2 font-medium italic px-4">
+                    Avem nevoie de numărul tău de telefon pentru facturare și livrări.
+                  </p>
+                </header>
+
+                <form onSubmit={handleCompleteProfile} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 ml-2 text-left block">Nume Complet</label>
+                      <input required type="text" className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500 outline-none transition-all font-medium text-sm" value={profileData.name} onChange={(e) => setProfileData(p => ({ ...p, name: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 ml-2 text-left block">Telefon</label>
+                      <input required type="tel" className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-gray-600" placeholder="Ex: 0712345678" value={profileData.phone} onChange={(e) => setProfileData(p => ({ ...p, phone: e.target.value }))} />
+                    </div>
+
+                    <label className="flex items-start gap-3 mt-4 cursor-pointer group p-2 rounded-xl hover:bg-white/5 transition-colors">
+                      <div className="relative flex items-center mt-0.5">
+                        <input type="checkbox" required checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="peer h-4 w-4 shrink-0 appearance-none rounded border border-white/20 bg-white/5 checked:border-indigo-500 checked:bg-indigo-500 focus:outline-none transition-all" />
+                        <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-2.5 w-2.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </div>
+                      <span className="text-[10px] text-gray-400 font-medium leading-relaxed italic text-left">
+                        Sunt de acord cu <Link to="/terms" target="_blank" className="text-indigo-400 hover:text-indigo-300 font-bold underline">Termenii</Link> și <Link to="/confidentialitate" target="_blank" className="text-indigo-400 hover:text-indigo-300 font-bold underline">GDPR</Link>.
+                      </span>
+                    </label>
+                  </div>
+
+                  {error && <p className="text-[10px] text-pink-500 font-bold uppercase tracking-tighter">{error}</p>}
+
+                  <button disabled={loading || !acceptedTerms} className="w-full rounded-2xl py-5 text-xs font-black text-white bg-indigo-500 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 active:scale-[0.98] transition-all disabled:opacity-50 uppercase tracking-widest">
+                    {loading ? "Se salvează..." : "Continuă la Checkout"}
+                  </button>
+                </form>
               </div>
+            ) : (
+              // --- PASUL 1: AUTENTIFICARE NORMALA / GOOGLE INIȚIAL ---
+              <div className="animate-in fade-in duration-500">
+                <div className="h-16 w-16 rounded-[24px] bg-gradient-to-br from-indigo-500 to-pink-500 mx-auto mb-6 flex items-center justify-center text-2xl shadow-2xl">🔑</div>
+                <h2 className="text-3xl font-black text-white uppercase italic drop-shadow-lg mb-2">Autentificare</h2>
+                <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-8 italic">Pentru a finaliza comanda</p>
+                
+                <form onSubmit={handleInlineLogin} className="space-y-4">
+                  <input required type="email" className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-5 text-white outline-none focus:border-indigo-500/50 transition-all text-xs font-bold uppercase tracking-wider" placeholder="EMAIL" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} />
+                  
+                  <div className="space-y-2">
+                     <input required type="password" className="w-full bg-white/5 border border-white/10 rounded-[20px] px-6 py-5 text-white outline-none focus:border-indigo-500/50 transition-all text-xs font-bold uppercase tracking-wider" placeholder="PAROLĂ" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} />
+                     <div className="flex justify-end px-2">
+                        <Link to="/auth/forgot" onClick={handleCloseModal} className="text-[9px] text-gray-400 hover:text-pink-400 font-black uppercase tracking-widest transition-colors">Ai uitat parola?</Link>
+                     </div>
+                  </div>
 
-              {error && <p className="text-[10px] text-pink-500 font-bold uppercase tracking-tighter">{error}</p>}
-              
-              <button disabled={loading} className="w-full py-5 rounded-[20px] font-black text-white bg-indigo-600 hover:bg-indigo-500 transition-all uppercase tracking-widest text-[11px] mt-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98]">
-                {loading ? "Se verifică..." : "Continuă →"}
-              </button>
-            </form>
+                  {error && <p className="text-[10px] text-pink-500 font-bold uppercase tracking-tighter">{error}</p>}
+                  
+                  <button disabled={loading} className="w-full py-5 rounded-[20px] font-black text-white bg-indigo-600 hover:bg-indigo-500 transition-all uppercase tracking-widest text-[11px] mt-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98]">
+                    {loading ? "Se verifică..." : "Continuă →"}
+                  </button>
+                </form>
 
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-              <div className="relative flex justify-center text-[9px] uppercase tracking-widest font-black">
-                <span className="bg-[#161e31] px-4 text-gray-500">SAU</span>
+                <div className="relative my-8">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+                  <div className="relative flex justify-center text-[9px] uppercase tracking-widest font-black">
+                    <span className="bg-[#161e31] px-4 text-gray-500">SAU</span>
+                  </div>
+                </div>
+
+                <button 
+                  type="button" 
+                  onClick={handleGoogleLoginInit} 
+                  disabled={loading}
+                  className="w-full py-4 rounded-[20px] font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-all uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  Logare cu Google
+                </button>
+
+                <p className="mt-8 text-[10px] text-gray-400 font-medium uppercase tracking-widest">
+                  Nu ai cont? 
+                  <Link to="/auth/register" onClick={handleCloseModal} className="text-indigo-400 hover:text-white font-black transition-colors ml-1.5 underline">
+                    Înregistrează-te
+                  </Link>
+                </p>
               </div>
-            </div>
-
-            <button 
-              type="button" 
-              onClick={() => { 
-                setShowLoginModal(false); 
-                nav("/login"); 
-              }} 
-              className="w-full py-4 rounded-[20px] font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-all uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 shadow-lg active:scale-[0.98]"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              Logare cu Google
-            </button>
-
-            <p className="mt-8 text-[10px] text-gray-400 font-medium uppercase tracking-widest">
-              Nu ai cont? 
-              <Link to="/register" onClick={() => setShowLoginModal(false)} className="text-indigo-400 hover:text-white font-black transition-colors ml-1.5 underline">
-                Înregistrează-te
-              </Link>
-            </p>
+            )}
 
           </div>
         </div>
