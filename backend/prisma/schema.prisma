@@ -97,6 +97,13 @@ model Order {
   createdAt         DateTime        @default(now())
   returnRequests    ReturnRequest[]
 
+  // --- NOU: Metoda de plată ---
+  paymentMethod     String          @default("ramburs") // Poate fi "ramburs" sau "online"
+
+  // --- NOU: Date pentru SmartBill ---
+  smartbillSeries   String?
+  smartbillNumber   String?
+
   // --- DATE FACTURARE PERSOANĂ JURIDICĂ ---
   isCompany         Boolean         @default(false)
   companyName       String?
