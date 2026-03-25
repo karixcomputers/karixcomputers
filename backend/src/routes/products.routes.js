@@ -287,4 +287,37 @@ router.post("/:id/reviews", requireAuth, async (req, res, next) => {
   }
 });
 
+/**
+ * 8. POST: Sincronizare preț PC Garage (Apelat de scriptul de acasă)
+ */
+router.post("/update-pc-price", async (req, res, next) => {
+  try {
+    const { wishlistId, rawPrice, secretKey } = req.body;
+
+    // Verificăm parola secretă ca să nu ne modifice hackerii prețurile
+    // Poți schimba "karix_secret_123" cu orice parolă vrei tu
+    if (secretKey !== (process.env.SCRAPER_SECRET || "karix_secret_123")) {
+      return res.status(401).json({ error: "Parolă secretă incorectă!" });
+    }
+
+    // FORMULA KARIX
+    const manopera = 200;
+    const adaosPercent = 1.10; // 10%
+    let calculated = (rawPrice * adaosPercent) + manopera;
+    let finalPrice = Math.ceil(calculated / 10) * 10 - 1;
+
+    // ATENȚIE: În baza ta de date prețul este salvat în bani (priceCents), deci înmulțim cu 100
+    await prisma.product.update({
+      where: { pcgarageWishlistId: wishlistId },
+      data: { priceCents: finalPrice * 100 } 
+    });
+
+    console.log(`✅ [SYNC] Wishlist ${wishlistId} actualizat la ${finalPrice} RON`);
+    res.json({ success: true, newPrice: finalPrice });
+  } catch (e) {
+    console.error("SYNC ERROR:", e);
+    res.status(500).json({ error: "Eroare la sincronizarea prețului." });
+  }
+});
+
 export default router;
