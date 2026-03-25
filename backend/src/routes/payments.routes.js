@@ -166,6 +166,14 @@ const confirmPayment = async (req, res) => {
                 
                 if (invoiceData && invoiceData.series && invoiceData.number) {
                     console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
+                    // --- ADAUGĂ ASTA (Salvăm factura în baza de date ca să o putem descărca oricând) ---
+                    await prisma.order.update({
+                        where: { id: orderId },
+                        data: { 
+                            smartbillSeries: invoiceData.series,
+                            smartbillNumber: invoiceData.number
+                        }
+                    });
                     invoicePdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
                     if (invoicePdfBuffer) {
                         console.log("✅ PDF-ul facturii a fost preluat cu succes.");

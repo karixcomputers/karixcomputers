@@ -16,6 +16,9 @@ import {
   sendOrderCanceledEmail 
 } from "../services/mail.service.js";
 
+// --- IMPORT NOU PENTRU FACTURI ---
+import { getSmartBillPdf } from "../services/smartbill.service.js";
+
 const prisma = new PrismaClient();
 const router = express.Router();
 
@@ -237,11 +240,9 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
 // 7. POST: Creare comandă
 router.post("/", requireAuth, async (req, res, next) => {
   try {
-    // MODIFICARE AICI: Am adăugat paymentMethod în destructuring pentru a ști cum plătește
     const { client, cartItems, total, userEmail, pickupType, couponCode, paymentMethod } = req.body;
     const randomOrderId = await generateUniqueOrderId();
 
-    // 1. Identificăm tipul de conținut folosind aceeași logică ca în Mail Service
     const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
     
     const containsServices = cartItems.some(item => {
@@ -263,8 +264,9 @@ router.post("/", requireAuth, async (req, res, next) => {
         cui: client.isCompany ? client.cui : null,
         regCom: client.isCompany ? client.regCom : null,
 
-        // MODIFICARE OPȚIONALĂ: Setăm statusul inițial diferit pentru plăți online vs ramburs
-        status: paymentMethod === 'online' ? "neplatita" : "in_asteptare",
+        // --- SALVĂM CORECT METODA DE PLATĂ ---
+        paymentMethod: paymentMethod === 'online' ? 'online' : 'ramburs',
+        status: "in_asteptare",
 
         items: {
           create: cartItems.map(item => {
@@ -294,7 +296,6 @@ router.post("/", requireAuth, async (req, res, next) => {
       }).catch(err => console.error("Eroare incrementare cupon:", err));
     }
 
-    // 2. Pregătim datele pentru mail
     const commonMailData = {
       client: client,
       orderId: newOrder.id,
@@ -317,8 +318,6 @@ router.post("/", requireAuth, async (req, res, next) => {
       })
     };
 
-    // 3. Trimitem confirmările unificate DOAR dacă NU e plată online
-    // Dacă e plată online, aceste mailuri vor pleca din payments.routes.js, după confirmare
     if (paymentMethod !== 'online') {
       const uEmail = userEmail || (req.user && req.user.email);
       if (uEmail) {
@@ -356,6 +355,46 @@ router.post("/anaf", async (req, res) => {
   } catch (error) {
     console.error("❌ Eroare conexiune ANAF:", error.message);
     res.status(200).json({ cod: 500, message: "Conexiune refuzată de ANAF." });
+  }
+});
+
+// 8. NOU: GET: Descărcare Factură PDF
+router.get("/:id/invoice", requireAuth, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const userId = req.user.sub;
+
+    const order = await prisma.order.findUnique({
+      where: { id }
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Comanda nu a fost găsită." });
+    }
+
+    // Doar proprietarul sau adminul poate descărca
+    if (order.userId !== userId && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Acces interzis." });
+    }
+
+    // Verificăm dacă avem factura salvată pe comandă
+    if (!order.smartbillSeries || !order.smartbillNumber) {
+      return res.status(404).json({ error: "Factura nu a fost încă emisă pentru această comandă." });
+    }
+
+    const pdfBuffer = await getSmartBillPdf(order.smartbillSeries, order.smartbillNumber);
+
+    if (!pdfBuffer) {
+      return res.status(500).json({ error: "Eroare la preluarea facturii de la SmartBill." });
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=Factura_Karix_${order.id}.pdf`);
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error("Eroare download factură:", error);
+    res.status(500).json({ error: "Eroare internă la descărcarea facturii." });
   }
 });
 
