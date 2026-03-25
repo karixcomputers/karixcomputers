@@ -137,7 +137,7 @@ export default function Orders() {
 
   const cancelMutation = useMutation({
     mutationFn: async (orderId) => {
-      const res = await apiFetch(`/api/orders/${orderId}/cancel`, { method: "PATCH" });
+      const res = await apiFetch(`/orders/${orderId}/cancel`, { method: "PATCH" });
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || "Nu s-a putut anula comanda.");
