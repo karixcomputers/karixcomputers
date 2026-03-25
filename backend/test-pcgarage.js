@@ -1,73 +1,70 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+// Activăm modul "invizibil"
+puppeteer.use(StealthPlugin());
 
 const WISHLIST_ID = "6151169"; 
 
 async function testScraper() {
-  console.log(`🚀 Pornire test avansat pentru Wishlist: ${WISHLIST_ID}...`);
+  console.log(`🕵️ Pornire test în mod STEALTH pentru Wishlist: ${WISHLIST_ID}...`);
   
   const browser = await puppeteer.launch({
     headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+    args: [
+      '--no-sandbox', 
+      '--disable-setuid-sandbox',
+      '--window-size=1920,1080'
+    ]
   });
 
   try {
     const page = await browser.newPage();
     
-    // Ne dăm drept un browser foarte comun
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+    // Setăm o rezoluție și un limbaj de om
+    await page.setViewport({ width: 1920, height: 1080 });
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7'
+    });
 
-    console.log("🌐 Navigăm către PC Garage...");
+    console.log("🌐 Navigăm către PC Garage (Stealth Mode)...");
     await page.goto(`https://www.pcgarage.ro/vizualizare-wishlist/${WISHLIST_ID}/`, {
-      waitUntil: 'networkidle0', 
+      waitUntil: 'networkidle2', 
       timeout: 60000
     });
 
-    // Așteptăm 3 secunde extra să fim siguri că s-au încărcat prețurile dinamice
-    console.log("⏳ Așteptăm încărcarea prețurilor...");
-    await new Promise(r => setTimeout(r, 3000));
+    // Așteptăm puțin mai mult, să fim siguri că s-au calculat prețurile
+    console.log("⏳ Așteptăm încărcarea datelor...");
+    await new Promise(r => setTimeout(r, 5000));
 
-    // Încercăm să găsim prețul în mai multe locuri
+    // Încercăm să luăm prețul cu un selector mai precis
     const priceRaw = await page.evaluate(() => {
-      // Selectori posibili pentru prețul total
-      const selectors = [
-        '.price_format', 
-        '#wishlist_total', 
-        '.total_price',
-        '.cart-total .price'
-      ];
+      // Căutăm textul care conține "Total" sau clasa de preț
+      // PC Garage folosește deseori clase care încep cu 'price'
+      const priceElement = document.querySelector('.price_format');
+      if (priceElement) return priceElement.innerText;
       
-      for (let s of selectors) {
-        const el = document.querySelector(s);
-        if (el && el.innerText.trim().length > 0) return el.innerText;
-      }
-      return null;
+      // Dacă nu găsește clasa, caută în tot tabelul de total
+      const allText = document.body.innerText;
+      const match = allText.match(/Total:\s*([\d\.,]+)\s*RON/i);
+      return match ? match[1] : null;
     });
 
     if (!priceRaw) {
-      console.log("❌ Tot nu am găsit prețul.");
-      // Salvăm un screenshot ca să vezi EXACT ce a văzut robotul (poți descărca fișierul din VPS să-l vezi)
-      await page.screenshot({ path: 'debug_pcgarage.png' });
-      console.log("📸 Am salvat debug_pcgarage.png. Verifică-l să vezi dacă apare Cloudflare.");
+      console.log("❌ Nici Stealth nu a găsit prețul direct.");
+      await page.screenshot({ path: 'stealth_failed.png' });
+      console.log("📸 Verifică stealth_failed.png. Dacă vezi un cerc care se învârte sau un checkbox, suntem la nivelul de captcha.");
     } else {
-      console.log(`🔎 Preț brut găsit în pagină: ${priceRaw}`);
+      console.log(`🔎 Preț găsit: ${priceRaw}`);
 
-      // Curățăm textul: eliminăm tot ce nu e cifră
       const cleanPrice = parseInt(priceRaw.replace(/\./g, "").replace(/[^0-9]/g, ""));
-      
-      if (isNaN(cleanPrice)) {
-          console.log("❌ Prețul găsit nu este un număr valid.");
-          return;
-      }
-
       const manopera = 200;
       const adaosPercent = 1.10;
-      let calculated = (cleanPrice * adaosPercent) + manopera;
-      let finalPrice = Math.ceil(calculated / 10) * 10 - 1;
+      let finalPrice = Math.ceil((cleanPrice * adaosPercent) + manopera / 10) * 10 - 1;
 
       console.log("--------------------------------------");
-      console.log(`✅ SUCCES!`);
-      console.log(`💰 Pret Wishlist: ${cleanPrice} RON`);
-      console.log(`🛠️ Manopera: ${manopera} RON`);
+      console.log(`✅ SUCCES STEALTH!`);
+      console.log(`💰 Pret Brut: ${cleanPrice} RON`);
       console.log(`💎 PRET FINAL KARIX: ${finalPrice} RON`);
       console.log("--------------------------------------");
     }
