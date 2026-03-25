@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom"; // Am adăugat useNavigate
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 
 export default function Success() {
@@ -8,38 +8,37 @@ export default function Success() {
   const { clearCart } = useCart();
   const nav = useNavigate();
   
-  // State pentru a nu randa pagina până nu facem verificarea
-  const [isValid, setIsValid] = useState(false);
+  // Citim biletul o singură dată, chiar când se construiește pagina
+  const [isValid] = useState(() => {
+    return sessionStorage.getItem("orderJustPlaced") === "true";
+  });
 
   useEffect(() => {
-    // 1. Verificăm dacă clientul are biletul VIP primit de la Checkout
-    const justPlaced = sessionStorage.getItem("orderJustPlaced");
-
-    if (!justPlaced) {
-      // Dacă nu are biletul (a tastat manual /success), îl dăm afară spre Home
+    // Dacă nu are biletul (a tastat manual /success), îl dăm afară spre Home
+    if (!isValid) {
       nav("/");
       return;
     }
 
-    // 2. Dacă are biletul, "îl rupem" ca să nu poată da refresh la nesfârșit
-    sessionStorage.removeItem("orderJustPlaced");
-    
-    // 3. Îi dăm voie să vadă pagina
-    setIsValid(true);
-
-    // 4. Îi golim coșul
+    // Dacă e valid, îi golim coșul
     if (clearCart) {
       clearCart();
     }
-  }, [clearCart, nav]);
 
-  // Cât timp face verificarea sau dacă îl dă afară, nu afișăm nimic pe ecran
+    // AICI E MAGIA: "Rupem" biletul abia când PLEACĂ de pe pagină (se distruge componenta).
+    // Asta rezolvă bug-ul cu fracțiunea de secundă.
+    return () => {
+      sessionStorage.removeItem("orderJustPlaced");
+    };
+  }, [isValid, clearCart, nav]);
+
+  // Dacă nu e valid, nu afișăm nimic (nici măcar o fracțiune de secundă)
   if (!isValid) return null;
 
   return (
     <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent flex items-center justify-center">
       
-      {/* Glow-uri de succes discrete peste animație */}
+      {/* Glow-uri de succes discrete */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-emerald-500/5 blur-[120px] rounded-full animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-teal-500/5 blur-[120px] rounded-full animate-pulse" />
