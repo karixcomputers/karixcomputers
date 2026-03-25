@@ -1,63 +1,61 @@
-import axios from "axios";
-import * as cheerio from "cheerio";
+import puppeteer from 'puppeteer';
 
-// ID-ul wishlist-ului tău de test
 const WISHLIST_ID = "6151169"; 
 
 async function testScraper() {
-  console.log(`🚀 Pornire test pentru Wishlist: ${WISHLIST_ID}...`);
+  console.log(`🚀 Pornire test cu BROWSER real pentru Wishlist: ${WISHLIST_ID}...`);
   
+  // Lansăm browserul în mod "headless" (fără interfață grafică)
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ['--no-sandbox', '--disable-setuid-sandbox'] // Necesar pentru rulare pe VPS/Linux
+  });
+
   try {
-    const url = `https://www.pcgarage.ro/vizualizare-wishlist/${WISHLIST_ID}/`;
+    const page = await browser.newPage();
     
-    // Luăm HTML-ul (cu User-Agent ca să părem un browser real)
-    const { data } = await axios.get(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7"
-      }
+    // Setăm un User-Agent de om, nu de robot
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+    console.log("🌐 Navigăm către PC Garage...");
+    await page.goto(`https://www.pcgarage.ro/vizualizare-wishlist/${WISHLIST_ID}/`, {
+      waitUntil: 'networkidle2', // Așteptăm să se încarce toate scripturile
+      timeout: 60000
     });
 
-    const $ = cheerio.load(data);
-    
-    // Selectorul pentru prețul total de pe PC Garage
-    // Căutăm textul care conține "Total" sau clasa price_format
-    let priceRaw = $(".price_format").first().text();
+    // Luăm prețul folosind selectorul de clasa
+    const priceRaw = await page.evaluate(() => {
+      const el = document.querySelector('.price_format');
+      return el ? el.innerText : null;
+    });
 
     if (!priceRaw) {
-      console.log("❌ Nu am putut găsi prețul. S-ar putea ca selectorul să se fi schimbat sau suntem blocați.");
-      return;
+      console.log("❌ Nu am găsit prețul. S-ar putea ca pagina să arate diferit.");
+      // Facem un screenshot ca să vedem ce vede "robotul" (opțional)
+      await page.screenshot({ path: 'error_screenshot.png' });
+      console.log("📸 Am salvat error_screenshot.png pentru investigații.");
+    } else {
+      console.log(`🔎 Preț brut găsit: ${priceRaw}`);
+
+      const cleanPrice = parseInt(priceRaw.replace(/\./g, "").replace(/[^0-9]/g, ""));
+      const manopera = 200;
+      const adaosPercent = 1.10;
+      
+      let calculated = (cleanPrice * adaosPercent) + manopera;
+      let finalPrice = Math.ceil(calculated / 10) * 10 - 1;
+
+      console.log("--------------------------------------");
+      console.log(`✅ SUCCES PRIN BROWSER!`);
+      console.log(`💰 Pret PC Garage: ${cleanPrice} RON`);
+      console.log(`💎 PRET FINAL KARIX: ${finalPrice} RON`);
+      console.log("--------------------------------------");
     }
-
-    console.log(`🔎 Preț brut găsit: ${priceRaw}`);
-
-    // CURĂȚARE: Scoatem punctele (pentru mii) și textul "RON", lăsăm doar cifrele
-    const cleanPrice = parseInt(priceRaw.replace(/\./g, "").replace(/[^0-9]/g, ""));
-    
-    // CALCULE KARIX
-    const manopera = 200;
-    const adaosPercent = 1.10; // 10%
-    
-    // Formula LaTeX: $$ \text{Pret Final} = (\text{Pret Brut} \times 1.10) + 200 $$
-    let calculated = (cleanPrice * adaosPercent) + manopera;
-    
-    // Rotunjire la "99" (ex: 4532 -> 4540 -> 4539)
-    let finalPrice = Math.ceil(calculated / 10) * 10 - 1;
-
-    console.log("--------------------------------------");
-    console.log(`✅ SUCCES!`);
-    console.log(`💰 Preț PC Garage: ${cleanPrice} RON`);
-    console.log(`🛠️ Manoperă: ${manopera} RON`);
-    console.log(`📈 Adaos 10%: +${(cleanPrice * 0.10).toFixed(0)} RON`);
-    console.log(`💎 PREȚ FINAL KARIX: ${finalPrice} RON`);
-    console.log("--------------------------------------");
 
   } catch (error) {
-    if (error.response?.status === 403) {
-      console.error("❌ EROARE: PC Garage ne-a blocat accesul (403 Forbidden).");
-    } else {
-      console.error("❌ EROARE SCRAPER:", error.message);
-    }
+    console.error("❌ EROARE:", error.message);
+  } finally {
+    await browser.close();
+    console.log("👋 Browser închis.");
   }
 }
 
