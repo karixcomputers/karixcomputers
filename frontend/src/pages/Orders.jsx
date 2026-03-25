@@ -71,14 +71,15 @@ function StatusBadge({ status, isService, isOradea }) {
   );
 }
 
-// NOU: Helper Payment Status Badge
+// CORECTAT: Helper Payment Status Badge
 function PaymentBadge({ paymentMethod, status }) {
   let label = "💵 Ramburs";
   let color = "text-gray-400 border-gray-500/20 bg-gray-500/5";
 
-  if (paymentMethod === "online") {
-    // Dacă e online dar comanda e "în așteptare", considerăm că plata a eșuat sau e nefinalizată.
-    // În arhitectura ta, "in_procesare" indică succesul plății Netopia.
+  // Verificăm conținutul exact. Ar putea fi "online", "Online", sau "card"
+  const method = (paymentMethod || "").toLowerCase();
+
+  if (method === "online" || method === "card") {
     if (status === "in_asteptare") {
         label = "⏳ Plată În Așteptare";
         color = "text-amber-400 border-amber-500/20 bg-amber-500/5";
@@ -121,7 +122,6 @@ export default function Orders() {
   const [activeTab, setActiveTab] = useState("orders");
   const [cancelModal, setCancelModal] = useState({ open: false, orderId: null });
   
-  // NOU: State pentru gestionarea descărcărilor
   const [downloadingId, setDownloadingId] = useState(null);
   const [toastMsg, setToastMsg] = useState("");
 
@@ -170,22 +170,22 @@ export default function Orders() {
     };
   };
 
-  // NOU: Funcția de descărcare factură
+  // CORECTAT: Funcția de descărcare factură - Am scos /api/ în plus
   const handleDownloadInvoice = async (orderId) => {
     setDownloadingId(orderId);
     try {
-        // Asumăm că vei crea această rută în backend pentru descărcare
-        const response = await apiFetch(`/api/orders/${orderId}/invoice`, {
+        // apiFetch adaugă deja domeniul și uneori `/api`, așa că dăm calea relativă justă.
+        // În funcție de cum e scris apiFetch-ul tău, dacă el adaugă deja `/api`, lăsăm așa:
+        const response = await apiFetch(`/orders/${orderId}/invoice`, {
             method: 'GET'
         });
 
         if (!response.ok) {
-            throw new Error('Factura nu este încă disponibilă sau a apărut o eroare.');
+            throw new Error('Factura nu este încă disponibilă sau a apărut o eroare la server.');
         }
 
         const blob = await response.blob();
         
-        // Dacă fișierul descărcat este prea mic, probabil a returnat JSON cu eroare (nu PDF real)
         if (blob.size < 100) {
              throw new Error('Factura generată este invalidă.');
         }
@@ -249,7 +249,6 @@ export default function Orders() {
           </div>
         )}
 
-        {/* --- VEDEREA 1: ISTORIC COMENZI --- */}
         {activeTab === "orders" && (
           <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {data?.length === 0 && !isLoading && (
@@ -278,7 +277,6 @@ export default function Orders() {
                 <div key={o.id} className={`p-[1px] rounded-[45px] bg-gradient-to-b from-white/10 to-transparent shadow-2xl transition-all ${o.status === 'anulat' ? 'opacity-50 grayscale' : ''}`}>
                   <div className="bg-[#0f172a]/60 backdrop-blur-3xl p-8 md:p-10 rounded-[44px]">
                     
-                    {/* Header Comandă */}
                     <div className="flex flex-col md:flex-row justify-between gap-6 mb-10 border-b border-white/10 pb-8">
                       <div className="space-y-1">
                         <div className="flex items-center gap-3">
@@ -289,9 +287,8 @@ export default function Orders() {
                             </span>
                           )}
                         </div>
-                        <div className="text-2xl font-black text-white italic drop-shadow-md flex items-center">
+                        <div className="text-2xl font-black text-white italic drop-shadow-md flex items-center flex-wrap gap-y-2">
                             #{String(o.id).slice(-8).toUpperCase()}
-                            {/* NOU: Adăugare Payment Badge */}
                             <PaymentBadge paymentMethod={o.paymentMethod} status={o.status} />
                         </div>
                         <div className="text-xs text-gray-400 font-medium italic">Plasată pe {new Date(o.createdAt).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
@@ -302,8 +299,7 @@ export default function Orders() {
                         <div className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">{formatRON(o.totalCents)}</div>
                         
                         <div className="flex gap-2 mt-4">
-                            {/* NOU: Buton Descărcare Factură */}
-                            {/* Am pus o condiție simplă ca să nu apară la comenzile nou-plasate online care încă așteaptă plata */}
+                            {/* Buton Descărcare Factură */}
                             {!(o.paymentMethod === 'online' && o.status === 'in_asteptare') && (
                                 <button 
                                     onClick={() => handleDownloadInvoice(o.id)} 
@@ -316,7 +312,7 @@ export default function Orders() {
                                             Se descarcă...
                                         </>
                                     ) : (
-                                        <>📄 Descarcă Factura</>
+                                        <>📄 Factură</>
                                     )}
                                 </button>
                             )}
@@ -328,7 +324,6 @@ export default function Orders() {
                       </div>
                     </div>
 
-                    {/* Produse */}
                     <div className="space-y-4">
                       {o.items.map(it => {
                         const itemName = (it.productName || "").toLowerCase();
@@ -353,7 +348,6 @@ export default function Orders() {
                       })}
                     </div>
 
-                    {/* --- REVENIRE LA BUTONUL DE INIȚIERE RETUR CA ÎNAINTE --- */}
                     {returnInfo && (
                       <div className="mt-10 pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-6">
                         <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">
@@ -408,7 +402,6 @@ export default function Orders() {
           </div>
         )}
 
-        {/* --- VEDEREA 2: FEREASTRA SEPARATĂ DE RETURURI --- */}
         {activeTab === "returns" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {allReturns.length === 0 && !isLoading && (
@@ -468,7 +461,6 @@ export default function Orders() {
         )}
       </div>
 
-      {/* TOAST EROARE DOWNLOAD FACTURĂ */}
       {toastMsg && (
         <div className="fixed bottom-10 right-10 z-[100] animate-in slide-in-from-right duration-300">
           <div className="rounded-3xl border border-pink-500/30 bg-[#1a2236]/90 p-6 shadow-3xl flex items-center gap-5 backdrop-blur-2xl">
@@ -478,7 +470,6 @@ export default function Orders() {
         </div>
       )}
 
-      {/* MODAL ANULARE */}
       {cancelModal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md bg-black/60">
           <div className="bg-[#0f172a] border border-white/10 p-10 rounded-[40px] max-w-md w-full shadow-2xl text-center animate-in zoom-in-95 duration-200">
