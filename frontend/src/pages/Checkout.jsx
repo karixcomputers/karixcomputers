@@ -393,6 +393,7 @@ export default function Checkout() {
         form.appendChild(dataInput);
 
         document.body.appendChild(form);
+        sessionStorage.setItem("orderJustPlaced", "true");
         form.submit(); // Redirecționare automată către pagina securizată Netopia
         return; 
 
@@ -400,6 +401,7 @@ export default function Checkout() {
         // Dacă este plată RAMBURS, procesul este clasic: notificăm, golim coșul și trimitem pe succes
         await notifyDiscord(orderData, appliedCoupon);
         if (clearCart) clearCart();
+        sessionStorage.setItem("orderJustPlaced", "true");
         nav("/success"); 
       }
       

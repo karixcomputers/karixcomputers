@@ -1,9 +1,21 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+// 1. Importăm useCart
+import { useCart } from "../context/CartContext";
 
 export default function Success() {
   const [sp] = useSearchParams();
   const sessionId = sp.get("session_id");
+  
+  // 2. Extragem funcția clearCart din context
+  const { clearCart } = useCart();
+
+  // 3. Golim coșul automat când se încarcă pagina
+  useEffect(() => {
+    if (clearCart) {
+      clearCart();
+    }
+  }, [clearCart]);
 
   return (
     /* Modificat: bg-[#0b1020] eliminat pentru transparență totală */
