@@ -64,7 +64,7 @@ const faqs = [
     },
     {
       question: "Locuiesc în Oradea. Cum se procedează cu livrarea?",
-      answer: "Pentru clienții din Oradea, oferim serviciul de livrare și ridicare personală gratuită, direct la domiciliul tău. Sediul nostru nu este deschis publicului, însă ne deplasăm noi pentru a prelua sau livra sistemele în siguranță maximă. La livrare, te putem ajuta inclusiv cu mufarea corectă a setup-ului tău."
+      answer: "Pentru clienții din Oradea, oferim serviciul de livrare și ridicare personală, direct la domiciliul tău. Sediul nostru nu este deschis publicului, însă ne deplasăm noi pentru a prelua sau livra sistemele în siguranță maximă. La livrare, te putem ajuta inclusiv cu mufarea corectă a setup-ului tău."
     },
     {
       question: "Am nevoie de un sfat tehnic sau detalii despre comanda mea. Cine mă poate ajuta rapid?",
