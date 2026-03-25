@@ -181,15 +181,30 @@ const confirmPayment = async (req, res) => {
 
             const commonMailData = {
                 client: {
-                    name: updatedOrder.shippingName, phone: updatedOrder.shippingPhone, addressDetails: updatedOrder.shippingAddress,
-                    isCompany: updatedOrder.isCompany, companyName: updatedOrder.companyName, cui: updatedOrder.cui, regCom: updatedOrder.regCom
+                    name: updatedOrder.shippingName, 
+                    phone: updatedOrder.shippingPhone, 
+                    addressDetails: updatedOrder.shippingAddress,
+                    // ADĂUGĂM ASTA ca să nu mai apară undefined:
+                    city: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'Oradea' : '',
+                    county: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'Bihor' : '',
+                    isCompany: updatedOrder.isCompany, 
+                    companyName: updatedOrder.companyName, 
+                    cui: updatedOrder.cui, 
+                    regCom: updatedOrder.regCom
                 },
-                orderId: updatedOrder.id, total: updatedOrder.totalCents, couponCode: null,
-                pickupType: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'ridicare_personala' : 'curier',
+                orderId: updatedOrder.id, 
+                total: updatedOrder.totalCents, 
+                couponCode: null,
+                shippingAddress: updatedOrder.shippingAddress, // Trimitem adresa direct
+                // MODIFICĂM VALOAREA să fie identică cu cea din mail service:
+                pickupType: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'KarixPersonal' : 'curier',
                 isServiceOrder: containsServices,
                 cartItems: updatedOrder.items.map(item => ({
-                    ...item, name: item.productName, isServiceItem: serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
-                    qty: item.qty || 1, priceCentsAtBuy: item.priceCentsAtBuy || item.priceCents
+                    ...item, 
+                    name: item.productName, 
+                    isServiceItem: serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
+                    qty: item.qty || 1, 
+                    priceCentsAtBuy: item.priceCentsAtBuy || item.priceCents
                 }))
             };
 
