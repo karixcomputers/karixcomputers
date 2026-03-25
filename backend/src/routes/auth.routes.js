@@ -341,7 +341,8 @@ router.post("/forgot-password", async (req, res, next) => {
     const { email } = req.body;
     const user = await prisma.user.findUnique({ where: { email } });
     if (user) {
-      const resetToken = jwt.sign({ sub: user.id }, env.JWT_ACCESS_SECRET, { expiresIn: "30m" });
+      // Am modificat expiresIn de la "30m" la "5m" pentru securitate sporită
+      const resetToken = jwt.sign({ sub: user.id }, env.JWT_ACCESS_SECRET, { expiresIn: "5m" });
       const resetUrl = `${env.CLIENT_URL}/auth/reset?token=${encodeURIComponent(resetToken)}`;
       await sendResetPassword(email, resetUrl);
     }
@@ -353,11 +354,18 @@ router.post("/forgot-password", async (req, res, next) => {
 router.post("/reset-password", async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
+    // JWT verifică automat dacă tokenul a expirat (în cele 5 minute). Dacă da, va arunca o eroare.
     const payload = jwt.verify(token, env.JWT_ACCESS_SECRET);
     const passwordHash = await hashPassword(newPassword);
     await prisma.user.update({ where: { id: payload.sub }, data: { passwordHash } });
     res.json({ ok: true });
-  } catch (e) { next(e); }
+  } catch (e) { 
+    // Dacă tokenul a expirat, trimitem un mesaj clar către frontend
+    if (e.name === 'TokenExpiredError') {
+      return res.status(400).json({ error: "Link-ul de resetare a expirat. Te rugăm să ceri altul." });
+    }
+    next(e); 
+  }
 });
 
 export default router;

@@ -102,7 +102,7 @@ export default function ForgotPassword() {
                 <span className="text-white font-bold">{email}</span>
               </p>
 
-              <Link to="/login" className="block w-full py-5 rounded-[20px] font-black text-[#0b1020] bg-white hover:bg-emerald-400 hover:text-white transition-all uppercase tracking-widest text-[11px] shadow-xl active:scale-95">
+              <Link to="/auth/login" className="block w-full py-5 rounded-[20px] font-black text-[#0b1020] bg-white hover:bg-emerald-400 hover:text-white transition-all uppercase tracking-widest text-[11px] shadow-xl active:scale-95">
                 Întoarce-te la Login
               </Link>
             </div>
