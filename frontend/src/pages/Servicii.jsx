@@ -134,7 +134,7 @@ export default function Servicii() {
                   Ești din <span className="text-indigo-400">Oradea</span>? Venim noi la tine!
                 </h3>
                 <p className="text-gray-300 font-medium leading-relaxed text-sm md:text-base">
-                  Dacă ești din municipiul Oradea nu mai trebuie să te complici cu firmele de curierat. Venim personal să ridicăm echipamentul de la domiciliul tău și ți-l aducem înapoi reparat pentru doar <strong className="text-white">30 RON</strong>.
+                  Dacă ești din municipiul Oradea, nu mai trebuie să te complici cu firmele de curierat. Venim personal să ridicăm echipamentul de la domiciliul tău și ți-l aducem înapoi pentru doar <strong className="text-white">30 RON</strong>. Garantăm că în <strong className="text-indigo-400 font-black uppercase tracking-wider">maxim 24 de ore</strong> de la ridicare, device-ul se va întoarce la tine gata de acțiune, cu toate serviciile comandate efectuate la cele mai înalte standarde profesionale.
                 </p>
               </div>
             </div>
@@ -147,7 +147,7 @@ export default function Servicii() {
                 <div>
                   <h3 className="text-xl font-black text-gray-200 mb-2 uppercase italic tracking-tighter">Procesul Door-to-Door Național</h3>
                   <p className="text-gray-400 font-medium leading-relaxed text-sm">
-                      Dacă ești din municipiul Oradea, nu mai trebuie să te complici cu firmele de curierat. Venim personal să ridicăm echipamentul de la domiciliul tău și ți-l aducem înapoi pentru doar <strong className="text-white">30 RON</strong>. Garantăm că în <strong className="text-indigo-400 font-black uppercase tracking-wider">maxim 24 de ore</strong> de la ridicare, device-ul se va întoarce la tine gata de acțiune, cu toate serviciile comandate efectuate la cele mai înalte standarde profesionale.
+                      Pentru restul țării, după plasarea comenzii vom trimite un curier la ușa ta în 24-48h. Tu doar ambalează produsul în cutia originală sau într-una rezistentă, de transport ne ocupăm noi. Diagnosticarea și reparația se fac în siguranță în laboratorul nostru specializat.
                   </p>
                 </div>
             </div>
