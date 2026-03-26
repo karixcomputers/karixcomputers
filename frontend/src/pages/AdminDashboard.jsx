@@ -73,7 +73,7 @@ export default function AdminDashboard() {
                 method: "PATCH",
                 body: JSON.stringify({ status: finalStatus })
               });
-              return null; // Îl scoatem din lista de comenzi active
+              return null; 
             }
             return { ...order, items: updatedItems };
           }
@@ -119,7 +119,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // NOU: Funcția de anulare globală a comenzii de către Admin
   const executeCancelOrder = async () => {
     const orderId = cancelModal.orderId;
     setCancelModal({ open: false, orderId: null });
@@ -133,7 +132,7 @@ export default function AdminDashboard() {
       if (!res.ok) throw new Error("Nu s-a putut anula comanda.");
       
       showToast(`Comanda #${orderId} a fost anulată cu succes!`, "success");
-      fetchOrders(); // Reîncărcăm lista, comanda va dispărea (mutată în istoric)
+      fetchOrders(); 
     } catch (error) {
       showToast(error.message, "error");
     }
@@ -147,12 +146,18 @@ export default function AdminDashboard() {
                       itemName.includes('reparatie');
                       
     const isOradea = order.shippingAddress?.toLowerCase().includes('oradea');
+    const isBankTransfer = order.paymentMethod === 'transfer_bancar';
+
+    // Generăm prima opțiune din listă pe baza metodei de plată
+    const initialOption = isBankTransfer 
+      ? <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
+      : <option value="in_asteptare">⏳ În Așteptare (Plătit)</option>;
 
     if (isService) {
       if (isOradea) {
         return (
           <>
-            <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
+            {initialOption}
             <option value="in_asteptare_ridicare">⏳ Așteptare Preluare Personală</option>
             <option value="posesie">📥 În laboratorul Karix</option>
             <option value="diagnosticare">🔍 Diagnosticare</option>
@@ -166,7 +171,7 @@ export default function AdminDashboard() {
       } else {
         return (
           <>
-            <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
+            {initialOption}
             <option value="in_asteptare_ridicare">🚚 Așteptare Curier (Către noi)</option>
             <option value="posesie">📥 În laboratorul Karix</option>
             <option value="diagnosticare">🔍 Diagnosticare</option>
@@ -182,7 +187,7 @@ export default function AdminDashboard() {
       if (isOradea) {
         return (
           <>
-            <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
+            {initialOption}
             <option value="in_procesare">⚙️ În Procesare</option>
             <option value="in_pregatire">🛠️ În Asamblare</option>
             <option value="gata_de_livrare">🤝 Gata de Livrare Personală</option>
@@ -193,7 +198,7 @@ export default function AdminDashboard() {
       } else {
         return (
           <>
-            <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
+            {initialOption}
             <option value="in_procesare">⚙️ În Procesare</option>
             <option value="in_pregatire">🛠️ În Asamblare</option>
             <option value="gata_de_livrare">📦 Ambalat (Așteaptă Curier)</option>
@@ -293,7 +298,6 @@ export default function AdminDashboard() {
                             </button>
                         )}
                         
-                        {/* NOU: BUTON GLOBAL DE ANULARE COMANDĂ */}
                         <button 
                             onClick={() => setCancelModal({ open: true, orderId: order.id })}
                             className="w-full py-3 rounded-2xl border border-rose-500/30 text-rose-500 font-black uppercase text-[10px] tracking-widest hover:bg-rose-500 hover:text-white shadow-lg shadow-rose-500/10 transition-all"
@@ -371,7 +375,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* MODAL CONFIRMARE OP (CUSTOM) */}
+      {/* MODAL CONFIRMARE OP */}
       {opModal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setOpModal({ open: false, orderId: null })}></div>
@@ -390,7 +394,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* NOU: MODAL ANULARE COMANDĂ ADMIN */}
+      {/* MODAL ANULARE COMANDĂ ADMIN */}
       {cancelModal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setCancelModal({ open: false, orderId: null })}></div>
@@ -409,7 +413,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TOAST NOTIFICATION (CUSTOM) */}
+      {/* TOAST NOTIFICATION */}
       {toastMsg.open && (
         <div className="fixed bottom-10 right-10 z-[100] animate-in slide-in-from-right duration-300">
           <div className={`rounded-3xl border p-6 shadow-3xl flex items-center gap-5 backdrop-blur-2xl ${
