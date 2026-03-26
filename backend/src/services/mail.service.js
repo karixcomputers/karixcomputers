@@ -96,6 +96,12 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invo
       subject = isAdmin ? "🟢 VÂNZARE PC (Oradea)" : "Livrare Personală în Oradea - Karix Computers";
     }
 
+    // 👉 Dacă e plată prin transfer bancar și nu e admin, trimitem instrucțiunile cu Proforma!
+    if (!isAdmin && orderData.paymentMethod === 'transfer_bancar') {
+      templateName = "orderPlacedBankTransfer.html";
+      subject = `Așteptăm Plata (Proformă Atașată) - Comanda #${orderData.id || orderData.orderId}`;
+    }
+
     if (isAdmin) {
       templateName = "adminOrderNotification.html";
       subject = `${subject} #${orderData.id || orderData.orderId}`;
@@ -870,3 +876,56 @@ export const sendWelcomeEmail = async (email, customerName) => {
     return { success: false, error };
   }
 };
+
+// ============================================================
+// 🚀 NOU: FUNCȚIE TRIMITERE FACTURĂ FINALĂ (CONFIRMARE OP)
+// ============================================================
+export async function sendFinalInvoiceEmail(to, orderData, pdfBuffer) {
+  try {
+    const templateName = "finalInvoice.html";
+    let html = "";
+    
+    // Verificăm dacă template-ul există, altfel construim un HTML de rezervă curat
+    try {
+      const tpl = loadTemplate(templateName);
+      html = render(tpl, {
+        customerName: orderData.shippingName || "Client Karix",
+        orderId: orderData.id,
+        date: new Date().toLocaleString('ro-RO')
+      });
+    } catch (e) {
+      // Fallback HTML dacă nu ai creat încă fișierul finalInvoice.html în folderul templates
+      html = `
+        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto;">
+          <h2 style="color: #4f46e5;">Plata a fost confirmată! 🎉</h2>
+          <p>Salut, <strong>${orderData.shippingName || "Client"}</strong>,</p>
+          <p>Îți confirmăm primirea plății pentru comanda <strong>#${orderData.id}</strong> achitată prin transfer bancar.</p>
+          <p>Factura fiscală aferentă comenzii tale este atașată la acest email în format PDF.</p>
+          <p>Echipa noastră va pregăti acum produsele pentru livrare. Vei primi un email separat când coletul este predat curierului.</p>
+          <br>
+          <p>Cu respect,<br>Echipa Karix Computers</p>
+        </div>
+      `;
+    }
+
+    const mailOptions = {
+      to,
+      subject: `Factură Fiscală - Comanda #${orderData.id} - Karix Computers`,
+      html,
+      attachments: []
+    };
+
+    if (pdfBuffer) {
+      mailOptions.attachments.push({
+        filename: `Factura_Karix_${orderData.id}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      });
+    }
+
+    await sendHtmlMail(mailOptions);
+    console.log(`✅ FACTURA FINALA (OP) TRIMISA LA: ${to}`);
+  } catch (err) {
+    console.error("❌ Eroare sendFinalInvoiceEmail:", err);
+  }
+}

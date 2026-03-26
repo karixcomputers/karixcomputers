@@ -13,11 +13,17 @@ import {
   sendServiceFinishedEmail,
   sendServiceShippedBackEmail,
   sendServiceUnrepairableEmail,
-  sendOrderCanceledEmail 
+  sendOrderCanceledEmail,
+  sendFinalInvoiceEmail // 👉 Trebuie să creăm această funcție în mail.service.js
 } from "../services/mail.service.js";
 
-// --- IMPORT NOU PENTRU FACTURI ---
-import { getSmartBillPdf } from "../services/smartbill.service.js";
+// --- IMPORT NOU PENTRU FACTURI & PROFORME ---
+import { 
+  getSmartBillPdf,
+  createSmartBillProforma, // 👉 Va trebui creată
+  getSmartBillProformaPdf, // 👉 Va trebui creată
+  createSmartBillInvoice   // 👉 Va trebui creată
+} from "../services/smartbill.service.js";
 
 const prisma = new PrismaClient();
 const router = express.Router();
@@ -118,7 +124,7 @@ router.patch("/:id/cancel", requireAuth, async (req, res, next) => {
       return res.status(404).json({ error: "Comanda nu a fost găsită." });
     }
 
-    const cancelableStatuses = ["in_asteptare", "in_procesare", "in_asteptare_ridicare"];
+    const cancelableStatuses = ["in_asteptare", "in_procesare", "in_asteptare_ridicare", "in_asteptare_plata"];
     const canCancel = order.items.every(it => cancelableStatuses.includes(it.status));
 
     if (!canCancel) {
@@ -250,6 +256,9 @@ router.post("/", requireAuth, async (req, res, next) => {
         return item.category === 'service' || serviceKeywords.some(kw => name.includes(kw));
     });
 
+    // Stabilim statusul inițial (Dacă e OP, așteptăm plata)
+    const initialStatus = paymentMethod === 'transfer_bancar' ? 'in_asteptare_plata' : 'in_asteptare';
+
     const newOrder = await prisma.order.create({
       data: {
         id: randomOrderId,
@@ -264,9 +273,9 @@ router.post("/", requireAuth, async (req, res, next) => {
         cui: client.isCompany ? client.cui : null,
         regCom: client.isCompany ? client.regCom : null,
 
-        // --- SALVĂM CORECT METODA DE PLATĂ ---
-        paymentMethod: paymentMethod === 'online' ? 'online' : 'ramburs',
-        status: "in_asteptare",
+        // Salvăm metoda de plată venită din checkout (online, ramburs, transfer_bancar)
+        paymentMethod: paymentMethod,
+        status: initialStatus,
 
         items: {
           create: cartItems.map(item => {
@@ -280,7 +289,7 @@ router.post("/", requireAuth, async (req, res, next) => {
               productName: nameFinal, 
               qty: item.qty || 1,
               priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
-              status: isServiceItem ? "in_asteptare_ridicare" : "in_asteptare",
+              status: isServiceItem ? "in_asteptare_ridicare" : initialStatus,
               warrantyMonths: item.warrantyMonths ? parseInt(item.warrantyMonths) : (isServiceItem ? 0 : 24)
             };
           })
@@ -296,6 +305,20 @@ router.post("/", requireAuth, async (req, res, next) => {
       }).catch(err => console.error("Eroare incrementare cupon:", err));
     }
 
+    // --- LOGICĂ NOUĂ PENTRU TRANSFER BANCAR (GENERARE PROFORMĂ) ---
+    let proformaPdfBuffer = null;
+    if (paymentMethod === 'transfer_bancar') {
+      try {
+        const proformaData = await createSmartBillProforma(newOrder, client, cartItems);
+        if (proformaData && proformaData.series && proformaData.number) {
+          proformaPdfBuffer = await getSmartBillProformaPdf(proformaData.series, proformaData.number);
+        }
+      } catch (err) {
+        console.error("⚠️ Eroare generare proformă SmartBill:", err);
+        // Nu oprim procesul dacă crapă SmartBill, trimitem mailul fără ea și o generăm manual.
+      }
+    }
+
     const commonMailData = {
       client: client,
       orderId: newOrder.id,
@@ -303,6 +326,7 @@ router.post("/", requireAuth, async (req, res, next) => {
       couponCode: couponCode || null,
       pickupType: pickupType,
       isServiceOrder: containsServices, 
+      paymentMethod: paymentMethod, // Transmitem și metoda pentru a afișa datele bancare în mail
       cartItems: cartItems.map(item => {
         const nameFinal = item.productName || item.name;
         const nameLower = nameFinal.toLowerCase();
@@ -321,11 +345,12 @@ router.post("/", requireAuth, async (req, res, next) => {
     if (paymentMethod !== 'online') {
       const uEmail = userEmail || (req.user && req.user.email);
       if (uEmail) {
-         await sendUnifiedOrderEmail(uEmail, commonMailData).catch(err => console.error("Eroare Mail Client:", err));
+         // Trimitem proformaPdfBuffer către mail service
+         await sendUnifiedOrderEmail(uEmail, commonMailData, false, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client:", err));
       }
       
       const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
-      await sendUnifiedOrderEmail(adminEmail, commonMailData, true).catch(err => console.error("Eroare Mail Admin:", err));
+      await sendUnifiedOrderEmail(adminEmail, commonMailData, true, proformaPdfBuffer).catch(err => console.error("Eroare Mail Admin:", err));
     }
 
     res.status(200).json({ success: true, orderId: newOrder.id });
@@ -358,7 +383,7 @@ router.post("/anaf", async (req, res) => {
   }
 });
 
-// 8. NOU: GET: Descărcare Factură PDF
+// 8. GET: Descărcare Factură PDF
 router.get("/:id/invoice", requireAuth, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -372,12 +397,10 @@ router.get("/:id/invoice", requireAuth, async (req, res, next) => {
       return res.status(404).json({ error: "Comanda nu a fost găsită." });
     }
 
-    // Doar proprietarul sau adminul poate descărca
     if (order.userId !== userId && req.user.role !== "admin") {
       return res.status(403).json({ error: "Acces interzis." });
     }
 
-    // Verificăm dacă avem factura salvată pe comandă
     if (!order.smartbillSeries || !order.smartbillNumber) {
       return res.status(404).json({ error: "Factura nu a fost încă emisă pentru această comandă." });
     }
@@ -395,6 +418,62 @@ router.get("/:id/invoice", requireAuth, async (req, res, next) => {
   } catch (error) {
     console.error("Eroare download factură:", error);
     res.status(500).json({ error: "Eroare internă la descărcarea facturii." });
+  }
+});
+
+// 9. NOU: POST: Confirmare Plată Transfer Bancar (Boton pentru Admin)
+router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    
+    // Luăm comanda completă
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { items: true, user: true }
+    });
+
+    if (!order) return res.status(404).json({ error: "Comanda nu a fost găsită." });
+    if (order.paymentMethod !== "transfer_bancar") {
+      return res.status(400).json({ error: "Această acțiune este doar pentru comenzile cu plată prin Transfer Bancar." });
+    }
+
+    // 1. Generăm Factura Finală în SmartBill pe baza proformei (sau ca factură nouă)
+    let invoiceData;
+    let pdfBuffer;
+    try {
+      invoiceData = await createSmartBillInvoice(order);
+      if (invoiceData && invoiceData.series && invoiceData.number) {
+        pdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
+      }
+    } catch (smartbillError) {
+      console.error("Eroare SmartBill la emitere factură finală:", smartbillError);
+      return res.status(500).json({ error: "Plata nu a fost confirmată deoarece emiterea facturii în SmartBill a eșuat." });
+    }
+
+    // 2. Actualizăm Comanda în Baza de Date
+    await prisma.order.update({
+      where: { id },
+      data: {
+        status: "in_procesare", // Trecem comanda din 'in_asteptare_plata' in 'in_procesare'
+        smartbillSeries: invoiceData.series,
+        smartbillNumber: invoiceData.number,
+        items: {
+          updateMany: {
+            where: { status: "in_asteptare_plata" },
+            data: { status: "in_procesare" }
+          }
+        }
+      }
+    });
+
+    // 3. Trimitem Email-ul clientului cu Factura Fiscală atașată
+    await sendFinalInvoiceEmail(order.user.email, order, pdfBuffer);
+
+    res.json({ success: true, message: "Plata a fost confirmată, iar factura a fost trimisă clientului." });
+
+  } catch (error) {
+    console.error("Eroare la confirmarea plății OP:", error);
+    res.status(500).json({ error: "Eroare internă." });
   }
 });
 
