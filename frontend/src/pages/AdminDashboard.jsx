@@ -12,9 +12,12 @@ export default function AdminDashboard() {
 
   const [confirmingOpId, setConfirmingOpId] = useState(null);
   
-  // NOI STĂRI PENTRU ALERTE CUSTOM
+  // STĂRI PENTRU ALERTE ȘI MODAL-URI CUSTOM
   const [toastMsg, setToastMsg] = useState({ open: false, type: "success", text: "" });
   const [opModal, setOpModal] = useState({ open: false, orderId: null });
+  
+  // NOU: Stare pentru Modal-ul de Anulare Comandă
+  const [cancelModal, setCancelModal] = useState({ open: false, orderId: null });
 
   const showToast = (text, type = "success") => {
     setToastMsg({ open: true, type, text });
@@ -62,13 +65,15 @@ export default function AdminDashboard() {
             );
             
             const allDelivered = updatedItems.every(i => i.status === "livrat");
+            const allCanceled = updatedItems.every(i => i.status === "anulat");
             
-            if (allDelivered) {
+            if (allDelivered || allCanceled) {
+              const finalStatus = allDelivered ? "livrat" : "anulat";
               apiFetch(`/orders/${orderId}/status`, {
                 method: "PATCH",
-                body: JSON.stringify({ status: "livrat" })
+                body: JSON.stringify({ status: finalStatus })
               });
-              return null;
+              return null; // Îl scoatem din lista de comenzi active
             }
             return { ...order, items: updatedItems };
           }
@@ -85,16 +90,14 @@ export default function AdminDashboard() {
     }
   };
 
-  // Funcția care doar deschide modal-ul de confirmare
   const initiateConfirmTransfer = (orderId) => {
     setOpModal({ open: true, orderId });
   };
 
-  // Funcția care execută efectiv confirmarea după ce se apasă "DA" în modal
   const executeConfirmTransfer = async () => {
     const orderId = opModal.orderId;
-    setOpModal({ open: false, orderId: null }); // Închidem modalul
-    setConfirmingOpId(orderId); // Punem butonul în starea "Se procesează..."
+    setOpModal({ open: false, orderId: null }); 
+    setConfirmingOpId(orderId); 
 
     try {
       const res = await apiFetch(`/orders/${orderId}/confirm-transfer`, {
@@ -113,6 +116,26 @@ export default function AdminDashboard() {
       showToast(error.message, "error");
     } finally {
       setConfirmingOpId(null);
+    }
+  };
+
+  // NOU: Funcția de anulare globală a comenzii de către Admin
+  const executeCancelOrder = async () => {
+    const orderId = cancelModal.orderId;
+    setCancelModal({ open: false, orderId: null });
+
+    try {
+      const res = await apiFetch(`/orders/${orderId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "anulat" })
+      });
+
+      if (!res.ok) throw new Error("Nu s-a putut anula comanda.");
+      
+      showToast(`Comanda #${orderId} a fost anulată cu succes!`, "success");
+      fetchOrders(); // Reîncărcăm lista, comanda va dispărea (mutată în istoric)
+    } catch (error) {
+      showToast(error.message, "error");
     }
   };
 
@@ -137,6 +160,7 @@ export default function AdminDashboard() {
             <option value="ireparabil">❌ Ireparabil</option>
             <option value="gata_de_livrare">🤝 Pregătit pentru Predare</option>
             <option value="livrat">🏁 Predat (Finalizat)</option>
+            <option value="anulat">❌ Anulat</option>
           </>
         );
       } else {
@@ -150,6 +174,7 @@ export default function AdminDashboard() {
             <option value="ireparabil">❌ Ireparabil</option>
             <option value="predat_curier">📦 Predat Curier (Retur Către Client)</option>
             <option value="livrat">🏁 Livrat Final</option>
+            <option value="anulat">❌ Anulat</option>
           </>
         );
       }
@@ -162,6 +187,7 @@ export default function AdminDashboard() {
             <option value="in_pregatire">🛠️ În Asamblare</option>
             <option value="gata_de_livrare">🤝 Gata de Livrare Personală</option>
             <option value="livrat">🏁 Livrat Final</option>
+            <option value="anulat">❌ Anulat</option>
           </>
         );
       } else {
@@ -173,6 +199,7 @@ export default function AdminDashboard() {
             <option value="gata_de_livrare">📦 Ambalat (Așteaptă Curier)</option>
             <option value="predat_curier">🚚 Predat Curier (AWB)</option>
             <option value="livrat">🏁 Livrat Final</option>
+            <option value="anulat">❌ Anulat</option>
           </>
         );
       }
@@ -254,8 +281,9 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      {isPendingBankTransfer && (
-                        <div className="mt-8 pt-6 border-t border-white/10">
+                      {/* BLOC ACȚIUNI ADMIN */}
+                      <div className="mt-8 pt-6 border-t border-white/10 flex flex-col gap-3">
+                        {isPendingBankTransfer && (
                             <button 
                                 onClick={() => initiateConfirmTransfer(order.id)}
                                 disabled={confirmingOpId === order.id}
@@ -263,9 +291,16 @@ export default function AdminDashboard() {
                             >
                                 {confirmingOpId === order.id ? "Se procesează..." : "✅ Confirmă Încasarea OP"}
                             </button>
-                            <p className="text-[9px] text-gray-500 text-center mt-2 italic">Va genera factura și va trece comanda în procesare.</p>
-                        </div>
-                      )}
+                        )}
+                        
+                        {/* NOU: BUTON GLOBAL DE ANULARE COMANDĂ */}
+                        <button 
+                            onClick={() => setCancelModal({ open: true, orderId: order.id })}
+                            className="w-full py-3 rounded-2xl border border-rose-500/30 text-rose-500 font-black uppercase text-[10px] tracking-widest hover:bg-rose-500 hover:text-white shadow-lg shadow-rose-500/10 transition-all"
+                        >
+                            ❌ Anulează Comanda
+                        </button>
+                      </div>
                     </div>
 
                     <div className="lg:w-2/3 space-y-6">
@@ -350,6 +385,25 @@ export default function AdminDashboard() {
             <div className="flex gap-4">
                 <button onClick={() => setOpModal({ open: false, orderId: null })} className="flex-1 py-4 rounded-2xl bg-white/5 text-gray-400 font-black uppercase text-[10px] hover:text-white hover:bg-white/10 transition-colors">Înapoi</button>
                 <button onClick={executeConfirmTransfer} className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black uppercase text-[10px] shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 transition-colors">Da, confirm plata!</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NOU: MODAL ANULARE COMANDĂ ADMIN */}
+      {cancelModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setCancelModal({ open: false, orderId: null })}></div>
+          <div className="relative w-full max-w-md p-10 rounded-[40px] bg-[#12192c]/95 backdrop-blur-3xl border border-rose-500/20 shadow-2xl animate-in zoom-in duration-300 text-center">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h2 className="text-xl font-black text-rose-400 uppercase italic mb-2">Anulare Comandă</h2>
+            <p className="text-gray-400 text-xs mb-8 font-medium leading-relaxed">
+              Ești sigur că vrei să anulezi global comanda <strong className="text-white">#{cancelModal.orderId}</strong>? <br/><br/>
+              Aceasta va dispărea din comenzile active și va fi mutată în Arhivă cu statusul "Anulat".
+            </p>
+            <div className="flex gap-4">
+                <button onClick={() => setCancelModal({ open: false, orderId: null })} className="flex-1 py-4 rounded-2xl bg-white/5 text-gray-400 font-black uppercase text-[10px] hover:text-white hover:bg-white/10 transition-colors">Înapoi</button>
+                <button onClick={executeCancelOrder} className="flex-1 py-4 rounded-2xl bg-rose-600 text-white font-black uppercase text-[10px] shadow-xl shadow-rose-600/20 hover:bg-rose-500 transition-colors">Da, anulează</button>
             </div>
           </div>
         </div>
