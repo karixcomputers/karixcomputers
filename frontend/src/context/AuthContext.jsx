@@ -28,24 +28,32 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("karix_logged_in");
   };
 
-  useEffect(() => {
-    async function restoreSession() {
-      try {
-        const data = await refreshApi();
-        if (data && data.user && data.accessToken) {
-          updateAuth(data.user, data.accessToken);
-        } else {
-          clearAuth();
-        }
-      } catch (err) {
-        console.warn("Sesiune inexistentă la pornire.");
+useEffect(() => {
+  async function restoreSession() {
+    try {
+      const data = await refreshApi();
+      if (data && data.user && data.accessToken) {
+        updateAuth(data.user, data.accessToken);
+      } else {
         clearAuth();
-      } finally {
-        setLoading(false);
       }
+    } catch (err) {
+      // 👉 MODIFICARE CRITICĂ:
+      // Dacă eroarea este 429 (Rate Limit), NU ștergem sesiunea.
+      // Doar logăm eroarea și lăsăm utilizatorul "așa cum e".
+      if (err.response && err.response.status === 429) {
+        console.warn("⚠️ Rate limit atins la refresh. Sesiunea rămâne intactă local.");
+      } else {
+        // Doar pentru erori 401 sau altele grave curățăm tot
+        console.warn("Sesiune inexistentă sau expirată.");
+        clearAuth();
+      }
+    } finally {
+      setLoading(false);
     }
-    restoreSession();
-  }, []);
+  }
+  restoreSession();
+}, []);
 
   // --- FUNCȚIA NOUĂ PENTRU GOOGLE ---
   const loginWithGoogle = (data) => {
