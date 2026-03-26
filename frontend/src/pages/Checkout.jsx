@@ -88,7 +88,7 @@ const notifyDiscord = async (orderData, coupon) => {
           { name: "🎟️ Cupon", value: coupon ? `**${coupon.code}**` : "Niciunul", inline: true },
           { 
             name: "📋 Produse", 
-            value: orderData.cartItems.map(item => `• ${item.productName} (x${item.qty})`).join('\n') || "Niciun produs",
+            value: orderData.cartItems.map(item => `• ${item.productName} (x${item.qty}) [Garanție: ${item.warrantyMonths} Luni]`).join('\n') || "Niciun produs",
             inline: false 
           }
         ],
@@ -134,7 +134,6 @@ export default function Checkout() {
   });
 
   const [pickupByKarix, setPickupByKarix] = useState(false);
-  // Am schimbat metoda default de plată pe "online"
   const [paymentMethod, setPaymentMethod] = useState("online"); 
   
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -219,7 +218,6 @@ export default function Checkout() {
     return appliedCoupon.discountValue; 
   }, [appliedCoupon, currentSubtotal]);
 
-  // Costul de livrare este acum mereu 0 (inclus)
   const shippingCents = useMemo(() => {
     return 0; 
   }, []);
@@ -321,9 +319,23 @@ export default function Checkout() {
       const nameStr = (item.productName || item.name || "").toLowerCase();
       const isService = item.category === 'service' || 
                         ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => nameStr.includes(kw));
-      let finalWarranty = (item.warrantyMonths !== undefined && item.warrantyMonths !== null) 
-                          ? parseInt(item.warrantyMonths) 
-                          : (isService ? 0 : 24);
+      
+      // LOGICA NOUĂ: Calcul Garanție B2B (Firme)
+      let finalWarranty = 0;
+      
+      if (!isService) {
+          // Garanția standard (din baza de date sau 24 default)
+          let baseWarranty = (item.warrantyMonths !== undefined && item.warrantyMonths !== null) 
+                             ? parseInt(item.warrantyMonths) 
+                             : 24;
+                             
+          // Dacă e persoană juridică, limităm garanția la 12 luni
+          if (shipping.isCompany) {
+              finalWarranty = Math.min(baseWarranty, 12);
+          } else {
+              finalWarranty = baseWarranty;
+          }
+      }
 
       return {
         ...item,
@@ -396,7 +408,6 @@ export default function Checkout() {
         return; 
 
       } else {
-        // Aici ajunge dacă e transfer bancar. Trimitem notificare și arătăm pagina de succes.
         await notifyDiscord(orderData, appliedCoupon);
         if (clearCart) clearCart();
         sessionStorage.setItem("orderJustPlaced", "true");
@@ -456,6 +467,16 @@ export default function Checkout() {
                     </button>
                   </div>
                 </div>
+
+                {/* NOTIFICARE GARANȚIE FIRMĂ (Apare doar când B2B e selectat) */}
+                {shipping.isCompany && (
+                  <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+                      <span className="text-amber-400 mt-0.5">ℹ️</span>
+                      <p className="text-xs text-amber-400 font-medium leading-relaxed">
+                          Conform legislației în vigoare, garanția comercială pentru persoanele juridice este limitată la maxim <strong className="font-black text-white">12 luni</strong> pentru produsele hardware.
+                      </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {!shipping.isCompany ? (
