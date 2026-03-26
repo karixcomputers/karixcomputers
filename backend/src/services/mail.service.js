@@ -929,3 +929,26 @@ export async function sendFinalInvoiceEmail(to, orderData, pdfBuffer) {
     console.error("❌ Eroare sendFinalInvoiceEmail:", err);
   }
 }
+
+// ============================================================
+// 🚀 NOU: FUNCȚIE ANULARE COMANDĂ DE CĂTRE ADMIN
+// ============================================================
+export async function sendAdminOrderCanceledEmail(to, data) {
+  try {
+    const tpl = loadTemplate("adminCanceledOrder.html");
+    const html = render(tpl, {
+      customerName: data.customerName,
+      orderId: data.orderId,
+      date: new Date().toLocaleString('ro-RO')
+    });
+
+    await sendHtmlMail({ 
+      to, 
+      subject: `Comandă Anulată #${data.orderId} - Karix Computers`, 
+      html 
+    });
+    console.log(`✅ MAIL ANULARE (ADMIN) TRIMIS LA: ${to}`);
+  } catch (err) {
+    console.error("❌ Eroare sendAdminOrderCanceledEmail:", err);
+  }
+}

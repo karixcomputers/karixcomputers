@@ -14,15 +14,16 @@ import {
   sendServiceShippedBackEmail,
   sendServiceUnrepairableEmail,
   sendOrderCanceledEmail,
-  sendFinalInvoiceEmail // 👉 Trebuie să creăm această funcție în mail.service.js
+  sendFinalInvoiceEmail,
+  sendAdminOrderCanceledEmail // 👉 Importăm funcția nouă!
 } from "../services/mail.service.js";
 
 // --- IMPORT NOU PENTRU FACTURI & PROFORME ---
 import { 
   getSmartBillPdf,
-  createSmartBillProforma, // 👉 Va trebui creată
-  getSmartBillProformaPdf, // 👉 Va trebui creată
-  createSmartBillInvoice   // 👉 Va trebui creată
+  createSmartBillProforma, 
+  getSmartBillProformaPdf, 
+  createSmartBillInvoice   
 } from "../services/smartbill.service.js";
 
 const prisma = new PrismaClient();
@@ -100,11 +101,37 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res, next) =>
   try {
     const id = parseInt(req.params.id, 10); 
     const { status } = req.body; 
+    
+    // Actualizăm statusul comenzii și luăm datele utilizatorului
     const updatedOrder = await prisma.order.update({
       where: { id },
-      data: { status },
-      include: { user: { select: { email: true } } }
+      data: { 
+        status,
+        // Dacă adminul anulează comanda, anulăm automat și toate produsele din ea
+        ...(status === "anulat" && {
+          items: {
+            updateMany: {
+              where: {},
+              data: { status: "anulat" }
+            }
+          }
+        })
+      },
+      include: { 
+        user: { select: { email: true } },
+        items: true 
+      }
     });
+
+    // 👉 Dacă adminul trece comanda pe status "anulat", trimitem noul mail!
+    if (status === "anulat" && updatedOrder.user?.email) {
+      const mailData = {
+        customerName: updatedOrder.shippingName || "Client Karix",
+        orderId: updatedOrder.id
+      };
+      await sendAdminOrderCanceledEmail(updatedOrder.user.email, mailData).catch(err => console.error(err));
+    }
+
     res.json({ success: true, order: updatedOrder });
   } catch (e) { next(e); }
 });
@@ -315,7 +342,6 @@ router.post("/", requireAuth, async (req, res, next) => {
         }
       } catch (err) {
         console.error("⚠️ Eroare generare proformă SmartBill:", err);
-        // Nu oprim procesul dacă crapă SmartBill, trimitem mailul fără ea și o generăm manual.
       }
     }
 
@@ -345,7 +371,6 @@ router.post("/", requireAuth, async (req, res, next) => {
     if (paymentMethod !== 'online') {
       const uEmail = userEmail || (req.user && req.user.email);
       if (uEmail) {
-         // Trimitem proformaPdfBuffer către mail service
          await sendUnifiedOrderEmail(uEmail, commonMailData, false, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client:", err));
       }
       
