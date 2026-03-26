@@ -27,6 +27,8 @@ import adminConfiguratorRoutes from "./routes/adminconfigurator.routes.js";
 
 export const app = express();
 
+app.set("trust proxy", 1);
+
 // 1. Webhooks - Trebuie să fie înainte de express.json() pentru a nu corupe semnătura
 app.use("/api/webhooks", webhooksRoutes);
 

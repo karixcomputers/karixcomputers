@@ -13,6 +13,9 @@ import {
 } from "../services/auth.service.js";
 import { sendVerifyEmail, sendResetPassword, sendWelcomeEmail } from "../services/mail.service.js";
 
+// 👉 IMPORTĂM NOUL SCUT ANTI-BRUTE FORCE
+import { loginLimiter } from "../middleware/rateLimit.js";
+
 const prisma = new PrismaClient();
 const router = express.Router();
 
@@ -266,8 +269,8 @@ router.post("/resend-verification", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// 4. LOGIN
-router.post("/login", async (req, res, next) => {
+// 4. LOGIN (👉 SCUTUL APLICAT AICI)
+router.post("/login", loginLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const user = await prisma.user.findUnique({ where: { email } });
@@ -424,6 +427,5 @@ router.post("/verify-reset-token", async (req, res) => {
     res.status(400).json({ valid: false });
   }
 });
-
 
 export default router;
