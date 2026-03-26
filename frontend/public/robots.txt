@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /account
+Disallow: /admin
+Disallow: /orders
+
+Sitemap: https://karixcomputers.ro/sitemap.xml
