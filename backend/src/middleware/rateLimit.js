@@ -1,18 +1,18 @@
 import rateLimit from 'express-rate-limit';
 
-// 1. Scut general pentru tot site-ul (Aici intră produsele, coșul, etc.)
+// 1. Scut general (Produse, poze, coș)
 export const rateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minute
-  max: 200, // Am crescut puțin la 200 pentru refresh-uri rapide
+  windowMs: 5 * 60 * 1000, // Scădem la 5 minute (e suficient pentru a opri un atac)
+  max: 500, // Urcăm la 500 de cereri (un user normal nu face 500 în 5 min)
   standardHeaders: true,
   legacyHeaders: false,
-  message: { status: 429, message: "⚠️ Prea multe cereri. Revino peste 15 minute." }
+  message: { status: 429, message: "⚠️ Prea multe cereri. Revino peste 5 minute." }
 });
 
-// 2. Scut pentru verificarea sesiunii (Când dai F5 pe site)
+// 2. Scut pentru sesiune (F5-uri)
 export const authLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minut!
-  max: 60, // Poți da F5 de 60 de ori pe minut fără să fii banat
+  windowMs: 1 * 60 * 1000, 
+  max: 100, // Urcăm la 100 (React uneori face 2-3 cereri de auth la un singur refresh)
   standardHeaders: true,
   legacyHeaders: false,
   message: { status: 429, message: "⚠️ Prea multe refresh-uri. Așteaptă 1 minut." }
