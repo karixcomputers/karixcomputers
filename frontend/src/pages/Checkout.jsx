@@ -3,7 +3,6 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { formatRON } from "../utils/money";
-// IMPORTĂM COMPONENTA SEO
 import SEO from "../components/SEO";
 
 const JUDETE = [
@@ -14,7 +13,6 @@ const JUDETE = [
   "Tulcea", "Vaslui", "Vâlcea", "Vrancea"
 ];
 
-// --- FUNCȚIE DE PARSARE A ADRESEI ANAF ---
 const parseAnafAddress = (rawAddress, judeteList) => {
   if (!rawAddress) return { county: "", city: "", cleanAddress: "" };
   
@@ -22,20 +20,17 @@ const parseAnafAddress = (rawAddress, judeteList) => {
   let county = "";
   let city = "";
 
-  // 1. Extragere București (caz special)
   if (addr.includes("BUCUREŞTI") || addr.includes("BUCURESTI")) {
     county = "București";
     city = "București";
     addr = addr.replace(/MUN\.\s*BUCURE[ŞS]TI/g, '').replace(/SECTOR(UL)?\s*\d/g, '').replace(/SEC\.\s*\d/g, '');
   } else {
-    // 2. Extragere Județ
     const judMatch = addr.match(/JUD\.\s*([^,]+)/);
     if (judMatch) {
       county = judMatch[1].trim();
       addr = addr.replace(judMatch[0], ''); 
     }
 
-    // 3. Extragere Oraș / Localitate
     const cityMatch = addr.match(/(?:MUN\.|OR[ŞS]\.|COM\.|SAT)\s*([^,]+)/);
     if (cityMatch) {
       city = cityMatch[1].trim();
@@ -43,7 +38,6 @@ const parseAnafAddress = (rawAddress, judeteList) => {
     }
   }
 
-  // 4. Curățare rest adresă
   let cleanAddress = addr.replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ', ').trim();
 
   const toTitleCase = (str) => {
@@ -51,7 +45,6 @@ const parseAnafAddress = (rawAddress, judeteList) => {
     return str.toLowerCase().replace(/(^|\s|-)\S/g, l => l.toUpperCase());
   };
 
-  // 5. Potrivire inteligentă a Județului
   let matchedCounty = toTitleCase(county);
   if (county) {
     const noDiacritics = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -74,7 +67,10 @@ const notifyDiscord = async (orderData, coupon) => {
     ? `🏢 **${orderData.client.companyName}**\nCUI: ${orderData.client.cui}`
     : `👤 **${orderData.client.name}**`;
 
-  const paymentMethodInfo = orderData.paymentMethod === "ramburs" ? "💵 Numerar la Livrare (Ramburs)" : "💳 Plată Online (Netopia)";
+  let paymentMethodInfo = "💳 Plată Online (Netopia)";
+  if (orderData.paymentMethod === "transfer_bancar") {
+    paymentMethodInfo = "🏦 Transfer Bancar (OP)";
+  }
 
   const message = {
     embeds: [
@@ -138,7 +134,8 @@ export default function Checkout() {
   });
 
   const [pickupByKarix, setPickupByKarix] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("ramburs"); 
+  // Am schimbat metoda default de plată pe "online"
+  const [paymentMethod, setPaymentMethod] = useState("online"); 
   
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -222,18 +219,10 @@ export default function Checkout() {
     return appliedCoupon.discountValue; 
   }, [appliedCoupon, currentSubtotal]);
 
+  // Costul de livrare este acum mereu 0 (inclus)
   const shippingCents = useMemo(() => {
-    if (currentSubtotal >= 100000) {
-      return 0; 
-    }
-    if (cartAnalysis.hasService) {
-      return 3000; 
-    }
-    if (pickupByKarix) {
-      return 0; 
-    }
-    return 2500; 
-  }, [cartAnalysis.hasService, currentSubtotal, pickupByKarix]);
+    return 0; 
+  }, []);
 
   const totalCents = Math.max(0, currentSubtotal - discountCents + shippingCents);
 
@@ -407,6 +396,7 @@ export default function Checkout() {
         return; 
 
       } else {
+        // Aici ajunge dacă e transfer bancar. Trimitem notificare și arătăm pagina de succes.
         await notifyDiscord(orderData, appliedCoupon);
         if (clearCart) clearCart();
         sessionStorage.setItem("orderJustPlaced", "true");
@@ -587,23 +577,6 @@ export default function Checkout() {
                   
                   <button 
                     type="button" 
-                    onClick={() => setPaymentMethod("ramburs")} 
-                    className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${paymentMethod === "ramburs" ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}
-                  >
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${paymentMethod === "ramburs" ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
-                      💵
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-white font-black text-xs uppercase tracking-wider">Numerar la Livrare (Ramburs)</h4>
-                      <p className="text-gray-400 text-[10px]">Plătești direct la curier când primești comanda.</p>
-                    </div>
-                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "ramburs" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
-                      {paymentMethod === "ramburs" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
-                    </div>
-                  </button>
-
-                  <button 
-                    type="button" 
                     onClick={() => setPaymentMethod("online")}
                     className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${paymentMethod === "online" ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}
                   >
@@ -616,6 +589,23 @@ export default function Checkout() {
                     </div>
                     <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "online" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
                       {paymentMethod === "online" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                    </div>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => setPaymentMethod("transfer_bancar")} 
+                    className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${paymentMethod === "transfer_bancar" ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}
+                  >
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${paymentMethod === "transfer_bancar" ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
+                      🏦
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-black text-xs uppercase tracking-wider">Transfer Bancar (OP)</h4>
+                      <p className="text-gray-400 text-[10px]">Ideal pentru firme. Livrare în 5-10 zile lucrătoare de la confirmarea plății.</p>
+                    </div>
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "transfer_bancar" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
+                      {paymentMethod === "transfer_bancar" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
                     </div>
                   </button>
 
@@ -643,11 +633,9 @@ export default function Checkout() {
                   )}
 
                   <div className="flex justify-between text-gray-400 font-medium text-sm">
-                    <span>{cartAnalysis.hasService ? "Transport Service (Tur-Retur)" : "Logistică"}</span>
-                    <span className={shippingCents === 0 ? "text-emerald-400 font-black text-[10px] uppercase tracking-widest" : "text-white font-bold"}>
-                      {shippingCents === 0 
-                        ? (pickupByKarix ? "Karix Express (Gratuit)" : "Gratuit") 
-                        : formatRON(shippingCents)}
+                    <span>{cartAnalysis.hasService ? "Transport Service" : "Logistică"}</span>
+                    <span className="text-emerald-400 font-black text-[10px] uppercase tracking-widest">
+                      Gratuit (Inclus)
                     </span>
                   </div>
 
