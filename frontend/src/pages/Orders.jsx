@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchMyOrders } from "../api/orders";
 import { apiFetch } from "../api/client"; 
 import { formatRON } from "../utils/money";
-// IMPORTĂM COMPONENTA SEO
 import SEO from "../components/SEO";
 
 // Helper Status Badge Inteligent
@@ -16,6 +15,7 @@ function StatusBadge({ status, isService, isOradea }) {
     if (isOradea) {
       const map = {
         in_asteptare: { label: "În așteptare", color: "text-amber-400 border-amber-500/20 bg-amber-500/5" },
+        in_asteptare_plata: { label: "Așteaptă Plata", color: "text-yellow-400 border-yellow-500/20 bg-yellow-500/5" },
         in_asteptare_ridicare: { label: "Așteaptă Preluarea", color: "text-pink-400 border-pink-500/20 bg-pink-500/5" },
         posesie: { label: "În laborator", color: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5" },
         diagnosticare: { label: "Diagnosticare", color: "text-purple-400 border-purple-500/20 bg-purple-500/5" },
@@ -29,6 +29,7 @@ function StatusBadge({ status, isService, isOradea }) {
     } else {
       const map = {
         in_asteptare: { label: "În așteptare", color: "text-amber-400 border-amber-500/20 bg-amber-500/5" },
+        in_asteptare_plata: { label: "Așteaptă Plata", color: "text-yellow-400 border-yellow-500/20 bg-yellow-500/5" },
         in_asteptare_ridicare: { label: "Așteaptă Curierul", color: "text-pink-400 border-pink-500/20 bg-pink-500/5" },
         posesie: { label: "În laborator", color: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5" },
         diagnosticare: { label: "Diagnosticare", color: "text-purple-400 border-purple-500/20 bg-purple-500/5" },
@@ -45,6 +46,7 @@ function StatusBadge({ status, isService, isOradea }) {
     if (isOradea) {
        const map = {
         in_asteptare: { label: "În așteptare", color: "text-amber-400 border-amber-500/20 bg-amber-500/5" },
+        in_asteptare_plata: { label: "Așteaptă Plata", color: "text-yellow-400 border-yellow-500/20 bg-yellow-500/5" },
         in_procesare: { label: "În Procesare", color: "text-blue-400 border-blue-500/20 bg-blue-500/5" },
         in_pregatire: { label: "În Asamblare", color: "text-amber-500 border-amber-500/20 bg-amber-500/5" },
         gata_de_livrare: { label: "Gata de Predare", color: "text-indigo-400 border-indigo-500/20 bg-indigo-500/5" },
@@ -55,6 +57,7 @@ function StatusBadge({ status, isService, isOradea }) {
     } else {
        const map = {
         in_asteptare: { label: "În așteptare", color: "text-amber-400 border-amber-500/20 bg-amber-500/5" },
+        in_asteptare_plata: { label: "Așteaptă Plata", color: "text-yellow-400 border-yellow-500/20 bg-yellow-500/5" },
         in_procesare: { label: "În Procesare", color: "text-blue-400 border-blue-500/20 bg-blue-500/5" },
         in_pregatire: { label: "În Asamblare", color: "text-amber-500 border-amber-500/20 bg-amber-500/5" },
         gata_de_livrare: { label: "Ambalat", color: "text-indigo-400 border-indigo-500/20 bg-indigo-500/5" },
@@ -73,22 +76,30 @@ function StatusBadge({ status, isService, isOradea }) {
   );
 }
 
-// CORECTAT: Helper Payment Status Badge
+// Payment Status Badge - Actualizat fără Ramburs
 function PaymentBadge({ paymentMethod, status }) {
-  let label = "💵 Ramburs";
+  let label = "Detalii Plată";
   let color = "text-gray-400 border-gray-500/20 bg-gray-500/5";
 
   const method = (paymentMethod || "").toLowerCase();
 
   if (method === "online" || method === "card") {
-    if (status === "in_asteptare") {
-        label = "⏳ Plată În Așteptare";
-        color = "text-amber-400 border-amber-500/20 bg-amber-500/5";
-    } else if (status === "anulat") {
+    if (status === "anulat") {
         label = "❌ Plată Anulată";
         color = "text-rose-500 border-rose-500/20 bg-rose-500/5";
     } else {
         label = "💳 Plătit Online";
+        color = "text-emerald-400 border-emerald-500/20 bg-emerald-500/5";
+    }
+  } else if (method === "transfer_bancar") {
+    if (status === "in_asteptare_plata") {
+        label = "⏳ Așteaptă OP";
+        color = "text-amber-400 border-amber-500/20 bg-amber-500/5";
+    } else if (status === "anulat") {
+        label = "❌ OP Anulat";
+        color = "text-rose-500 border-rose-500/20 bg-rose-500/5";
+    } else {
+        label = "🏦 OP Confirmat";
         color = "text-emerald-400 border-emerald-500/20 bg-emerald-500/5";
     }
   }
@@ -154,7 +165,7 @@ export default function Orders() {
   });
 
   const canCancel = (order) => {
-    const cancelableStatuses = ["in_asteptare", "in_procesare", "in_asteptare_ridicare"];
+    const cancelableStatuses = ["in_asteptare", "in_procesare", "in_asteptare_ridicare", "in_asteptare_plata"];
     if (order.status === "anulat" || order.status === "livrat") return false;
     return order.items.every(it => cancelableStatuses.includes(it.status));
   };
@@ -180,13 +191,13 @@ export default function Orders() {
         });
 
         if (!response.ok) {
-            throw new Error('Factura nu este încă disponibilă sau a apărut o eroare la server.');
+            throw new Error('Documentul nu este încă disponibil sau a apărut o eroare la server.');
         }
 
         const blob = await response.blob();
         
         if (blob.size < 100) {
-             throw new Error('Factura generată este invalidă.');
+             throw new Error('Documentul generat este invalid.');
         }
 
         const url = window.URL.createObjectURL(blob);
@@ -201,8 +212,8 @@ export default function Orders() {
         document.body.removeChild(a);
 
     } catch (error) {
-        console.error("Download invoice error:", error);
-        showToast(error.message || "Eroare la descărcarea facturii.");
+        console.error("Download document error:", error);
+        showToast(error.message || "Eroare la descărcare.");
     } finally {
         setDownloadingId(null);
     }
@@ -217,7 +228,6 @@ export default function Orders() {
 
   return (
     <>
-      {/* SEO DINAMIC: TITLU ADAPTAT ÎN FUNCȚIE DE TAB */}
       <SEO 
         title={activeTab === "orders" ? "Comenzile Mele" : "Status Retururi"}
         description="Gestionează comenzile tale Karix Computers, descarcă facturi fiscale și verifică statusul cererilor de retur în timp real."
@@ -305,22 +315,22 @@ export default function Orders() {
                           <div className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">{formatRON(o.totalCents)}</div>
                           
                           <div className="flex gap-2 mt-4">
-                              {!(o.paymentMethod === 'online' && o.status === 'in_asteptare') && (
-                                  <button 
-                                      onClick={() => handleDownloadInvoice(o.id)} 
-                                      disabled={downloadingId === o.id}
-                                      className="px-4 py-2 rounded-xl border border-indigo-500/30 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-lg shadow-indigo-500/10 disabled:opacity-50 flex items-center gap-2"
-                                  >
-                                      {downloadingId === o.id ? (
-                                          <>
-                                              <div className="w-3 h-3 border-2 border-indigo-200 border-t-transparent rounded-full animate-spin"></div>
-                                              Se descarcă...
-                                          </>
-                                      ) : (
-                                          <>📄 Factură</>
-                                      )}
-                                  </button>
-                              )}
+                              <button 
+                                  onClick={() => handleDownloadInvoice(o.id)} 
+                                  disabled={downloadingId === o.id}
+                                  className="px-4 py-2 rounded-xl border border-indigo-500/30 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-lg shadow-indigo-500/10 disabled:opacity-50 flex items-center gap-2"
+                              >
+                                  {downloadingId === o.id ? (
+                                      <>
+                                          <div className="w-3 h-3 border-2 border-indigo-200 border-t-transparent rounded-full animate-spin"></div>
+                                          Se descarcă...
+                                      </>
+                                  ) : (
+                                      <>
+                                          {o.paymentMethod === 'transfer_bancar' && o.status === 'in_asteptare_plata' ? "📄 Descarcă Proformă" : "📄 Descărcă Factură"}
+                                      </>
+                                  )}
+                              </button>
 
                               {canCancel(o) && (
                                   <button onClick={() => setCancelModal({ open: true, orderId: o.id })} className="px-4 py-2 rounded-xl border border-rose-500/30 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-rose-500/10">Anulează</button>

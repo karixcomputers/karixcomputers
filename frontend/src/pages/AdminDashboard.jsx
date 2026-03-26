@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-// Importăm apiFetch pentru a folosi rutele corecte de producție
 import { apiFetch } from "../api/client";
 import { Link } from "react-router-dom";
 
@@ -11,9 +10,11 @@ export default function AdminDashboard() {
   const [awbModal, setAwbModal] = useState({ open: false, itemId: null, orderId: null });
   const [tempAwb, setTempAwb] = useState("");
 
+  // NOU: Stare pentru butonul de confirmare OP
+  const [confirmingOpId, setConfirmingOpId] = useState(null);
+
   const fetchOrders = async () => {
     try {
-      // MODIFICAT: folosim apiFetch cu ruta scurtă
       const res = await apiFetch("/orders/admin/all");
       if (res.ok) {
         const data = await res.json();
@@ -38,7 +39,6 @@ export default function AdminDashboard() {
 
   const executeItemUpdate = async (orderId, itemId, status, awb) => {
     try {
-      // MODIFICAT: am trecut de la axios la apiFetch pentru update-ul item-ului
       const res = await apiFetch(`/orders/item/${itemId}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status, awb })
@@ -56,7 +56,6 @@ export default function AdminDashboard() {
             const allDelivered = updatedItems.every(i => i.status === "livrat");
             
             if (allDelivered) {
-              // MODIFICAT: folosim apiFetch și aici pentru statusul general al comenzii
               apiFetch(`/orders/${orderId}/status`, {
                 method: "PATCH",
                 body: JSON.stringify({ status: "livrat" })
@@ -77,6 +76,33 @@ export default function AdminDashboard() {
     }
   };
 
+  // NOU: Funcția care trimite requestul de confirmare a transferului bancar
+  const handleConfirmTransfer = async (orderId) => {
+    if (!window.confirm(`Ești sigur că ai încasat banii pentru comanda #${orderId}? Va genera factura în SmartBill și o va trimite clientului pe mail.`)) {
+        return;
+    }
+
+    setConfirmingOpId(orderId);
+    try {
+      const res = await apiFetch(`/orders/${orderId}/confirm-transfer`, {
+        method: "POST"
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Eroare la confirmarea plății.");
+      }
+
+      alert("Plată confirmată cu succes! Factura a fost trimisă clientului.");
+      fetchOrders(); // Reîmprospătăm lista pentru a lua noile statusuri
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setConfirmingOpId(null);
+    }
+  };
+
   const renderStatusOptions = (item, order) => {
     const itemName = (item.productName || "").toLowerCase();
     const isService = itemName.includes('service') || 
@@ -90,6 +116,7 @@ export default function AdminDashboard() {
       if (isOradea) {
         return (
           <>
+            <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
             <option value="in_asteptare_ridicare">⏳ Așteptare Preluare Personală</option>
             <option value="posesie">📥 În laboratorul Karix</option>
             <option value="diagnosticare">🔍 Diagnosticare</option>
@@ -102,6 +129,7 @@ export default function AdminDashboard() {
       } else {
         return (
           <>
+            <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
             <option value="in_asteptare_ridicare">🚚 Așteptare Curier (Către noi)</option>
             <option value="posesie">📥 În laboratorul Karix</option>
             <option value="diagnosticare">🔍 Diagnosticare</option>
@@ -116,6 +144,7 @@ export default function AdminDashboard() {
       if (isOradea) {
         return (
           <>
+            <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
             <option value="in_procesare">⚙️ În Procesare</option>
             <option value="in_pregatire">🛠️ În Asamblare</option>
             <option value="gata_de_livrare">🤝 Gata de Livrare Personală</option>
@@ -125,6 +154,7 @@ export default function AdminDashboard() {
       } else {
         return (
           <>
+            <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
             <option value="in_procesare">⚙️ În Procesare</option>
             <option value="in_pregatire">🛠️ În Asamblare</option>
             <option value="gata_de_livrare">📦 Ambalat (Așteaptă Curier)</option>
@@ -164,37 +194,69 @@ export default function AdminDashboard() {
           ) : (
             orders.map((order) => {
               const isOrderOradea = order.shippingAddress?.toLowerCase().includes('oradea');
+              
+              // Verificăm dacă este plată OP și încă nu a fost confirmată
+              const isPendingBankTransfer = order.paymentMethod === "transfer_bancar" && order.status === "in_asteptare_plata";
 
               return (
                 <div key={order.id} className="p-8 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl transition-all hover:bg-white/[0.08]">
                   <div className="flex flex-col lg:flex-row gap-10">
-                    <div className="lg:w-1/3 lg:border-r border-white/5 lg:pr-10">
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20">
-                          #{String(order.id).slice(-8).toUpperCase()}
-                        </span>
-                        {isOrderOradea && (
-                          <span className="text-[9px] font-black text-pink-400 uppercase tracking-widest bg-pink-500/10 px-2 py-1 rounded-lg border border-pink-500/20">
-                            📍 Oradea
+                    <div className="lg:w-1/3 lg:border-r border-white/5 lg:pr-10 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center gap-3 mb-4 flex-wrap">
+                          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20">
+                            #{String(order.id).slice(-8).toUpperCase()}
                           </span>
+                          
+                          {/* Badge Metode de Plată pentru Admin */}
+                          {order.paymentMethod === "transfer_bancar" && (
+                             <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
+                              🏦 OP
+                             </span>
+                          )}
+                          {order.paymentMethod === "online" && (
+                             <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
+                              💳 Online
+                             </span>
+                          )}
+
+                          {isOrderOradea && (
+                            <span className="text-[9px] font-black text-pink-400 uppercase tracking-widest bg-pink-500/10 px-2 py-1 rounded-lg border border-pink-500/20">
+                              📍 Oradea
+                            </span>
+                          )}
+                        </div>
+                        
+                        <h3 className="text-3xl font-black text-white uppercase italic leading-tight drop-shadow-md">{order.shippingName}</h3>
+                        
+                        {order.isCompany && (
+                          <div className="mt-3 bg-black/20 p-3 rounded-xl border border-indigo-500/20">
+                             <p className="text-[9px] text-indigo-400 font-black uppercase tracking-widest mb-1">Date Facturare B2B</p>
+                             <p className="text-xs font-bold text-white mb-1">{order.companyName}</p>
+                             <p className="text-[10px] text-gray-400">CUI: {order.cui} | Reg: {order.regCom}</p>
+                          </div>
                         )}
+
+                        <div className="mt-6 space-y-4 text-gray-300 text-xs font-bold italic">
+                          <p className="flex items-center gap-2"><span>📧</span> {order.user?.email || 'Fără Email'}</p>
+                          <p className="flex items-center gap-2"><span>📞</span> {order.shippingPhone}</p>
+                          <p className="leading-relaxed flex items-start gap-2"><span>📍</span> {order.shippingAddress}</p>
+                        </div>
                       </div>
-                      
-                      <h3 className="text-3xl font-black text-white uppercase italic leading-tight drop-shadow-md">{order.shippingName}</h3>
-                      
-                      {order.isCompany && (
-                        <div className="mt-3 bg-black/20 p-3 rounded-xl border border-indigo-500/20">
-                           <p className="text-[9px] text-indigo-400 font-black uppercase tracking-widest mb-1">Date Facturare B2B</p>
-                           <p className="text-xs font-bold text-white mb-1">{order.companyName}</p>
-                           <p className="text-[10px] text-gray-400">CUI: {order.cui} | Reg: {order.regCom}</p>
+
+                      {/* BUTONUL NOU PENTRU CONFIRMARE TRANSFER BANCAR */}
+                      {isPendingBankTransfer && (
+                        <div className="mt-8 pt-6 border-t border-white/10">
+                            <button 
+                                onClick={() => handleConfirmTransfer(order.id)}
+                                disabled={confirmingOpId === order.id}
+                                className="w-full py-4 rounded-2xl bg-amber-500 text-black font-black uppercase text-[10px] tracking-widest hover:bg-amber-400 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
+                            >
+                                {confirmingOpId === order.id ? "Se procesează..." : "✅ Confirmă Încasarea OP"}
+                            </button>
+                            <p className="text-[9px] text-gray-500 text-center mt-2 italic">Va genera factura și va trece comanda în procesare.</p>
                         </div>
                       )}
-
-                      <div className="mt-6 space-y-4 text-gray-300 text-xs font-bold italic">
-                        <p className="flex items-center gap-2"><span>📧</span> {order.user?.email || 'Fără Email'}</p>
-                        <p className="flex items-center gap-2"><span>📞</span> {order.shippingPhone}</p>
-                        <p className="leading-relaxed flex items-start gap-2"><span>📍</span> {order.shippingAddress}</p>
-                      </div>
                     </div>
 
                     <div className="lg:w-2/3 space-y-6">
