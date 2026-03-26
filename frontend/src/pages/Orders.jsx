@@ -76,7 +76,7 @@ function StatusBadge({ status, isService, isOradea }) {
   );
 }
 
-// Payment Status Badge - Actualizat fără Ramburs
+// Payment Status Badge - Actualizat fără Ramburs și cu "Comandă Anulată"
 function PaymentBadge({ paymentMethod, status }) {
   let label = "Detalii Plată";
   let color = "text-gray-400 border-gray-500/20 bg-gray-500/5";
@@ -85,7 +85,7 @@ function PaymentBadge({ paymentMethod, status }) {
 
   if (method === "online" || method === "card") {
     if (status === "anulat") {
-        label = "❌ Plată Anulată";
+        label = "❌ Comandă Anulată";
         color = "text-rose-500 border-rose-500/20 bg-rose-500/5";
     } else {
         label = "💳 Plătit Online";
@@ -96,7 +96,7 @@ function PaymentBadge({ paymentMethod, status }) {
         label = "⏳ Așteaptă OP";
         color = "text-amber-400 border-amber-500/20 bg-amber-500/5";
     } else if (status === "anulat") {
-        label = "❌ OP Anulat";
+        label = "❌ Comandă Anulată";
         color = "text-rose-500 border-rose-500/20 bg-rose-500/5";
     } else {
         label = "🏦 OP Confirmat";
