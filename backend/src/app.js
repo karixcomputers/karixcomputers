@@ -42,7 +42,7 @@ app.use(
 );
 
 // 3. RATE LIMITER GENERAL (Scutul anti-flood de bază pe tot API-ul)
-app.use(rateLimiter);
+//app.use(rateLimiter);
 
 // 4. CONFIGURARE CORS DINAMICĂ (Cu fix pentru erorile din log-uri)
 const allowedOrigins = [
@@ -88,7 +88,7 @@ app.get("/health", (req, res) => res.json({ ok: true, timestamp: new Date() }));
 
 // 7. RUTE API
 // Aplicăm authLimiter (scutul dur) DOAR pe rutele de autentificare
-app.use("/api/auth", authLimiter, authRoutes); 
+app.use("/api/auth", authRoutes); 
 
 app.use("/api/products", productsRoutes);
 app.use("/api/orders", ordersRoutes);
