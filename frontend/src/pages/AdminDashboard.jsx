@@ -10,8 +10,16 @@ export default function AdminDashboard() {
   const [awbModal, setAwbModal] = useState({ open: false, itemId: null, orderId: null });
   const [tempAwb, setTempAwb] = useState("");
 
-  // NOU: Stare pentru butonul de confirmare OP
   const [confirmingOpId, setConfirmingOpId] = useState(null);
+  
+  // NOI STĂRI PENTRU ALERTE CUSTOM
+  const [toastMsg, setToastMsg] = useState({ open: false, type: "success", text: "" });
+  const [opModal, setOpModal] = useState({ open: false, orderId: null });
+
+  const showToast = (text, type = "success") => {
+    setToastMsg({ open: true, type, text });
+    setTimeout(() => setToastMsg({ open: false, type: "success", text: "" }), 4000);
+  };
 
   const fetchOrders = async () => {
     try {
@@ -71,18 +79,23 @@ export default function AdminDashboard() {
 
       setAwbModal({ open: false, itemId: null, orderId: null });
       setTempAwb("");
+      showToast("Status actualizat cu succes!");
     } catch (err) {
-      alert("Eroare la update: " + err.message);
+      showToast(err.message, "error");
     }
   };
 
-  // NOU: Funcția care trimite requestul de confirmare a transferului bancar
-  const handleConfirmTransfer = async (orderId) => {
-    if (!window.confirm(`Ești sigur că ai încasat banii pentru comanda #${orderId}? Va genera factura în SmartBill și o va trimite clientului pe mail.`)) {
-        return;
-    }
+  // Funcția care doar deschide modal-ul de confirmare
+  const initiateConfirmTransfer = (orderId) => {
+    setOpModal({ open: true, orderId });
+  };
 
-    setConfirmingOpId(orderId);
+  // Funcția care execută efectiv confirmarea după ce se apasă "DA" în modal
+  const executeConfirmTransfer = async () => {
+    const orderId = opModal.orderId;
+    setOpModal({ open: false, orderId: null }); // Închidem modalul
+    setConfirmingOpId(orderId); // Punem butonul în starea "Se procesează..."
+
     try {
       const res = await apiFetch(`/orders/${orderId}/confirm-transfer`, {
         method: "POST"
@@ -94,10 +107,10 @@ export default function AdminDashboard() {
         throw new Error(data.error || "Eroare la confirmarea plății.");
       }
 
-      alert("Plată confirmată cu succes! Factura a fost trimisă clientului.");
-      fetchOrders(); // Reîmprospătăm lista pentru a lua noile statusuri
+      showToast("Plată confirmată! Factura a fost trimisă clientului.", "success");
+      fetchOrders(); 
     } catch (error) {
-      alert(error.message);
+      showToast(error.message, "error");
     } finally {
       setConfirmingOpId(null);
     }
@@ -194,8 +207,6 @@ export default function AdminDashboard() {
           ) : (
             orders.map((order) => {
               const isOrderOradea = order.shippingAddress?.toLowerCase().includes('oradea');
-              
-              // Verificăm dacă este plată OP și încă nu a fost confirmată
               const isPendingBankTransfer = order.paymentMethod === "transfer_bancar" && order.status === "in_asteptare_plata";
 
               return (
@@ -208,7 +219,6 @@ export default function AdminDashboard() {
                             #{String(order.id).slice(-8).toUpperCase()}
                           </span>
                           
-                          {/* Badge Metode de Plată pentru Admin */}
                           {order.paymentMethod === "transfer_bancar" && (
                              <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
                               🏦 OP
@@ -244,11 +254,10 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      {/* BUTONUL NOU PENTRU CONFIRMARE TRANSFER BANCAR */}
                       {isPendingBankTransfer && (
                         <div className="mt-8 pt-6 border-t border-white/10">
                             <button 
-                                onClick={() => handleConfirmTransfer(order.id)}
+                                onClick={() => initiateConfirmTransfer(order.id)}
                                 disabled={confirmingOpId === order.id}
                                 className="w-full py-4 rounded-2xl bg-amber-500 text-black font-black uppercase text-[10px] tracking-widest hover:bg-amber-400 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
                             >
@@ -304,6 +313,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* MODAL PENTRU AWB */}
       {awbModal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setAwbModal({ open: false, itemId: null, orderId: null })}></div>
@@ -322,6 +332,41 @@ export default function AdminDashboard() {
                 <button onClick={() => setAwbModal({ open: false, itemId: null, orderId: null })} className="flex-1 py-4 text-gray-500 font-black uppercase text-[10px] hover:text-white transition-colors">Anulare</button>
                 <button onClick={() => executeItemUpdate(awbModal.orderId, awbModal.itemId, "predat_curier", tempAwb)} className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black uppercase text-[10px] shadow-xl hover:bg-indigo-500 transition-colors">Salvează</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIRMARE OP (CUSTOM) */}
+      {opModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setOpModal({ open: false, orderId: null })}></div>
+          <div className="relative w-full max-w-md p-10 rounded-[40px] bg-[#12192c]/95 backdrop-blur-3xl border border-amber-500/20 shadow-2xl animate-in zoom-in duration-300 text-center">
+            <div className="text-4xl mb-4">💰</div>
+            <h2 className="text-xl font-black text-amber-400 uppercase italic mb-2">Confirmare Încasare</h2>
+            <p className="text-gray-400 text-xs mb-8 font-medium leading-relaxed">
+              Ești sigur că au intrat banii în cont pentru comanda <strong className="text-white">#{opModal.orderId}</strong>? <br/><br/>
+              Acest pas va <strong className="text-emerald-400">emite factura fiscală în SmartBill</strong> și o va trimite clientului pe e-mail.
+            </p>
+            <div className="flex gap-4">
+                <button onClick={() => setOpModal({ open: false, orderId: null })} className="flex-1 py-4 rounded-2xl bg-white/5 text-gray-400 font-black uppercase text-[10px] hover:text-white hover:bg-white/10 transition-colors">Înapoi</button>
+                <button onClick={executeConfirmTransfer} className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black uppercase text-[10px] shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 transition-colors">Da, confirm plata!</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST NOTIFICATION (CUSTOM) */}
+      {toastMsg.open && (
+        <div className="fixed bottom-10 right-10 z-[100] animate-in slide-in-from-right duration-300">
+          <div className={`rounded-3xl border p-6 shadow-3xl flex items-center gap-5 backdrop-blur-2xl ${
+            toastMsg.type === "error" ? "bg-rose-900/90 border-rose-500/30" : "bg-[#1a2236]/90 border-emerald-500/30"
+          }`}>
+            <div className={`h-10 w-10 rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg ${
+              toastMsg.type === "error" ? "bg-rose-500/20 text-rose-400" : "bg-emerald-500/20 text-emerald-400"
+            }`}>
+              {toastMsg.type === "error" ? "!" : "✓"}
+            </div>
+            <div className="flex-1 text-sm font-bold text-white drop-shadow-md">{toastMsg.text}</div>
           </div>
         </div>
       )}
