@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchMyOrders } from "../api/orders"; 
 import { apiFetch } from "../api/client"; 
 import { useAuth } from "../context/AuthContext.jsx";
-// IMPORTĂM COMPONENTA SEO
 import SEO from "../components/SEO";
 
 // Componentă pentru Statusul de Service
@@ -80,7 +79,7 @@ export default function Warranties() {
 
             results.push({
               id: `WR-${String(item.id).slice(-4).toUpperCase()}`,
-              orderRef: String(order.id).slice(-6).toUpperCase(),
+              orderRef: String(order.id).slice(-8).toUpperCase(), // Păstrăm 8 caractere pentru consistență
               product: item.productName,
               purchaseDate,
               expiryDate,
@@ -103,7 +102,6 @@ export default function Warranties() {
 
   return (
     <>
-      {/* SEO DINAMIC: TITLU ADAPTAT PENTRU TAB-UL ACTIV */}
       <SEO 
         title={activeTab === "active_warranties" ? "Garanțiile Mele" : "Status Intervenții Service"}
         description="Gestionează garanțiile sistemelor tale Karix Computers și urmărește statusul fișelor de service în timp real. Suport tehnic profesional în Oradea."
@@ -155,7 +153,16 @@ export default function Warranties() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">ID: {w.id} • GARANȚIE: {w.duration}</p>
+                            
+                            {/* NOU: Afișare număr comandă, ID garanție și durată */}
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="px-2 py-1 rounded bg-black/20 border border-white/5 text-[9px] font-bold text-indigo-300 uppercase tracking-widest">
+                                    Comandă: #{w.orderRef}
+                                </span>
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                                    ID: {w.id} • {w.duration}
+                                </span>
+                            </div>
                           </div>
                         </div>
                         <div className="text-left md:text-right">

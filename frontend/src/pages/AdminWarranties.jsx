@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
-import { formatRON } from "../utils/money";
 
 export default function AdminWarranties() {
   const [orders, setOrders] = useState([]);
@@ -12,7 +11,6 @@ export default function AdminWarranties() {
   useEffect(() => {
     const fetchAllOrders = async () => {
       try {
-        // MODIFICAT: din "/orders/admin/history" în "/orders/admin/history"
         const res = await apiFetch("/orders/admin/history");
         if (res.ok) {
           const data = await res.json();
@@ -44,9 +42,15 @@ export default function AdminWarranties() {
           const isService = item.category === 'service' || SERVICE_KEYWORDS.some(kw => nameStr.includes(kw));
 
           if (!isService) {
+            // Extragem garanția dinamic (12, 24, etc.)
+            let months = 24; 
+            if (item.warrantyMonths !== undefined && item.warrantyMonths !== null) {
+              months = parseInt(item.warrantyMonths, 10);
+            }
+
             const purchaseDate = new Date(order.createdAt);
             const expiryDate = new Date(order.createdAt);
-            expiryDate.setMonth(expiryDate.getMonth() + 24);
+            expiryDate.setMonth(expiryDate.getMonth() + months);
 
             const isExpired = new Date() > expiryDate;
             const isReturned = finalizedReturnedProducts.includes(item.productName);
@@ -59,9 +63,10 @@ export default function AdminWarranties() {
               productName: item.productName,
               purchaseDate: purchaseDate,
               expiryDate: expiryDate,
-              orderRef: String(order.id).slice(-6).toUpperCase(),
+              orderRef: String(order.id).slice(-8).toUpperCase(), // Pus la 8 caractere pentru consistență
               isReturned: isReturned,
               isExpired: isExpired,
+              duration: `${months} Luni`, // Durata dinamică
               status: isReturned ? "Anulată (Retur)" : (isExpired ? "Expirată" : "Activă")
             };
 
@@ -84,7 +89,8 @@ export default function AdminWarranties() {
     return currentList.filter(w => 
       w.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       w.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.productName.toLowerCase().includes(searchTerm.toLowerCase())
+      w.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      w.orderRef.toLowerCase().includes(searchTerm.toLowerCase()) // Se poate căuta și după ID-ul comenzii acum
     );
   }, [searchTerm, currentList]);
 
@@ -126,7 +132,7 @@ export default function AdminWarranties() {
             </div>
             <input 
               type="text"
-              placeholder="Caută client sau produs..."
+              placeholder="Caută client, produs sau ID comandă..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-[25px] py-5 pl-14 pr-6 text-white outline-none focus:border-indigo-500/50 backdrop-blur-xl transition-all shadow-2xl placeholder-gray-600 font-bold italic text-sm"
@@ -166,8 +172,8 @@ export default function AdminWarranties() {
                         <h3 className={`text-2xl font-black italic uppercase tracking-tight truncate ${w.isReturned ? 'line-through text-gray-500' : ''}`}>
                           {w.productName}
                         </h3>
-                        <span className="shrink-0 px-2 py-0.5 rounded bg-white/10 text-[8px] font-black text-indigo-300 border border-indigo-500/20 tracking-widest uppercase">
-                          {w.isReturned ? "Fără Garanție" : "24 Luni"}
+                        <span className="shrink-0 ml-3 px-2 py-0.5 rounded bg-white/10 text-[8px] font-black text-indigo-300 border border-indigo-500/20 tracking-widest uppercase">
+                          {w.isReturned ? "Fără Garanție" : w.duration}
                         </span>
                       </div>
                       <p className="text-sm font-bold text-gray-400 italic mb-2">{w.clientName} • <span className="text-xs opacity-50">{w.clientEmail}</span></p>

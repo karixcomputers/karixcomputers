@@ -30,7 +30,7 @@ export default function ServiceRequest() {
 
   const mutation = useMutation({
     mutationFn: async (data) => {
-      const res = await apiFetch("/api/service-orders", {
+      const res = await apiFetch("/service-orders", {
         method: "POST",
         body: JSON.stringify({
           method: method,
