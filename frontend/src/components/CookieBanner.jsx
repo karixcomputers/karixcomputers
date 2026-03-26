@@ -8,8 +8,8 @@ export default function CookieBanner() {
     // Verificăm dacă există consimțământul salvat permanent
     const consent = localStorage.getItem("karix_cookie_consent");
     if (!consent) {
-      // Afișăm banner-ul după 2 secunde
-      const timer = setTimeout(() => setIsVisible(true), 2000);
+      // MODIFICARE: Afișăm banner-ul după 4.5 secunde pentru a NU bloca First Contentful Paint (FCP)
+      const timer = setTimeout(() => setIsVisible(true), 4500);
       return () => clearTimeout(timer);
     }
   }, []);
