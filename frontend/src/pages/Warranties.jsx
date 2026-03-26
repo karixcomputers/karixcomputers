@@ -41,7 +41,7 @@ export default function Warranties() {
   const { data: serviceRequests, isLoading: serviceLoading } = useQuery({
     queryKey: ["myServiceRequests"],
     queryFn: async () => {
-        const res = await apiFetch("/api/service-orders/my-requests");
+        const res = await apiFetch("/service-orders/my-requests");
         return res.json();
     },
     enabled: !!user
