@@ -57,9 +57,10 @@ router.post("/", requireAuth, async (req, res) => {
         phoneNumber,
         method,
         issueDescription,
-        judet: method === "curier" ? judet : null,
+        judet: method === "curier" ? judet : "Bihor",
         oras: method === "curier" ? oras : "Oradea",
-        address: method === "curier" ? address : "Predare Sediu",
+        // 👉 MODIFICAT: Salvăm adresa reală oferită de client indiferent de metodă
+        address: address || "Nespecificat", 
         preferredDate,
         userId: userId,
         status: "in_asteptare"
@@ -67,17 +68,18 @@ router.post("/", requireAuth, async (req, res) => {
     });
 
     try {
+      // 👉 MODIFICAT: Setăm adresa corectă pentru email-ul clientului
       const fullAddress = method === "curier" 
         ? `${address}, ${oras}, ${judet}`
-        : "Predare personală la sediul Karix (Oradea)";
+        : `${address}, Oradea, Bihor`;
 
-await sendServiceOrderPlaced(userEmail, {
+      await sendServiceOrderPlaced(userEmail, {
         customerName: finalName,
         orderId: orderId, 
         serviceList: productName, 
         deliveryAddress: fullAddress,
         phone: phoneNumber,
-        method: method // 👉 NOU: Îi spunem funcției de mail ce a ales clientul
+        method: method // Îi spunem funcției de mail ce a ales clientul
       });
       
       if (method === "curier") {
@@ -94,7 +96,9 @@ await sendServiceOrderPlaced(userEmail, {
           customerName: finalName,
           customerPhone: phoneNumber,
           preferredDate,
-          issueDescription
+          issueDescription,
+          // 👉 MODIFICAT: Trimitem adresa către funcția de mail pentru Admin
+          address: address
         });
       }
     } catch (mailErr) {

@@ -622,12 +622,14 @@ export async function sendAdminServiceOradeaAlert(data) {
       customerName: data.customerName,
       customerPhone: data.customerPhone || data.phoneNumber,
       preferredDate: data.preferredDate,
-      issueDescription: data.issueDescription
+      issueDescription: data.issueDescription,
+      // 👉 NOU: Pasăm adresa către template-ul HTML al Adminului
+      address: data.address || "Nu a fost specificată" 
     });
 
     await sendHtmlMail({ 
       to: env.ADMIN_EMAIL, 
-      subject: `📍 SERVICE ORADEA: ${data.customerName}`, 
+      subject: `📍 SERVICE ORADEA: Ridicare de la ${data.customerName}`, 
       html 
     });
   } catch (err) {

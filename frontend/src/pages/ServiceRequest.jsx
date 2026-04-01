@@ -39,7 +39,7 @@ export default function ServiceRequest() {
           issueDescription: data.issueDescription,
           judet: method === "curier" ? data.judet : "Bihor",
           oras: method === "curier" ? data.oras : "Oradea",
-          address: method === "curier" ? data.pickupAddress : "Predare Sediu",
+          address: data.pickupAddress, // 👉 NOU: Trimitem adresa de preluare indiferent de metodă
           phoneNumber: data.phoneNumber,
           preferredDate: data.preferredDate
         }),
@@ -206,10 +206,24 @@ export default function ServiceRequest() {
               </div>
             )}
 
+            {/* CAMPURI DINAMICE ORADEA */}
             {method === "oradea" && (
-              <div className="p-8 rounded-[30px] bg-indigo-500/5 border border-indigo-500/20 text-indigo-300 text-sm italic animate-in zoom-in duration-300 flex items-center gap-4">
-                <span className="text-3xl">📍</span>
-                <p>Vom veni noi la tine! După confirmarea solicitării, vom prelua personal produsul de la adresa ta. Diagnosticarea se face în laboratorul nostru în cel mult 24 de ore de la ridicare.</p>
+              <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="p-6 rounded-[24px] bg-indigo-500/5 border border-indigo-500/20 text-indigo-300 text-sm italic flex items-center gap-4">
+                  <span className="text-3xl">📍</span>
+                  <p>Vom veni noi la tine! După confirmarea solicitării, vom prelua personal produsul de la adresa ta din Oradea. Diagnosticarea se face în laboratorul nostru în cel mult 24 de ore de la ridicare.</p>
+                </div>
+                
+                {/* NOU: Câmp pentru adresa din Oradea */}
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-2">Adresa de ridicare din Oradea</label>
+                  <input 
+                    type="text" required
+                    placeholder="Ex: Str. Nufărului Nr. 12, Bl. A, Ap. 3"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-indigo-500 transition-all shadow-inner font-medium"
+                    onChange={(e) => setFormData({...formData, pickupAddress: e.target.value})}
+                  />
+                </div>
               </div>
             )}
 
