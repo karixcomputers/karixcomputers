@@ -22,18 +22,23 @@ export async function getFanToken() {
         const url = `https://api.fancourier.ro/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
         const response = await fetch(url, { method: "POST" });
 
-        if (!response.ok) throw new Error(`Eroare FAN Auth: ${response.status}`);
-
         const data = await response.json();
-        if (data && data.token) {
-            currentToken = data.token;
+        
+        // Printăm răspunsul ca să vedem exact dacă e totul ok
+        console.log("🔍 Răspuns Autentificare FAN Courier:", data);
+
+        // FAN Courier ascunde de obicei tokenul în data.data.token
+        const extractedToken = data?.data?.token || data?.token;
+
+        if (extractedToken) {
+            currentToken = extractedToken;
             tokenExpiration = new Date(new Date().getTime() + 23 * 60 * 60 * 1000);
             return currentToken;
         } else {
-            throw new Error("Nu s-a putut extrage token-ul.");
+            throw new Error(data.message || JSON.stringify(data) || "Nu s-a putut extrage token-ul.");
         }
     } catch (error) {
-        console.error("❌ Eroare FAN Courier Auth:", error);
+        console.error("❌ Eroare FAN Courier Auth:", error.message);
         throw error;
     }
 }
@@ -41,7 +46,6 @@ export async function getFanToken() {
 // ==========================================
 // 2. GENERARE AWB REAL
 // ==========================================
-// Am adăugat weight și packages. Modul de test e dezactivat (false).
 export async function createFanAWB(order, isTestMode = false, weight = 1, packagesCount = 1) { 
     console.log(`📦 Inițiere generare AWB pentru comanda #${order.id}. Greutate: ${weight}kg, Colete: ${packagesCount}`);
 
