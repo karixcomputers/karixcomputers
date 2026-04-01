@@ -365,6 +365,7 @@ export async function sendServiceOrderPlaced(to, data) {
       date: new Date().toLocaleString('ro-RO'),
       // Adăugăm și aceste variabile în caz că template-ul serviceCourierNotification le folosește
       productName: data.serviceList,
+      issueDescription: data.issueDescription || "Nu a fost furnizată o descriere.",
       address: data.deliveryAddress
     });
 

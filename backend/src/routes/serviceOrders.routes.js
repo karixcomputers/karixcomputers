@@ -73,16 +73,17 @@ router.post("/", requireAuth, async (req, res) => {
         ? `${address}, ${oras}, ${judet}`
         : `${address}, Oradea, Bihor`;
 
-      // ✉️ Trimitere mail confirmare către CLIENT
-      await sendServiceOrderPlaced(userEmail, {
-        customerName: finalName,
-        // 👉 REPARAȚIE: Folosim ID-ul unic al cererii (newServiceOrder.id) pentru a evita "N/A"
-        orderId: newServiceOrder.id, 
-        serviceList: productName, 
-        deliveryAddress: fullAddress,
-        phone: phoneNumber,
-        method: method // Trimitem metoda pentru a alege template-ul corect (Curier vs Oradea)
-      });
+// În serviceOrders.routes.js, în interiorul router.post("/")
+await sendServiceOrderPlaced(userEmail, {
+    customerName: finalName,
+    orderId: newServiceOrder.id, 
+    serviceList: productName, 
+    deliveryAddress: fullAddress,
+    phone: phoneNumber,
+    method: method,
+    // 👉 ADAUGĂ ACEASTĂ LINIE:
+    issueDescription: issueDescription 
+});
       
       // ✉️ Trimitere alertă către ADMIN
       if (method === "curier") {
