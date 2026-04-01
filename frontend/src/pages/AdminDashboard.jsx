@@ -147,7 +147,8 @@ export default function AdminDashboard() {
   };
 
   const renderStatusOptions = (item, order) => {
-    const itemName = (item.productName || "").toLowerCase();
+    // Normalizăm textul ca să scăpăm de diacritice (ex: MENTENANȚĂ -> mentenanta)
+    const itemName = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const isService = itemName.includes('service') || 
                       itemName.includes('mentenanta') ||
                       itemName.includes('curatare') ||
@@ -158,7 +159,9 @@ export default function AdminDashboard() {
 
     const initialOption = isBankTransfer 
       ? <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
-      : <option value="in_asteptare">⏳ În Așteptare (Plătit)</option>;
+      : (order.paymentMethod === "online"
+          ? <option value="in_asteptare">✅ Plătit</option>
+          : <option value="in_asteptare">⏳ În Așteptare</option>);
 
     if (isService) {
       if (isOradea) {
@@ -316,7 +319,8 @@ export default function AdminDashboard() {
                     <div className="lg:w-2/3 space-y-6">
                       <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 text-center lg:text-left">Status Produse</h4>
                       {order.items?.map((item) => {
-                         const itemName = (item.productName || "").toLowerCase();
+                         // Normalizăm și aici ca să afișeze corect tag-ul roz de "Serviciu"
+                         const itemName = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                          const isService = itemName.includes('service') || 
                                            itemName.includes('mentenanta') ||
                                            itemName.includes('curatare') ||
