@@ -140,6 +140,14 @@ export default function Checkout() {
 
   const appliedCoupon = location.state?.coupon || null;
 
+  // 👉 VERIFICĂM DACĂ E COMANDĂ EXCLUSIV DE ASAMBLARE
+  const isAssemblyOrder = useMemo(() => {
+    return items.some(i => {
+      const n = (i.name || i.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return n.includes("asamblare");
+    });
+  }, [items]);
+
   const cartAnalysis = useMemo(() => {
     const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie'];
     
@@ -264,7 +272,7 @@ export default function Checkout() {
         const isOradea = parsedAddress.city?.toLowerCase() === "oradea";
         const shouldAutoPickup = isBihor && isOradea;
 
-        if (shouldAutoPickup) {
+        if (shouldAutoPickup && !isAssemblyOrder) {
           setPickupByKarix(true);
         }
 
@@ -286,9 +294,24 @@ export default function Checkout() {
   };
 
   const handlePlaceOrder = async () => {
-    if (!shipping.phone || !shipping.addressDetails || !shipping.city || !shipping.county) {
-      triggerError("Te rugăm să completezi toate datele de livrare.");
+    // Validări
+    if (!shipping.phone) {
+      triggerError("Te rugăm să introduci un număr de telefon valid.");
       return;
+    }
+
+    if (!isAssemblyOrder) {
+      // Validări normale pentru restul comenzilor
+      if (!shipping.addressDetails || !shipping.city || !shipping.county) {
+        triggerError("Te rugăm să completezi datele complete de livrare.");
+        return;
+      }
+    } else {
+      // La asamblare, validăm doar mesajul suplimentar dacă nu alege Oradea
+      if (!pickupByKarix && !shipping.addressDetails) {
+         triggerError("Te rugăm să ne oferi câteva detalii despre cum ne trimiți piesele.");
+         return;
+      }
     }
 
     if (shipping.isCompany) {
@@ -320,16 +343,12 @@ export default function Checkout() {
       const isService = item.category === 'service' || 
                         ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => nameStr.includes(kw));
       
-      // LOGICA NOUĂ: Calcul Garanție B2B (Firme)
       let finalWarranty = 0;
       
       if (!isService) {
-          // Garanția standard (din baza de date sau 24 default)
           let baseWarranty = (item.warrantyMonths !== undefined && item.warrantyMonths !== null) 
                              ? parseInt(item.warrantyMonths) 
                              : 24;
-                             
-          // Dacă e persoană juridică, limităm garanția la 12 luni
           if (shipping.isCompany) {
               finalWarranty = Math.min(baseWarranty, 12);
           } else {
@@ -428,8 +447,6 @@ export default function Checkout() {
       />
 
       <div className="min-h-screen pt-32 pb-24 px-4 sm:px-6 relative overflow-hidden bg-transparent text-left font-sans">
-
-
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="flex items-center gap-4 mb-12">
             <Link to="/cart" className="p-3 rounded-2xl bg-white/5 border border-white/10 text-gray-400 hover:text-white backdrop-blur-md transition-all group shadow-xl">
@@ -467,7 +484,6 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                {/* NOTIFICARE GARANȚIE FIRMĂ (Apare doar când B2B e selectat) */}
                 {shipping.isCompany && (
                   <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
                       <span className="text-amber-400 mt-0.5">ℹ️</span>
@@ -546,47 +562,103 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* 2. Detalii Livrare */}
+              {/* 2. Detalii Livrare / ASAMBLARE */}
               <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
-                <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">2. Detalii Livrare / Ridicare</h2>
+                <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
+                  {isAssemblyOrder ? "2. Detalii Predare Componente" : "2. Detalii Livrare / Ridicare"}
+                </h2>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   
-                  <div className="md:col-span-2 mb-4">
-                    <button type="button" onClick={() => setPickupByKarix(!pickupByKarix)} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
-                      <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${pickupByKarix ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
-                        {cartAnalysis.hasPC ? "🚀" : "🏠"}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-white font-black text-xs uppercase tracking-wider">{pickupLabel}</h4>
-                        <p className="text-gray-400 text-[10px]">{pickupDescription}</p>
-                      </div>
-                      <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${pickupByKarix ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
-                        {pickupByKarix && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
-                      </div>
-                    </button>
-                  </div>
+                  {isAssemblyOrder ? (
+                    // 👉 DESIGN SPECIAL PENTRU ASAMBLARE PC
+                    <>
+                      <div className="md:col-span-2 mb-4 flex flex-col gap-4">
+                        <button type="button" onClick={() => { setPickupByKarix(true); setShipping(prev => ({ ...prev, county: "Bihor", city: "Oradea" })); }} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
+                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${pickupByKarix ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>📍</div>
+                          <div className="flex-1">
+                            <h4 className="text-white font-black text-xs uppercase tracking-wider">Predare Personală Oradea</h4>
+                            <p className="text-gray-400 text-[10px]">Ne vedem în Oradea (F2F) ca să ne predai componentele tale.</p>
+                          </div>
+                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${pickupByKarix ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
+                            {pickupByKarix && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                          </div>
+                        </button>
 
-                  <div className="space-y-2 relative" ref={dropdownRef}>
-                    <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
-                    <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} placeholder="Scrie județul..." value={shipping.county} onFocus={() => !pickupByKarix && setShowJudete(true)} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, county: e.target.value }))} readOnly={pickupByKarix} />
-                    {showJudete && !pickupByKarix && filteredJudete.length > 0 && (
-                      <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
-                        {filteredJudete.map(j => (
-                          <button key={j} className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}>{j}</button>
-                        ))}
+                        <button type="button" onClick={() => setPickupByKarix(false)} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${!pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
+                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${!pickupByKarix ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>🚚</div>
+                          <div className="flex-1">
+                            <h4 className="text-white font-black text-xs uppercase tracking-wider">Trimit Piesele (Din toată țara)</h4>
+                            <p className="text-gray-400 text-[10px]">Comanzi piesele direct la noi la adresă sau le pui tu la curier.</p>
+                          </div>
+                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${!pickupByKarix ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
+                            {!pickupByKarix && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                          </div>
+                        </button>
                       </div>
-                    )}
-                  </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș</label>
-                    <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} value={shipping.city} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, city: e.target.value }))} placeholder="Orașul tău" readOnly={pickupByKarix} />
-                  </div>
+                      {!pickupByKarix && (
+                        <div className="md:col-span-2 space-y-4 p-5 rounded-2xl bg-indigo-500/5 border border-indigo-500/20">
+                           <div>
+                              <h4 className="text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-1">Unde trimiți componentele?</h4>
+                              <p className="text-white text-sm font-medium leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5">
+                                [Aici pui Adresa ta Completă, Oradea, Bihor]<br/>
+                                <span className="text-gray-400 text-xs">Telefon destinatar: [Telefonul tău]</span>
+                              </p>
+                           </div>
+                           <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Detalii (Opțional, dar ajută)</label>
+                            <textarea 
+                              className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600 text-sm" 
+                              value={shipping.addressDetails} 
+                              onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} 
+                              placeholder="Ex: Am comandat de la eMAG / Trimit azi pachet cu Fan Courier..." 
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    // 👉 DESIGN NORMAL PENTRU RESTUL PRODUSELOR
+                    <>
+                      <div className="md:col-span-2 mb-4">
+                        <button type="button" onClick={() => setPickupByKarix(!pickupByKarix)} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
+                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${pickupByKarix ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
+                            {cartAnalysis.hasPC ? "🚀" : "🏠"}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-white font-black text-xs uppercase tracking-wider">{pickupLabel}</h4>
+                            <p className="text-gray-400 text-[10px]">{pickupDescription}</p>
+                          </div>
+                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${pickupByKarix ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
+                            {pickupByKarix && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                          </div>
+                        </button>
+                      </div>
 
-                  <div className="md:col-span-2 space-y-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
-                    <textarea className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc, Apartament..." />
-                  </div>
+                      <div className="space-y-2 relative" ref={dropdownRef}>
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
+                        <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} placeholder="Scrie județul..." value={shipping.county} onFocus={() => !pickupByKarix && setShowJudete(true)} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, county: e.target.value }))} readOnly={pickupByKarix} />
+                        {showJudete && !pickupByKarix && filteredJudete.length > 0 && (
+                          <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
+                            {filteredJudete.map(j => (
+                              <button key={j} className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}>{j}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș</label>
+                        <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} value={shipping.city} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, city: e.target.value }))} placeholder="Orașul tău" readOnly={pickupByKarix} />
+                      </div>
+
+                      <div className="md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
+                        <textarea className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc, Apartament..." />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -622,7 +694,7 @@ export default function Checkout() {
                     </div>
                     <div className="flex-1">
                       <h4 className="text-white font-black text-xs uppercase tracking-wider">Transfer Bancar (OP)</h4>
-                      <p className="text-gray-400 text-[10px]">Ideal pentru firme. Livrare în 5-10 zile lucrătoare de la confirmarea plății.</p>
+                      <p className="text-gray-400 text-[10px]">Ideal pentru firme. Procesarea începe la confirmarea plății.</p>
                     </div>
                     <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "transfer_bancar" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
                       {paymentMethod === "transfer_bancar" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
@@ -653,7 +725,7 @@ export default function Checkout() {
                   )}
 
                   <div className="flex justify-between text-gray-400 font-medium text-sm">
-                    <span>{cartAnalysis.hasService ? "Transport Service" : "Logistică"}</span>
+                    <span>{isAssemblyOrder ? "Transport Asamblare" : (cartAnalysis.hasService ? "Transport Service" : "Logistică")}</span>
                     <span className="text-emerald-400 font-black text-[10px] uppercase tracking-widest">
                       Gratuit (Inclus)
                     </span>
