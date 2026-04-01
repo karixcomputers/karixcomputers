@@ -49,7 +49,6 @@ router.post("/", requireAuth, async (req, res) => {
     // 2. EXTRACȚIE AUTOMATĂ ID COMANDĂ (CIFRE)
     let purchaseOrderId = orderId;
 
-    // Dacă ID-ul lipsește, îl căutăm în tabelul de comenzi/achiziții
     if (!purchaseOrderId || purchaseOrderId === "") {
       const realOrder = await prisma.order.findFirst({
         where: {
@@ -60,7 +59,6 @@ router.post("/", requireAuth, async (req, res) => {
         select: { id: true }
       });
       
-      // Dacă am găsit comanda de achiziție, luăm ID-ul ei (cifre), altfel punem un cod generic de service
       purchaseOrderId = realOrder ? String(realOrder.id) : "S" + Date.now().toString().slice(-6);
     }
 
@@ -88,7 +86,7 @@ router.post("/", requireAuth, async (req, res) => {
         ? `${address}, ${oras}, ${judet}`
         : `${address}, Oradea, Bihor`;
 
-      // Către CLIENT (Folosim .orderId care este numărul din cifre)
+      // Către CLIENT
       await sendServiceOrderPlaced(userEmail, {
         customerName: finalName,
         orderId: newServiceOrder.orderId, 
@@ -106,7 +104,9 @@ router.post("/", requireAuth, async (req, res) => {
           orderId: newServiceOrder.orderId,
           customerName: finalName,
           customerPhone: phoneNumber,
-          judet, oras, address, preferredDate
+          judet, oras, address, preferredDate,
+          // 👉 FIX: Trimitem descrierea defectului către funcția de alertă
+          issueDescription: issueDescription 
         });
       } else {
         await sendAdminServiceOradeaAlert({
@@ -115,7 +115,7 @@ router.post("/", requireAuth, async (req, res) => {
           customerName: finalName,
           customerPhone: phoneNumber,
           preferredDate,
-          issueDescription,
+          issueDescription: issueDescription,
           address: address 
         });
       }
@@ -181,7 +181,6 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
     const userEmail = updatedOrder.user.email;
     const emailData = {
       customerName: updatedOrder.customerName,
-      // 👉 REPARAȚIE: Folosim .orderId (numărul din cifre) în loc de .id (litere)
       orderId: updatedOrder.orderId, 
       productName: updatedOrder.productName,
       awb: awb || updatedOrder.awb
