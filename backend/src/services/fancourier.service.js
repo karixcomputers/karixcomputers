@@ -24,10 +24,8 @@ export async function getFanToken() {
 
         const data = await response.json();
         
-        // Printăm răspunsul ca să vedem exact dacă e totul ok
         console.log("🔍 Răspuns Autentificare FAN Courier:", data);
 
-        // FAN Courier ascunde de obicei tokenul în data.data.token
         const extractedToken = data?.data?.token || data?.token;
 
         if (extractedToken) {
@@ -66,21 +64,25 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const locality = addressParts.length >= 2 ? addressParts[addressParts.length - 2] : "Bucuresti";
         const street = addressParts.length >= 1 ? addressParts[0] : "Adresa nespecificata";
 
+        // Suma de ramburs (0 daca e platit online/OP, valoarea comenzii daca e ramburs curier)
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : (order.totalCents / 100);
+
+        // Stabilim tipul serviciului corect conform documentatiei
+        const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
 
         const payload = {
             clientId: parseInt(clientId),
             shipments: [
                 {
                     info: {
-                        service: "Standard",
+                        service: serviceType, // 'Standard' sau 'Cont Colector'
                         packages: { parcel: parseInt(packagesCount), envelopes: 0 },
                         weight: parseInt(weight),
-                        payment: "sender", 
+                        payment: "sender", // Tu platesti curierul (conform contractului tau)
                         observation: `Comanda Karix #${String(order.id).slice(-8)}`,
                         content: "Sistem PC / Componente Hardware",
                         dimensions: { length: 40, height: 40, width: 20 }, 
-                        repayment: rambursValue > 0 ? rambursValue : undefined 
+                        cod: rambursValue // Aici e cheia reparata conform PDF-ului (Cash On Delivery)
                     },
                     recipient: {
                         name: order.shippingName,
@@ -109,10 +111,8 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
 
         const data = await response.json();
         
-        // 👉 NOU: Printăm răspunsul exact ca să știm ce ne blochează!
         console.log("🔍 Răspuns FAN Courier Creare AWB:", JSON.stringify(data, null, 2));
 
-        // 👉 NOU: Reparat sistemul de citire al erorilor
         if (data.status === "error" || !data.data || !Array.isArray(data.data) || data.data.length === 0 || data.data[0].errors) {
              const errorMessage = data?.data?.[0]?.errors || data?.message || JSON.stringify(data);
              throw new Error(`Refuzat de FAN Courier: ${typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)}`);
