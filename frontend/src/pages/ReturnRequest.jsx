@@ -135,7 +135,7 @@ export default function ReturnRequest() {
             <div className="w-20 h-20 bg-rose-500/10 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner">
               {formData.method === 'personal' ? '🚗' : '📦'}
             </div>
-            <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-4">Solicitare Primisă!</h2>
+            <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-4">Solicitare Primită!</h2>
             <p className="text-gray-400 italic text-sm mb-8 leading-relaxed">
               {formData.method === 'personal' 
                 ? `Echipa Karix va veni personal la adresa indicată din Oradea pentru a ridica produsele.` 
