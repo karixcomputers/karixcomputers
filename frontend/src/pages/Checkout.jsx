@@ -130,7 +130,9 @@ export default function Checkout() {
     isCompany: false,
     companyName: "",
     cui: "",
-    regCom: ""
+    regCom: "",
+    // 👉 State separat pentru detaliile de la asamblare
+    assemblyNotes: "" 
   });
 
   const [pickupByKarix, setPickupByKarix] = useState(false);
@@ -307,9 +309,9 @@ export default function Checkout() {
         return;
       }
     } else {
-      // La asamblare, validăm doar mesajul suplimentar dacă nu alege Oradea
-      if (!pickupByKarix && !shipping.addressDetails) {
-         triggerError("Te rugăm să ne oferi câteva detalii despre cum ne trimiți piesele.");
+      // La asamblare prin curier, validăm adresa de retur
+      if (!pickupByKarix && (!shipping.addressDetails || !shipping.city || !shipping.county)) {
+         triggerError("Te rugăm să completezi adresa ta pentru a ști unde să livrăm PC-ul asamblat.");
          return;
       }
     }
@@ -366,8 +368,14 @@ export default function Checkout() {
       };
     });
 
+    // Modificăm cum trimitem addressDetails dacă e asamblare, ca să includă și mesajul clientului
+    let finalAddressDetails = shipping.addressDetails;
+    if (isAssemblyOrder && !pickupByKarix && shipping.assemblyNotes) {
+       finalAddressDetails = `${shipping.addressDetails} | Note client: ${shipping.assemblyNotes}`;
+    }
+
     const orderData = { 
-      client: shipping, 
+      client: { ...shipping, addressDetails: finalAddressDetails }, 
       cartItems: enrichedItems,
       total: totalCents, 
       userEmail: user?.email, 
@@ -603,15 +611,41 @@ export default function Checkout() {
                               <h4 className="text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-1">Unde trimiți componentele?</h4>
                               <p className="text-white text-sm font-medium leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5">
                                 [Aici pui Adresa ta Completă, Oradea, Bihor]<br/>
-                                <span className="text-gray-400 text-xs">Telefon destinatar: [Telefonul tău]</span>
+                                <span className="text-gray-400 text-xs">Telefon destinatar: [Aici pui telefonul]</span>
                               </p>
                            </div>
-                           <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Detalii (Opțional, dar ajută)</label>
+
+                           <div className="h-px bg-indigo-500/20 w-full my-4" />
+
+                           {/* 👉 Câmpurile obligatorii pentru adresa de RETUR a PC-ului */}
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-2 relative" ref={dropdownRef}>
+                                <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ Retur PC</label>
+                                <input className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all" placeholder="Scrie județul..." value={shipping.county} onFocus={() => setShowJudete(true)} onChange={e => setShipping(s => ({ ...s, county: e.target.value }))} />
+                                {showJudete && filteredJudete.length > 0 && (
+                                  <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
+                                    {filteredJudete.map(j => (
+                                      <button key={j} className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}>{j}</button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș Retur PC</label>
+                                <input className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all" value={shipping.city} onChange={e => setShipping(s => ({ ...s, city: e.target.value }))} placeholder="Orașul tău" />
+                              </div>
+                              <div className="md:col-span-2 space-y-2">
+                                <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresa ta (pentru retur PC)</label>
+                                <textarea className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[60px] resize-none placeholder-gray-600 text-sm" value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc... Unde îți trimitem PC-ul gata asamblat?" />
+                              </div>
+                           </div>
+
+                           <div className="space-y-2 pt-4">
+                            <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Alte Detalii (Opțional, dar ajută)</label>
                             <textarea 
-                              className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600 text-sm" 
-                              value={shipping.addressDetails} 
-                              onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} 
+                              className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[60px] resize-none placeholder-gray-600 text-sm" 
+                              value={shipping.assemblyNotes} 
+                              onChange={e => setShipping(s => ({ ...s, assemblyNotes: e.target.value }))} 
                               placeholder="Ex: Am comandat de la eMAG / Trimit azi pachet cu Fan Courier..." 
                             />
                           </div>
