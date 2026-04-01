@@ -147,7 +147,8 @@ export default function Shop() {
   }, [pcs, filterCpu, filterGpu, maxPrice, sortOrder]);
 
   const handleAddToCart = (pc) => {
-    addItem({
+    // 👉 REPARAȚIE: Salvăm statusul returnat (succes sau oprit din cauza asamblării)
+    const success = addItem({
       id: pc.id,
       name: pc.name,
       category: pc.category,
@@ -165,6 +166,9 @@ export default function Shop() {
         psu: pc.psu
       }
     });
+
+    // 👉 REPARAȚIE: Dacă addItem a deschis modalul de conflict, nu mai afișăm toast-ul verde!
+    if (success === false) return;
 
     const toastId = Date.now();
     setToasts((prev) => [...prev, { id: toastId, message: `Sistemul "${pc.name}" a fost adăugat!` }]);
@@ -611,9 +615,36 @@ export default function Shop() {
                     
                     <button 
                       onClick={() => { 
-                        handleAddToCart(pc); 
-                        setCompareList(compareList.filter(c => c.id !== pc.id));
-                        if (compareList.length === 1) setShowCompareModal(false);
+                        // 👉 Aici verificăm dacă adăugarea s-a făcut cu succes, similar cu linia ~170
+                        const success = addItem({
+                          id: pc.id,
+                          name: pc.name,
+                          category: pc.category,
+                          priceCents: pc.priceCents, 
+                          warrantyMonths: pc.warrantyMonths || 24,
+                          image: getImageUrl(pc.images?.[0]),
+                          specs: {
+                            cpu: pc.cpuBrand,
+                            gpu: pc.gpuBrand,
+                            ram: pc.ramGb, 
+                            storage: pc.storageGb,
+                            motherboard: pc.motherboard, 
+                            case: pc.case,               
+                            cooler: pc.cooler,
+                            psu: pc.psu
+                          }
+                        });
+                        
+                        if (success !== false) {
+                          setCompareList(compareList.filter(c => c.id !== pc.id));
+                          if (compareList.length === 1) setShowCompareModal(false);
+                          
+                          const toastId = Date.now();
+                          setToasts((prev) => [...prev, { id: toastId, message: `Sistemul "${pc.name}" a fost adăugat!` }]);
+                          setTimeout(() => {
+                            setToasts((prev) => prev.filter((t) => t.id !== toastId));
+                          }, 3000);
+                        }
                       }} 
                       className="w-full py-4 mt-6 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-indigo-500 transition-all shadow-lg shrink-0 active:scale-95"
                     >

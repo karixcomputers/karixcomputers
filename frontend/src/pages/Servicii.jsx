@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx"; 
 import { formatRON } from "../utils/money"; 
 import { apiFetch } from "../api/client"; 
-// IMPORTĂM COMPONENTA SEO
 import SEO from "../components/SEO";
 
 export default function Servicii() {
@@ -12,7 +11,6 @@ export default function Servicii() {
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
-  // --- HELPER IMAGINI ---
   const getImageUrl = (img) => {
     if (!img) return null;
     if (img.startsWith("http")) return img;
@@ -43,13 +41,17 @@ export default function Servicii() {
   }, []);
 
   const handleAddToCart = (service) => {
-    addItem({
+    // 👉 REPARAȚIE: Verificăm dacă adăugarea a fost permisă de CartContext
+    const success = addItem({
       id: service.id,
       productName: service.name, 
       priceCents: service.priceCents, 
       image: getImageUrl(service.images?.[0]), 
       category: 'service'
     });
+
+    // Dacă addItem a returnat false (adică s-a deschis modalul de conflict), nu mai afișăm toast-ul
+    if (success === false) return;
 
     const id = Date.now(); 
     setToasts((prev) => [...prev, { id, message: `Ai adăugat "${service.name}" în coș!` }]);
@@ -66,7 +68,6 @@ export default function Servicii() {
 
   return (
     <>
-      {/* SEO: TARGETĂM REPARAȚIILE ȘI MENTENANȚA ÎN ORADEA */}
       <SEO 
         title="Service & Mentenanță PC, Laptop, Console" 
         description="Reparații profesionale în Oradea: Curățare praf și schimbare pastă termică PC/Laptop, asamblare calculatoare, reparații console și stick drift controllere. Ridicare și livrare la domiciliu!"
