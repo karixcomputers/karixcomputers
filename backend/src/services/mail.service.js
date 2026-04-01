@@ -611,7 +611,9 @@ export async function sendAdminServiceCourierAlert(data) {
       judet: data.judet,
       oras: data.oras,
       address: data.address,
-      preferredDate: data.preferredDate
+      preferredDate: data.preferredDate,
+      // 👉 ADAUGĂM DESCRIEREA DEFECTULUI
+      issueDescription: data.issueDescription || "Nespecificată"
     });
 
     await sendHtmlMail({ 
@@ -629,12 +631,13 @@ export async function sendAdminServiceOradeaAlert(data) {
     const tpl = loadTemplate("adminServiceAlertOradea.html");
     const html = render(tpl, {
       productName: data.productName,
+      // 👉 ADAUGĂM ORDER ID PENTRU ORADEA
+      orderId: data.orderId,
       customerName: data.customerName,
       customerPhone: data.customerPhone || data.phoneNumber,
       preferredDate: data.preferredDate,
-      issueDescription: data.issueDescription,
-      // 👉 NOU: Pasăm adresa către template-ul HTML al Adminului
-      address: data.address || "Nu a fost specificată" 
+      issueDescription: data.issueDescription || "Nespecificată",
+      address: data.address || "Oradea" 
     });
 
     await sendHtmlMail({ 
