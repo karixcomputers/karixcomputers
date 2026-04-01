@@ -15,8 +15,10 @@ import {
   sendServiceUnrepairableEmail,
   sendOrderCanceledEmail,
   sendFinalInvoiceEmail,
-  sendAdminOrderCanceledEmail // 👉 Importăm funcția nouă!
+  sendAdminOrderCanceledEmail
 } from "../services/mail.service.js";
+
+// 👉 IMPORTĂM FUNCȚIA DE FAN COURIER
 import { createFanAWB } from "../services/fancourier.service.js";
 
 // --- IMPORT NOU PENTRU FACTURI & PROFORME ---
@@ -189,6 +191,7 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
     const { itemId } = req.params;
     const { status, awb } = req.body;
 
+    // Am schimbat in "let" pentru a putea actualiza awb-ul dupa generare
     let updatedItem = await prisma.orderItem.update({
       where: { id: itemId },
       data: { 
@@ -234,81 +237,62 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
                       itemName.includes('reparatie');
                       
     const isOradea = updatedItem.order.shippingAddress?.toLowerCase().includes('oradea');
-
     let currentAwb = awb || updatedItem.awb || "";
 
-    // ==========================================
-    // LOGICĂ NOUĂ: GENERARE AWB FAN COURIER
-    // ==========================================
-    if (status === "gata_de_livrare") {
+    const emailData = {
+      customerName: updatedItem.order.shippingName,
+      productName: updatedItem.productName,
+      orderId: updatedItem.orderId,
+      awb: currentAwb,
+      phone: updatedItem.order.shippingPhone
+    };
+
+    if (status === "posesie") {
+      await sendServiceInPossessionEmail(userEmail, emailData).catch(err => console.error(err));
+    } 
+    else if (status === "reparat") {
+      await sendServiceFinishedEmail(userEmail, emailData).catch(err => console.error(err));
+    } 
+    else if (status === "ireparabil") {
+      await sendServiceUnrepairableEmail(userEmail, emailData).catch(err => console.error(err));
+    } 
+    else if (status === "gata_de_livrare") {
       if (!isOradea && !isService) {
-        
-        // 1. Generăm AWB automat dacă nu există deja unul
-        if (!currentAwb) { 
-           try {
-               // Apelăm FAN Courier (isTestMode este true din oficiu în fișierul fancourier.service.js)
-               const newAwb = await createFanAWB(updatedItem.order); 
-               
-               // Actualizăm produsul în baza de date cu noul AWB
-               updatedItem = await prisma.orderItem.update({
-                   where: { id: itemId },
-                   data: { awb: newAwb },
-                   include: { 
-                     order: { 
-                       include: { items: true, user: { select: { email: true } } } 
-                     } 
-                   }
-               });
-
-               currentAwb = newAwb;
-               console.log(`🚀 AWB salvat in DB pentru produsul ${itemId}: ${newAwb}`);
-           } catch (awbError) {
-               console.error("Eroare la generarea automata a AWB-ului:", awbError);
-           }
-        }
-
-        // 2. Trimitem email-ul clientului (acum va avea AWB-ul la dispoziție)
-        const emailData = {
-          customerName: updatedItem.order.shippingName,
-          productName: updatedItem.productName,
-          orderId: updatedItem.orderId,
-          awb: currentAwb,
-          phone: updatedItem.order.shippingPhone
-        };
-        
+        // La "Ambalat", trimitem DOAR email-ul ca pachetul e pregatit (Fara AWB)
         await sendOrderReadyEmail(userEmail, emailData).catch(err => console.error(err));
       }
     } 
-    // ==========================================
-    // RESTUL STATUSURILOR (Service, Expediat, etc)
-    // ==========================================
-    else {
-        const emailData = {
-          customerName: updatedItem.order.shippingName,
-          productName: updatedItem.productName,
-          orderId: updatedItem.orderId,
-          awb: currentAwb,
-          phone: updatedItem.order.shippingPhone
-        };
+    else if (status === "predat_curier") {
+      if (!isOradea) {
+        
+        // --- LOGICĂ NOUĂ AWB PE STATUS PREDAT CURIER ---
+        if (!currentAwb) {
+          try {
+            // Generam automat cu funcția (isTestMode din oficiu o să creeze AWB simulat momentan)
+            const newAwb = await createFanAWB(updatedItem.order); 
+            
+            // Salvăm noul awb in baza de date si actualizam currentAwb
+            updatedItem = await prisma.orderItem.update({
+              where: { id: itemId },
+              data: { awb: newAwb },
+              include: { order: { include: { items: true, user: { select: { email: true } } } } }
+            });
 
-        if (status === "posesie") {
-          await sendServiceInPossessionEmail(userEmail, emailData).catch(err => console.error(err));
-        } 
-        else if (status === "reparat") {
-          await sendServiceFinishedEmail(userEmail, emailData).catch(err => console.error(err));
-        } 
-        else if (status === "ireparabil") {
-          await sendServiceUnrepairableEmail(userEmail, emailData).catch(err => console.error(err));
-        } 
-        else if (status === "predat_curier") {
-          if (!isOradea) {
-            if (isService) {
-              await sendServiceShippedBackEmail(userEmail, emailData).catch(err => console.error(err));
-            } else {
-              await sendOrderShippedEmail(userEmail, emailData).catch(err => console.error(err));
-            }
+            currentAwb = newAwb;
+            emailData.awb = newAwb; // Actualizam si pt trimiterea din mail
+            console.log(`🚀 AWB generat automat la predare: ${newAwb}`);
+          } catch (awbError) {
+            console.error("❌ Eroare auto-generare AWB:", awbError);
           }
         }
+        
+        // Trimitem email-ul cu numarul de AWB
+        if (isService) {
+          await sendServiceShippedBackEmail(userEmail, emailData).catch(err => console.error(err));
+        } else {
+          await sendOrderShippedEmail(userEmail, emailData).catch(err => console.error(err));
+        }
+      }
     }
 
     res.json({ success: true, item: updatedItem, orderStatusSynced: finalOrderStatus });

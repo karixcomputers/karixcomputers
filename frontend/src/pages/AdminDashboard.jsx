@@ -41,10 +41,8 @@ export default function AdminDashboard() {
   useEffect(() => { fetchOrders(); }, []);
 
   const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
-    if (newStatus === "predat_curier") {
-      setAwbModal({ open: true, itemId, orderId });
-      return;
-    }
+    // Am eliminat interceptarea care deschidea modalul pentru AWB manual.
+    // Acum, selectarea "predat_curier" trimite cererea direct la backend pentru auto-generare.
     await executeItemUpdate(orderId, itemId, newStatus, null);
   };
 
@@ -202,7 +200,7 @@ export default function AdminDashboard() {
             <option value="in_procesare">⚙️ În Procesare</option>
             <option value="in_pregatire">🛠️ În Asamblare</option>
             <option value="gata_de_livrare">📦 Ambalat (Așteaptă Curier)</option>
-            <option value="predat_curier">🚚 Predat Curier (AWB)</option>
+            <option value="predat_curier">🚚 Predat Curier (GENEREAZĂ AWB)</option>
             <option value="livrat">🏁 Livrat Final</option>
             <option value="anulat">❌ Anulat</option>
           </>
@@ -252,14 +250,14 @@ export default function AdminDashboard() {
                           </span>
                           
                           {order.paymentMethod === "transfer_bancar" && (
-                             <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
-                              🏦 OP
-                             </span>
+                              <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
+                               🏦 OP
+                              </span>
                           )}
                           {order.paymentMethod === "online" && (
-                             <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
-                              💳 Online
-                             </span>
+                              <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
+                               💳 Online
+                              </span>
                           )}
 
                           {isOrderOradea && (
@@ -273,9 +271,9 @@ export default function AdminDashboard() {
                         
                         {order.isCompany && (
                           <div className="mt-3 bg-black/20 p-3 rounded-xl border border-indigo-500/20">
-                             <p className="text-[9px] text-indigo-400 font-black uppercase tracking-widest mb-1">Date Facturare B2B</p>
-                             <p className="text-xs font-bold text-white mb-1">{order.companyName}</p>
-                             <p className="text-[10px] text-gray-400">CUI: {order.cui} | Reg: {order.regCom}</p>
+                              <p className="text-[9px] text-indigo-400 font-black uppercase tracking-widest mb-1">Date Facturare B2B</p>
+                              <p className="text-xs font-bold text-white mb-1">{order.companyName}</p>
+                              <p className="text-[10px] text-gray-400">CUI: {order.cui} | Reg: {order.regCom}</p>
                           </div>
                         )}
 
@@ -352,7 +350,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* MODAL PENTRU AWB */}
+      {/* MODAL PENTRU AWB (Ascuns momentan de pe fluxul automat) */}
       {awbModal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setAwbModal({ open: false, itemId: null, orderId: null })}></div>
