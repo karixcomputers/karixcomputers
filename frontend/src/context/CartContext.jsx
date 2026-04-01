@@ -19,7 +19,6 @@ export const CartProvider = ({ children }) => {
     pendingProduct: null
   });
 
-  // 👉 AM MUTAT TOAST-URILE AICI PENTRU A FI GLOBALE
   const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
@@ -37,13 +36,22 @@ export const CartProvider = ({ children }) => {
     }, 0);
   }, [items]);
 
-  // 👉 Funcție globală de afișare Toast
+  // Funcție globală de afișare Toast - Acum verifică să nu adauge același mesaj de 2 ori într-o secundă
   const triggerToast = (message) => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 3000);
+    setToasts((prev) => {
+      // Evităm spam-ul: dacă exact același mesaj a fost emis în ultimele 2 secunde, nu-l mai adăugăm
+      const isSpam = prev.some(t => t.message === message);
+      if (isSpam) return prev;
+
+      const id = Date.now();
+      const newToasts = [...prev, { id, message }];
+      
+      setTimeout(() => {
+        setToasts((current) => current.filter((toast) => toast.id !== id));
+      }, 3000);
+
+      return newToasts;
+    });
   };
 
   const performAdd = (product, clearPrevious = false) => {
@@ -82,7 +90,6 @@ export const CartProvider = ({ children }) => {
       }];
     });
 
-    // 👉 Declanșăm toast-ul DOAR DUPĂ CE ADĂUGAREA A AVUT LOC EFECTIV
     triggerToast(`Ai adăugat "${product.name || product.productName}" în coș!`);
   };
 
@@ -123,7 +130,6 @@ export const CartProvider = ({ children }) => {
 
   const confirmReplaceCart = () => {
     if (conflictModal.pendingProduct) {
-      // Apelăm performAdd care va goli coșul, va adăuga produsul și VA DECLANȘA TOAST-UL!
       performAdd(conflictModal.pendingProduct, true); 
     }
     setConflictModal({ isOpen: false, type: null, pendingProduct: null });
@@ -142,7 +148,7 @@ export const CartProvider = ({ children }) => {
     <CartContext.Provider value={{ items, addItem, addToCart: addItem, removeFromCart, updateQty, totalCents, clearCart }}>
       {children}
 
-      {/* --- MODALUL DE CONFLICT --- */}
+      {/* MODAL CONFLICT */}
       {conflictModal.isOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={cancelModal}></div>
@@ -181,14 +187,17 @@ export const CartProvider = ({ children }) => {
         </div>
       )}
 
-      {/* --- TOAST-URILE SUNT ACUM GLOBALE (Apar indiferent pe ce pagină ești) --- */}
-      <div className="fixed bottom-8 right-0 left-0 md:left-auto md:right-8 z-[9999] flex flex-col items-center md:items-end gap-3 pointer-events-none px-4">
+      {/* TOAST-URI GLOBALE STILIZATE (Unul sub altul cu distanță) */}
+      <div className="fixed bottom-8 right-4 md:right-8 z-[9999] flex flex-col gap-3 pointer-events-none">
         {toasts.map((t) => (
-          <div key={t.id} className="animate-in slide-in-from-right-full pointer-events-auto flex items-center gap-4 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 p-4 rounded-2xl shadow-2xl min-w-[280px] md:min-w-[320px]">
-            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500 flex items-center justify-center shadow-lg shrink-0">
-              <span className="text-white text-xs">✓</span>
+          <div 
+            key={t.id} 
+            className="animate-in slide-in-from-right-full pointer-events-auto flex items-center gap-4 bg-[#0f172a]/95 backdrop-blur-xl border border-indigo-500/20 p-4 rounded-2xl shadow-2xl min-w-[280px] md:min-w-[320px] transition-all"
+          >
+            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.5)] shrink-0">
+              <span className="text-white text-xs font-bold">✓</span>
             </div>
-            <p className="text-white font-black text-[10px] uppercase tracking-widest text-left">{t.message}</p>
+            <p className="text-white font-black text-[10px] uppercase tracking-widest text-left leading-tight">{t.message}</p>
           </div>
         ))}
       </div>
