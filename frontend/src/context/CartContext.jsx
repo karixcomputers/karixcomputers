@@ -36,22 +36,16 @@ export const CartProvider = ({ children }) => {
     }, 0);
   }, [items]);
 
-  // Funcție globală de afișare Toast - Acum verifică să nu adauge același mesaj de 2 ori într-o secundă
+  // 👉 Am scos filtrul de spam. Acum poți adăuga oricâte mesaje vrei, se vor stivui frumos!
   const triggerToast = (message) => {
-    setToasts((prev) => {
-      // Evităm spam-ul: dacă exact același mesaj a fost emis în ultimele 2 secunde, nu-l mai adăugăm
-      const isSpam = prev.some(t => t.message === message);
-      if (isSpam) return prev;
-
-      const id = Date.now();
-      const newToasts = [...prev, { id, message }];
-      
-      setTimeout(() => {
-        setToasts((current) => current.filter((toast) => toast.id !== id));
-      }, 3000);
-
-      return newToasts;
-    });
+    // Folosim Math.random() pentru a asigura un ID unic la click-uri extrem de rapide
+    const id = Date.now() + Math.random(); 
+    
+    setToasts((prev) => [...prev, { id, message }]);
+    
+    setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 3000);
   };
 
   const performAdd = (product, clearPrevious = false) => {
@@ -90,6 +84,7 @@ export const CartProvider = ({ children }) => {
       }];
     });
 
+    // Declanșăm toast-ul după adăugare
     triggerToast(`Ai adăugat "${product.name || product.productName}" în coș!`);
   };
 
