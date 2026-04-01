@@ -166,13 +166,7 @@ export default function Servicii() {
           </div>
         </div>
 
-        <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-3 pointer-events-none">
-          {toasts.map((toast) => (
-            <div key={toast.id} className="pointer-events-auto bg-[#0f172a]/95 backdrop-blur-xl border border-white/10 text-white px-6 py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-2xl animate-in slide-in-from-right-full">
-              {toast.message}
-            </div>
-          ))}
-        </div>
+
       </div>
     </>
   );

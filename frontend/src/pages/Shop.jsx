@@ -658,16 +658,7 @@ export default function Shop() {
         )}
 
         {/* TOAST CONTAINER */}
-        <div className="fixed bottom-8 right-0 left-0 md:left-auto md:right-8 z-[300] flex flex-col items-center md:items-end gap-3 pointer-events-none px-4">
-          {toasts.map((t) => (
-            <div key={t.id} className="toast-card pointer-events-auto flex items-center gap-4 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 p-4 rounded-2xl shadow-2xl min-w-[280px] md:min-w-[320px]">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500 flex items-center justify-center shadow-lg shrink-0">
-                <span className="text-white text-xs">✓</span>
-              </div>
-              <p className="text-white font-black text-[10px] uppercase tracking-widest text-left">{t.message}</p>
-            </div>
-          ))}
-        </div>
+
       </div>
     </>
   ); 
