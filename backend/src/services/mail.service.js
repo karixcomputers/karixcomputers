@@ -340,28 +340,37 @@ export async function sendOrderPlaced(to, orderData, isAdmin = false) {
 
 export async function sendServiceOrderPlaced(to, data) {
   try {
-    // Verificăm dacă a ales predare în Oradea
+    // Verificăm dacă metoda aleasă de client este "oradea"
     const isOradea = data.method === "oradea";
     
-    // Setăm template-ul și subiectul în funcție de metodă
-    const templateName = isOradea ? "servicePlacedOradea.html" : "servicePlaced.html";
+    // 👉 REGLARE TEMPLATE-URI CONFORM CERINȚEI TALE:
+    // Dacă e oradea -> servicePlacedOradea.html
+    // Dacă e curier -> serviceCourierNotification.html
+    const templateName = isOradea ? "servicePlacedOradea.html" : "serviceCourierNotification.html";
+
+    // Setăm subiectul mailului
     const subject = isOradea 
-      ? `Detalii predare service Oradea (#${data.orderId || "General"})`
-      : `Pregătește coletul! Trimitem noi curierul (#${data.orderId || "General"})`;
+      ? `Detalii preluare personală Oradea (#${data.orderId || "Garanție"})`
+      : `Instrucțiuni trimitere prin curier (#${data.orderId || "Garanție"})`;
 
     const tpl = loadTemplate(templateName);
+
     const html = render(tpl, {
       customerName: data.customerName,
       orderId: data.orderId || "N/A",
-      serviceList: data.serviceList || "Solicitare Service Karix Computers",
-      deliveryAddress: data.deliveryAddress || "Predare personală Oradea",
+      // Variabila se numește serviceList în funcție, asigură-te că în HTML ai {{serviceList}}
+      serviceList: data.serviceList || "Solicitare Garanție / Service",
+      deliveryAddress: data.deliveryAddress || "Adresa specificată",
       phone: data.phone || "Nespecificat",
-      date: new Date().toLocaleString('ro-RO')
+      date: new Date().toLocaleString('ro-RO'),
+      // Adăugăm și aceste variabile în caz că template-ul serviceCourierNotification le folosește
+      productName: data.serviceList,
+      address: data.deliveryAddress
     });
 
     await sendHtmlMail({ to, subject, html });
   } catch (err) {
-    console.error("Error sending Service Order email:", err);
+    console.error("❌ Eroare la trimiterea mail-ului de garanție către client:", err);
   }
 }
 

@@ -5,18 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Confirmare Service Oradea - Karix Computers</title>
     <style>
-        .products-table td, 
-        .products-table span, 
-        .products-table b, 
-        .products-table div,
-        .products-table strong {
-            color: #ffffff !important;
-        }
-
-        .products-table td {
-            border-bottom: 1px solid #1e293b !important;
-        }
-
         .info-box td, .info-box strong, .info-box div, .info-box p, .info-box li {
             color: #ffffff !important;
         }
@@ -61,31 +49,15 @@
                                         <strong style="color: #ffffff;">Locație:</strong> {{deliveryAddress}}<br>
                                         <strong style="color: #ffffff;">Telefon:</strong> {{phone}}
                                     </p>
-                                    
-                                    {{billingSection}}
-
                                 </td>
                             </tr>
                         </table>
                         
-                        <h3 style="margin: 0 0 10px 0; font-size: 15px; color: #ffffff; border-bottom: 1px solid #1e293b; padding-bottom: 10px; text-transform: uppercase;">Servicii Solicitate</h3>
+                        <h3 style="margin: 0 0 10px 0; font-size: 15px; color: #ffffff; border-bottom: 1px solid #1e293b; padding-bottom: 10px; text-transform: uppercase;">Produsul Solicitat</h3>
                         
-                        <table class="products-table" border="0" cellpadding="12" cellspacing="0" width="100%" style="margin-bottom: 30px; font-size: 14px; color: #ffffff;">
-                            {{itemsList}}
-                            
-                            {{discountSection}}
-
-                            {{shippingSection}}
-
-                            <tr>
-                                <td style="padding: 20px 12px; text-align: right; border-bottom: none !important;">
-                                    <strong style="text-transform: uppercase; letter-spacing: 1px; color: #94a3b8 !important;">Total Estimat:</strong>
-                                </td>
-                                <td style="padding: 20px 12px; text-align: right; border-bottom: none !important;">
-                                    <strong style="font-size: 20px; color: #ffffff !important;">{{finalTotal}}</strong>
-                                </td>
-                            </tr>
-                        </table>
+                        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; margin-bottom: 30px; text-align: center;">
+                            <strong style="color: #ffffff; font-size: 16px; text-transform: uppercase;">{{serviceList}}</strong>
+                        </div>
 
                         <div style="text-align: left; margin-bottom: 30px; background-color: #0b1120; border: 1px solid #1e293b; padding: 25px; border-radius: 16px;">
                             <h3 style="color: #a855f7; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0;">Detalii Preluare:</h3>
@@ -128,11 +100,6 @@
                 <td align="center" style="padding: 35px 30px; background-color: #0b1120; border-top: 1px solid #1e293b; color: #475569; font-size: 12px; line-height: 1.8;">
                     <p style="margin: 0; margin-bottom: 8px;">Acesta este un mesaj automat generat de sistemul Karix Computers.</p>
                     <p style="margin: 0; font-weight: bold; color: #64748b;">© 2026 Karix Computers. Built for Performance.</p>
-                    <div style="margin-top: 15px;">
-                        <a href="https://instagram.com/karixcomputers" style="color: #4f46e5; text-decoration: none; margin: 0 10px;">Instagram</a>
-                        <a href="https://www.tiktok.com/@karixcomputers.ro" style="color: #4f46e5; text-decoration: none; margin: 0 10px;">TikTok</a>
-                        <a href="https://discord.gg/FV7DgzyTJk" style="color: #4f46e5; text-decoration: none; margin: 0 10px;">Discord Community</a>
-                    </div>
                 </td>
             </tr>
         </table>
