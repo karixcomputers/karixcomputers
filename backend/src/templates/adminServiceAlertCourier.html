@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: sans-serif; background-color: #0b1020; color: #ffffff; padding: 20px; }
+        .card { background: #0f172a; border: 2px solid #fbbf24; border-radius: 15px; padding: 20px; max-width: 600px; margin: auto; }
+        .header { color: #fbbf24; font-size: 18px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 20px; }
+        .label { color: #94a3b8; font-size: 11px; text-transform: uppercase; margin-top: 15px; }
+        .value { color: #ffffff; font-size: 16px; font-weight: bold; }
+        .issue { background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; padding: 10px; border-radius: 8px; color: #f87171; margin-top: 10px; font-style: italic; }
+        .address-box { background: #1e293b; padding: 15px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #fbbf24; }
+        .btn { display: inline-block; padding: 10px 20px; background: #fbbf24; color: #000; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">🚚 ALERTĂ SERVICE: CURIER NOU</div>
+        
+        <div class="label">Produs & ID Comandă:</div>
+        <div class="value">{{productName}} (#{{orderId}})</div>
+
+        <div class="label">Client:</div>
+        <div class="value">{{customerName}}</div>
+        <div class="value"><a href="tel:{{customerPhone}}" style="color: #fbbf24;">{{customerPhone}}</a></div>
+
+        <div class="label">Defect Reclamat:</div>
+        <div class="issue">"{{issueDescription}}"</div>
+
+        <div class="label">Adresa de Ridicare (CURIER):</div>
+        <div class="address-box">
+            {{address}}<br>
+            <strong>Oraș:</strong> {{oras}}, <strong>Județ:</strong> {{judet}}
+        </div>
+
+        <div class="label">Data dorită pentru ridicare:</div>
+        <div class="value" style="color: #fbbf24;">{{preferredDate}}</div>
+
+        <a href="https://karixcomputers.ro/admin/service" class="btn">DESCHIDE DASHBOARD</a>
+    </div>
+</body>
+</html>

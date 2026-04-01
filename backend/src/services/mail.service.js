@@ -602,7 +602,7 @@ export async function sendTicketResolvedEmail(to, data) {
 
 export async function sendAdminServiceCourierAlert(data) {
   try {
-    const tpl = loadTemplate("serviceCourierNotification.html");
+    const tpl = loadTemplate("adminServiceAlertCourier.html");
     const html = render(tpl, {
       productName: data.productName,
       orderId: data.orderId,
@@ -626,7 +626,7 @@ export async function sendAdminServiceCourierAlert(data) {
 
 export async function sendAdminServiceOradeaAlert(data) {
   try {
-    const tpl = loadTemplate("serviceOradeaNotification.html");
+    const tpl = loadTemplate("adminServiceAlertOradea.html");
     const html = render(tpl, {
       productName: data.productName,
       customerName: data.customerName,
