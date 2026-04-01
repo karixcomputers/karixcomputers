@@ -611,7 +611,7 @@ export async function sendAdminServiceCourierAlert(data) {
 
 export async function sendAdminServiceOradeaAlert(data) {
   try {
-    const tpl = loadTemplate("serviceOradeaNotification.html");
+    const tpl = loadTemplate("serviceOradeaNotificationold.html");
     const html = render(tpl, {
       productName: data.productName,
       customerName: data.customerName,
