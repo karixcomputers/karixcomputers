@@ -1007,7 +1007,7 @@ export async function sendWarrantyRejectedEmail(to, data, files = []) {
   }
 }
 
-export async function sendAssemblyOrderPlaced(to, data) {
+export async function sendAssemblyOrderPlaced(to, data, pdfBuffer = null) {
   try {
     const tpl = loadTemplate("assemblyPlacedClient.html");
     const subject = `Confirmare Asamblare PC (#${data.orderId}) - Karix Computers`;
@@ -1022,7 +1022,17 @@ export async function sendAssemblyOrderPlaced(to, data) {
       accountUrl: `https://karixcomputers.ro/orders`
     });
 
-    await sendHtmlMail({ to, subject, html });
+    const mailOptions = { to, subject, html };
+
+    // 👉 Dacă avem un PDF generat (Factură/Proformă), îl atașăm!
+    if (pdfBuffer) {
+      mailOptions.attachments = [{
+        filename: `Document_Karix_${data.orderId}.pdf`,
+        content: pdfBuffer
+      }];
+    }
+
+    await sendHtmlMail(mailOptions);
   } catch (err) {
     console.error("❌ Eroare sendAssemblyOrderPlaced:", err);
   }

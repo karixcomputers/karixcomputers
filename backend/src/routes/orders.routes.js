@@ -383,6 +383,19 @@ router.post("/", requireAuth, async (req, res, next) => {
     // 🚀 BIFURCAȚIE: ASAMBLARE vs STANDARD
     // ------------------------------------------------------------
     if (hasAssembly) {
+      // 👉 1. GENERĂM PROFORMA SMARTBILL PENTRU ASAMBLARE OP
+      let proformaPdfBuffer = null;
+      if (paymentMethod === 'transfer_bancar') {
+        try {
+          const proformaData = await createSmartBillProforma(newOrder, client, cartItems);
+          if (proformaData && proformaData.series && proformaData.number) {
+            proformaPdfBuffer = await getSmartBillProformaPdf(proformaData.series, proformaData.number);
+          }
+        } catch (err) {
+          console.error("⚠️ Eroare generare proformă SmartBill Asamblare:", err);
+        }
+      }
+
       let cleanAddress = `${client.addressDetails}, ${client.city}, ${client.county}`;
       let pieseText = "Așteptăm piesele clientului.";
       
@@ -401,7 +414,7 @@ router.post("/", requireAuth, async (req, res, next) => {
       // 👉 Dacă se alege transfer bancar sau ramburs, trimitem ACUM
       // Dacă se alege Netopia, lăsăm Webhook-ul de Netopia să facă treaba asta la confirmarea plății!
       if (paymentMethod !== 'online') {
-        // Mail către CLIENT
+        // Mail către CLIENT cu PROFORMA atașată (dacă e cazul)
         await sendAssemblyOrderPlaced(uEmail, {
             customerName: client.isCompany ? client.companyName : client.name,
             orderId: newOrder.id,
@@ -409,7 +422,7 @@ router.post("/", requireAuth, async (req, res, next) => {
             phone: client.phone,
             method: modPredare,
             issueDescription: pieseText
-        }).catch(err => console.error("Eroare Mail Client Asamblare:", err));
+        }, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare:", err));
 
         // Mail către ADMIN
         await sendAdminAssemblyAlert({
