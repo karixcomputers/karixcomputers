@@ -41,7 +41,6 @@ export default function Servicii() {
   }, []);
 
   const handleAddToCart = (service) => {
-    // 👉 REPARAȚIE: Verificăm dacă adăugarea a fost permisă de CartContext
     const success = addItem({
       id: service.id,
       productName: service.name, 
@@ -50,7 +49,6 @@ export default function Servicii() {
       category: 'service'
     });
 
-    // Dacă addItem a returnat false (adică s-a deschis modalul de conflict), nu mai afișăm toast-ul
     if (success === false) return;
 
     const id = Date.now(); 
@@ -73,8 +71,8 @@ export default function Servicii() {
         description="Reparații profesionale în Oradea: Curățare praf și schimbare pastă termică PC/Laptop, asamblare calculatoare, reparații console și stick drift controllere. Ridicare și livrare la domiciliu!"
       />
 
+      {/* Am eliminat div-ul decorativ care genera pata de lumină în fundal */}
       <div className="min-h-screen text-gray-200 relative pt-32 pb-24 px-4 overflow-hidden bg-transparent">
-        <div className="absolute top-20 left-10 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
         
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center mb-16 md:mb-20">
@@ -165,7 +163,6 @@ export default function Servicii() {
 
           </div>
         </div>
-
 
       </div>
     </>
