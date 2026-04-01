@@ -340,21 +340,26 @@ export async function sendOrderPlaced(to, orderData, isAdmin = false) {
 
 export async function sendServiceOrderPlaced(to, data) {
   try {
-    const tpl = loadTemplate("servicePlaced.html");
+    // Verificăm dacă a ales predare în Oradea
+    const isOradea = data.method === "oradea";
+    
+    // Setăm template-ul și subiectul în funcție de metodă
+    const templateName = isOradea ? "servicePlacedOradea.html" : "servicePlaced.html";
+    const subject = isOradea 
+      ? `Detalii predare service Oradea (#${data.orderId || "General"})`
+      : `Pregătește coletul! Trimitem noi curierul (#${data.orderId || "General"})`;
+
+    const tpl = loadTemplate(templateName);
     const html = render(tpl, {
       customerName: data.customerName,
-      orderId: data.orderId,
+      orderId: data.orderId || "N/A",
       serviceList: data.serviceList || "Solicitare Service Karix Computers",
       deliveryAddress: data.deliveryAddress || "Predare personală Oradea",
       phone: data.phone || "Nespecificat",
       date: new Date().toLocaleString('ro-RO')
     });
 
-    await sendHtmlMail({ 
-      to, 
-      subject: `Pregătește coletul! Trimitem noi curierul (#${data.orderId})`, 
-      html 
-    });
+    await sendHtmlMail({ to, subject, html });
   } catch (err) {
     console.error("Error sending Service Order email:", err);
   }
@@ -611,7 +616,7 @@ export async function sendAdminServiceCourierAlert(data) {
 
 export async function sendAdminServiceOradeaAlert(data) {
   try {
-    const tpl = loadTemplate("serviceOradeaNotificationold.html");
+    const tpl = loadTemplate("serviceOradeaNotification.html");
     const html = render(tpl, {
       productName: data.productName,
       customerName: data.customerName,

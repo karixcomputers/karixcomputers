@@ -71,12 +71,13 @@ router.post("/", requireAuth, async (req, res) => {
         ? `${address}, ${oras}, ${judet}`
         : "Predare personală la sediul Karix (Oradea)";
 
-      await sendServiceOrderPlaced(userEmail, {
+await sendServiceOrderPlaced(userEmail, {
         customerName: finalName,
         orderId: orderId, 
         serviceList: productName, 
         deliveryAddress: fullAddress,
-        phone: phoneNumber
+        phone: phoneNumber,
+        method: method // 👉 NOU: Îi spunem funcției de mail ce a ales clientul
       });
       
       if (method === "curier") {
