@@ -13,60 +13,46 @@ import {
 const prisma = new PrismaClient();
 const router = express.Router();
 
+/**
+ * Middleware pentru verificarea rolului de Admin
+ */
 const requireAdmin = (req, res, next) => {
   if (req.user && req.user.role === "admin") {
     next();
   } else {
-    res.status(403).json({ error: "Acces interzis." });
+    res.status(403).json({ error: "Acces interzis. Necesită administrator." });
   }
 };
 
 /**
  * 1. POST /api/service-orders
+ * Creare cerere service / garanție
  */
 router.post("/", requireAuth, async (req, res) => {
   try {
     const { 
       method, 
       productName, 
-      orderId, // ID-ul trimis din frontend (daca exista)
+      orderId, // Referința facturii originale (opțional)
       issueDescription, 
-      judet, oras, address, phoneNumber, preferredDate 
+      judet, 
+      oras, 
+      address, 
+      phoneNumber, 
+      preferredDate 
     } = req.body;
 
     const userId = req.user.id || req.user.sub;
     const userEmail = req.user.email;
 
-    // 🔎 LOGICA DE EXTRACȚIE: Căutăm în baza de date numărul real al comenzii (achiziției)
-    let purchaseOrderId = orderId;
-
-    // Dacă ID-ul lipsește (de ex. refresh la pagină), îl extragem din tabelul Order
-    if (!purchaseOrderId || purchaseOrderId === "") {
-      const realOrder = await prisma.order.findFirst({
-        where: {
-          userId: userId,
-          items: {
-            some: { productName: productName }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true }
-      });
-      
-      if (realOrder) {
-        purchaseOrderId = String(realOrder.id); // Extragem cifrele (ex: 10432)
-      } else {
-        purchaseOrderId = "Service-" + Math.floor(1000 + Math.random() * 9000); // Fallback minim dacă nu găsim achiziția
-      }
-    }
-
+    // Preluăm numele real din DB pentru a evita "Client Karix"
     const dbUser = await prisma.user.findUnique({ where: { id: userId } });
     const finalName = dbUser?.name || userEmail.split('@')[0];
 
-    // 2. Salvăm în ServiceOrder folosind ID-ul de achiziție extras (numai cifre)
+    // Salvare în baza de date
     const newServiceOrder = await prisma.serviceOrder.create({
       data: {
-        orderId: String(purchaseOrderId), 
+        orderId: String(orderId || ""),
         productName,
         customerName: finalName,
         phoneNumber,
@@ -82,20 +68,22 @@ router.post("/", requireAuth, async (req, res) => {
     });
 
     try {
+      // Formatăm adresa completă pentru email-ul clientului
       const fullAddress = method === "curier" 
         ? `${address}, ${oras}, ${judet}`
         : `${address}, Oradea, Bihor`;
 
-      // ✉️ Trimitere mail către CLIENT (folosim .orderId care conține cifrele extrase)
-      await sendServiceOrderPlaced(userEmail, {
-        customerName: finalName,
-        orderId: newServiceOrder.orderId, 
-        serviceList: productName, 
-        deliveryAddress: fullAddress,
-        phone: phoneNumber,
-        method: method,
-        issueDescription: issueDescription 
-      });
+// În serviceOrders.routes.js, în interiorul router.post("/")
+await sendServiceOrderPlaced(userEmail, {
+    customerName: finalName,
+    orderId: newServiceOrder.orderId, 
+    serviceList: productName, 
+    deliveryAddress: fullAddress,
+    phone: phoneNumber,
+    method: method,
+    // 👉 ADAUGĂ ACEASTĂ LINIE:
+    issueDescription: issueDescription 
+});
       
       // ✉️ Trimitere alertă către ADMIN
       if (method === "curier") {
@@ -114,17 +102,52 @@ router.post("/", requireAuth, async (req, res) => {
           customerPhone: phoneNumber,
           preferredDate,
           issueDescription,
-          address: address
+          address: address // Adresa din Oradea de unde trebuie ridicat
         });
       }
     } catch (mailErr) {
-      console.error("⚠️ Eroare mail:", mailErr);
+      console.error("⚠️ Notificările email au întâmpinat probleme:", mailErr);
     }
 
     res.status(201).json(newServiceOrder);
   } catch (error) {
-    console.error("❌ CREATE ERROR:", error);
-    res.status(500).json({ error: "Eroare la procesare." });
+    console.error("❌ SERVICE ORDER CREATE ERROR:", error);
+    res.status(500).json({ error: "Eroare la procesarea solicitării." });
+  }
+});
+
+/**
+ * 2. GET /api/service-orders/my-requests
+ * Permite clientului să își vadă istoricul de service
+ */
+router.get("/my-requests", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user.sub;
+
+    const orders = await prisma.serviceOrder.findMany({
+      where: { userId: userId },
+      orderBy: { createdAt: "desc" }
+    });
+
+    res.json(orders);
+  } catch (error) {
+    console.error("❌ FETCH MY SERVICE ORDERS ERROR:", error);
+    res.status(500).json({ error: "Eroare la preluarea istoricului de service." });
+  }
+});
+
+/**
+ * 3. GET /api/service-orders/admin/all
+ */
+router.get("/admin/all", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const orders = await prisma.serviceOrder.findMany({
+      include: { user: { select: { name: true, email: true } } },
+      orderBy: { createdAt: "desc" }
+    });
+    res.json(orders);
+  } catch (error) { 
+    res.status(500).json({ error: "Eroare la preluarea datelor." }); 
   }
 });
 
@@ -138,26 +161,36 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
 
     const updatedOrder = await prisma.serviceOrder.update({
       where: { id },
-      data: { status, awb: awb !== undefined ? awb : undefined },
+      data: { 
+        status,
+        awb: awb !== undefined ? awb : undefined 
+      },
       include: { user: { select: { email: true, name: true } } }
     });
 
     const userEmail = updatedOrder.user.email;
     const emailData = {
       customerName: updatedOrder.customerName,
-      // 👉 REPARAȚIE: Folosim .orderId (ID-ul numeric extras la creare)
-      orderId: updatedOrder.orderId, 
+      orderId: updatedOrder.id, // Folosim ID-ul înregistrării
       productName: updatedOrder.productName,
       awb: awb || updatedOrder.awb
     };
 
-    if (status === "in_service") await sendServiceInPossessionEmail(userEmail, emailData).catch(() => {});
-    else if (status === "finalizat") await sendServiceFinishedEmail(userEmail, emailData).catch(() => {});
-    else if (status === "expediat") await sendServiceShippedWithAwbEmail(userEmail, emailData).catch(() => {});
+    // Notificări automate la schimbarea statusului
+    if (status === "in_service") {
+      await sendServiceInPossessionEmail(userEmail, emailData).catch(() => {});
+    } 
+    else if (status === "finalizat") {
+      await sendServiceFinishedEmail(userEmail, emailData).catch(() => {});
+    }
+    else if (status === "expediat") {
+      await sendServiceShippedWithAwbEmail(userEmail, emailData).catch(() => {});
+    }
 
     res.json(updatedOrder);
   } catch (error) { 
-    res.status(500).json({ error: "Eroare la actualizare." }); 
+    console.error("❌ UPDATE STATUS ERROR:", error);
+    res.status(500).json({ error: "Eroare la actualizarea statusului." }); 
   }
 });
 
