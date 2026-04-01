@@ -66,7 +66,6 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const locality = addressParts.length >= 2 ? addressParts[addressParts.length - 2] : "Bucuresti";
         const street = addressParts.length >= 1 ? addressParts[0] : "Adresa nespecificata";
 
-        // Calculăm suma de ramburs doar dacă plata nu a fost făcută (ramburs la curier)
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : (order.totalCents / 100);
 
         const payload = {
@@ -77,11 +76,11 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         service: "Standard",
                         packages: { parcel: parseInt(packagesCount), envelopes: 0 },
                         weight: parseInt(weight),
-                        payment: "sender", // Expeditorul plătește transportul
+                        payment: "sender", 
                         observation: `Comanda Karix #${String(order.id).slice(-8)}`,
                         content: "Sistem PC / Componente Hardware",
-                        dimensions: { length: 40, height: 40, width: 20 }, // Valori generice
-                        repayment: rambursValue > 0 ? rambursValue : undefined // FAN cere ramburs doar dacă > 0
+                        dimensions: { length: 40, height: 40, width: 20 }, 
+                        repayment: rambursValue > 0 ? rambursValue : undefined 
                     },
                     recipient: {
                         name: order.shippingName,
@@ -109,15 +108,20 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         });
 
         const data = await response.json();
+        
+        // 👉 NOU: Printăm răspunsul exact ca să știm ce ne blochează!
+        console.log("🔍 Răspuns FAN Courier Creare AWB:", JSON.stringify(data, null, 2));
 
-        if (data.status === "error" || !data.data || !data.data[0] || data.data[0].errors) {
-             throw new Error(JSON.stringify(data.data[0]?.errors || data.message));
+        // 👉 NOU: Reparat sistemul de citire al erorilor
+        if (data.status === "error" || !data.data || !Array.isArray(data.data) || data.data.length === 0 || data.data[0].errors) {
+             const errorMessage = data?.data?.[0]?.errors || data?.message || JSON.stringify(data);
+             throw new Error(`Refuzat de FAN Courier: ${typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)}`);
         }
 
         return data.data[0].awbNumber;
 
     } catch (error) {
-        console.error("❌ Eroare creare AWB FAN:", error);
+        console.error("❌ Eroare creare AWB FAN:", error.message);
         throw error;
     }
 }
