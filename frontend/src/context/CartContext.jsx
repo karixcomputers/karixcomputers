@@ -13,12 +13,14 @@ export const CartProvider = ({ children }) => {
     }
   });
 
-  // Stare pentru modalul personalizat de conflict în coș
   const [conflictModal, setConflictModal] = useState({
     isOpen: false,
-    type: null, // 'WANTS_NORMAL' (are asamblare, vrea altceva) sau 'WANTS_ASSEMBLY' (are altceva, vrea asamblare)
+    type: null, 
     pendingProduct: null
   });
+
+  // 👉 AM MUTAT TOAST-URILE AICI PENTRU A FI GLOBALE
+  const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
     localStorage.setItem("karix_cart", JSON.stringify(items));
@@ -35,7 +37,15 @@ export const CartProvider = ({ children }) => {
     }, 0);
   }, [items]);
 
-  // Funcția efectivă care adaugă produsul în coș (apelată după validări)
+  // 👉 Funcție globală de afișare Toast
+  const triggerToast = (message) => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 3000);
+  };
+
   const performAdd = (product, clearPrevious = false) => {
     setItems((prev) => {
       const currentCart = clearPrevious ? [] : prev;
@@ -55,7 +65,6 @@ export const CartProvider = ({ children }) => {
          if (product.imageUrl) finalImages = [product.imageUrl];
          else if (product.image) finalImages = [product.image];
       }
-      
       const finalImageUrl = product.imageUrl || finalImages[0] || null;
 
       return [...currentCart, { 
@@ -72,9 +81,12 @@ export const CartProvider = ({ children }) => {
         qty: qtyToAdd 
       }];
     });
+
+    // 👉 Declanșăm toast-ul DOAR DUPĂ CE ADĂUGAREA A AVUT LOC EFECTIV
+    triggerToast(`Ai adăugat "${product.name || product.productName}" în coș!`);
   };
 
-const addItem = (product) => {
+  const addItem = (product) => {
     const incomingName = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const isIncomingAssembly = incomingName.includes("asamblare");
 
@@ -83,21 +95,18 @@ const addItem = (product) => {
       return n.includes("asamblare");
     });
 
-    // Cazul 1: Ai asamblare în coș și vrei să adaugi o componentă
     if (hasAssemblyInCart && !isIncomingAssembly) {
       setConflictModal({ isOpen: true, type: 'WANTS_NORMAL', pendingProduct: product });
-      return false; // 👉 ADĂUGAT: Returnează explicit false ca să oprească toast-ul din UI
+      return false;
     }
 
-    // Cazul 2: Ai componente în coș și vrei să adaugi asamblarea
     if (!hasAssemblyInCart && isIncomingAssembly && items.length > 0) {
       setConflictModal({ isOpen: true, type: 'WANTS_ASSEMBLY', pendingProduct: product });
-      return false; // 👉 ADĂUGAT: Returnează explicit false
+      return false;
     }
 
-    // Dacă nu există conflicte, adaugă normal
     performAdd(product, false);
-    return true; // 👉 ADĂUGAT: Returnează true pentru a declanșa toast-ul
+    return true;
   };
 
   const removeFromCart = (id) => {
@@ -112,12 +121,10 @@ const addItem = (product) => {
     );
   };
 
-  const addToCart = addItem;
-
-  // --- HANDLERE PENTRU MODAL ---
   const confirmReplaceCart = () => {
     if (conflictModal.pendingProduct) {
-      performAdd(conflictModal.pendingProduct, true); // true = golește coșul înainte de a adăuga
+      // Apelăm performAdd care va goli coșul, va adăuga produsul și VA DECLANȘA TOAST-UL!
+      performAdd(conflictModal.pendingProduct, true); 
     }
     setConflictModal({ isOpen: false, type: null, pendingProduct: null });
   };
@@ -128,21 +135,19 @@ const addItem = (product) => {
 
   const goToCheckout = () => {
     setConflictModal({ isOpen: false, type: null, pendingProduct: null });
-    window.location.href = '/checkout'; // Navigare forțată la checkout
+    window.location.href = '/checkout'; 
   };
 
   return (
-    <CartContext.Provider value={{ items, addItem, addToCart, removeFromCart, updateQty, totalCents, clearCart }}>
+    <CartContext.Provider value={{ items, addItem, addToCart: addItem, removeFromCart, updateQty, totalCents, clearCart }}>
       {children}
 
-      {/* MODAL PERSONALIZAT PENTRU CONFLICTE ÎN COȘ */}
+      {/* --- MODALUL DE CONFLICT --- */}
       {conflictModal.isOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={cancelModal}></div>
           <div className="relative w-full max-w-md p-8 md:p-10 rounded-[30px] bg-[#0b1020]/95 border border-rose-500/30 shadow-[0_0_50px_-12px_rgba(244,63,94,0.3)] animate-in zoom-in duration-300 text-center">
-            <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-inner">
-              ⚠️
-            </div>
+            <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-inner">⚠️</div>
             <h2 className="text-xl font-black text-white uppercase tracking-wider mb-4">Atenție la Coș</h2>
             
             {conflictModal.type === 'WANTS_NORMAL' && (
@@ -152,15 +157,9 @@ const addItem = (product) => {
                   Dorești să golești coșul pentru a adăuga noul produs, sau mergi direct la checkout cu asamblarea?
                 </p>
                 <div className="flex flex-col gap-3">
-                  <button onClick={confirmReplaceCart} className="w-full py-4 rounded-xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-rose-600/20 hover:bg-rose-500 transition-all">
-                    Golește coșul și adaugă
-                  </button>
-                  <button onClick={goToCheckout} className="w-full py-4 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all">
-                    Mergi la Checkout
-                  </button>
-                  <button onClick={cancelModal} className="w-full py-3 text-gray-500 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-all mt-2">
-                    Renunță
-                  </button>
+                  <button onClick={confirmReplaceCart} className="w-full py-4 rounded-xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-rose-600/20 hover:bg-rose-500 transition-all">Golește coșul și adaugă</button>
+                  <button onClick={goToCheckout} className="w-full py-4 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all">Mergi la Checkout</button>
+                  <button onClick={cancelModal} className="w-full py-3 text-gray-500 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-all mt-2">Renunță</button>
                 </div>
               </>
             )}
@@ -172,21 +171,28 @@ const addItem = (product) => {
                   Dorești să golești coșul actual pentru a putea comanda serviciul de asamblare?
                 </p>
                 <div className="flex flex-col gap-3">
-                  <button onClick={confirmReplaceCart} className="w-full py-4 rounded-xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-rose-600/20 hover:bg-rose-500 transition-all">
-                    Da, golește coșul
-                  </button>
-                  <button onClick={goToCheckout} className="w-full py-4 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all">
-                    Comandă piesele prima dată
-                  </button>
-                  <button onClick={cancelModal} className="w-full py-3 text-gray-500 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-all mt-2">
-                    Renunță
-                  </button>
+                  <button onClick={confirmReplaceCart} className="w-full py-4 rounded-xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-rose-600/20 hover:bg-rose-500 transition-all">Da, golește coșul</button>
+                  <button onClick={goToCheckout} className="w-full py-4 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all">Comandă piesele prima dată</button>
+                  <button onClick={cancelModal} className="w-full py-3 text-gray-500 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-all mt-2">Renunță</button>
                 </div>
               </>
             )}
           </div>
         </div>
       )}
+
+      {/* --- TOAST-URILE SUNT ACUM GLOBALE (Apar indiferent pe ce pagină ești) --- */}
+      <div className="fixed bottom-8 right-0 left-0 md:left-auto md:right-8 z-[9999] flex flex-col items-center md:items-end gap-3 pointer-events-none px-4">
+        {toasts.map((t) => (
+          <div key={t.id} className="animate-in slide-in-from-right-full pointer-events-auto flex items-center gap-4 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 p-4 rounded-2xl shadow-2xl min-w-[280px] md:min-w-[320px]">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500 flex items-center justify-center shadow-lg shrink-0">
+              <span className="text-white text-xs">✓</span>
+            </div>
+            <p className="text-white font-black text-[10px] uppercase tracking-widest text-left">{t.message}</p>
+          </div>
+        ))}
+      </div>
+
     </CartContext.Provider>
   );
 };
