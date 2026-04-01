@@ -76,7 +76,7 @@ router.post("/", requireAuth, async (req, res) => {
 // În serviceOrders.routes.js, în interiorul router.post("/")
 await sendServiceOrderPlaced(userEmail, {
     customerName: finalName,
-    orderId: newServiceOrder.id, 
+    orderId: newServiceOrder.orderId, 
     serviceList: productName, 
     deliveryAddress: fullAddress,
     phone: phoneNumber,
