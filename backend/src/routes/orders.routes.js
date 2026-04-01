@@ -15,7 +15,10 @@ import {
   sendServiceUnrepairableEmail,
   sendOrderCanceledEmail,
   sendFinalInvoiceEmail,
-  sendAdminOrderCanceledEmail
+  sendAdminOrderCanceledEmail,
+  // 👉 IMPORTĂM FUNCȚIILE NOI DE ASAMBLARE AICI
+  sendAssemblyOrderPlaced,
+  sendAdminAssemblyAlert
 } from "../services/mail.service.js";
 
 // 👉 IMPORTĂM FUNCȚIA DE FAN COURIER
@@ -236,7 +239,8 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
                       itemName.includes('curatare') || 
                       itemName.includes('drift') || 
                       itemName.includes('hall') || 
-                      itemName.includes('reparatie');
+                      itemName.includes('reparatie') ||
+                      itemName.includes('asamblare'); // Adaugat asamblare la conditia de service
                       
     const isOradea = updatedItem.order.shippingAddress?.toLowerCase().includes('oradea');
     let currentAwb = awb || updatedItem.awb || "";
@@ -311,6 +315,12 @@ router.post("/", requireAuth, async (req, res, next) => {
 
     const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
     
+    // Verificăm dacă măcar UN produs din coș are "asamblare" în nume
+    const hasAssembly = cartItems.some(item => {
+        const name = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return name.includes("asamblare");
+    });
+
     const containsServices = cartItems.some(item => {
         const name = (item.productName || item.name || "").toLowerCase();
         return item.category === 'service' || serviceKeywords.some(kw => name.includes(kw));
@@ -342,7 +352,8 @@ router.post("/", requireAuth, async (req, res, next) => {
             const nameFinal = item.productName || item.name;
             const nameLower = nameFinal.toLowerCase();
             const isServiceItem = (item.category === 'service') || 
-                                  serviceKeywords.some(kw => nameLower.includes(kw));
+                                  serviceKeywords.some(kw => nameLower.includes(kw)) ||
+                                  nameLower.includes("asamblare");
             
             return {
               productId: String(item.id),
@@ -365,50 +376,92 @@ router.post("/", requireAuth, async (req, res, next) => {
       }).catch(err => console.error("Eroare incrementare cupon:", err));
     }
 
-    // --- LOGICĂ NOUĂ PENTRU TRANSFER BANCAR (GENERARE PROFORMĂ) ---
-    let proformaPdfBuffer = null;
-    if (paymentMethod === 'transfer_bancar') {
-      try {
-        const proformaData = await createSmartBillProforma(newOrder, client, cartItems);
-        if (proformaData && proformaData.series && proformaData.number) {
-          proformaPdfBuffer = await getSmartBillProformaPdf(proformaData.series, proformaData.number);
-        }
-      } catch (err) {
-        console.error("⚠️ Eroare generare proformă SmartBill:", err);
-      }
-    }
+    const uEmail = userEmail || (req.user && req.user.email);
+    const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
 
-    const commonMailData = {
-      client: client,
-      orderId: newOrder.id,
-      total: total,
-      couponCode: couponCode || null,
-      pickupType: pickupType,
-      isServiceOrder: containsServices, 
-      paymentMethod: paymentMethod, // Transmitem și metoda pentru a afișa datele bancare în mail
-      cartItems: cartItems.map(item => {
-        const nameFinal = item.productName || item.name;
-        const nameLower = nameFinal.toLowerCase();
-        const isSrv = (item.category === 'service') || serviceKeywords.some(kw => nameLower.includes(kw));
-        
-        return {
-          ...item,
-          name: nameFinal, 
-          isServiceItem: isSrv,
-          priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
-          qty: item.qty || 1
-        };
-      })
-    };
-
-    if (paymentMethod !== 'online') {
-      const uEmail = userEmail || (req.user && req.user.email);
-      if (uEmail) {
-         await sendUnifiedOrderEmail(uEmail, commonMailData, false, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client:", err));
-      }
+    // ------------------------------------------------------------
+    // 🚀 BIFURCAȚIE: ASAMBLARE vs STANDARD
+    // ------------------------------------------------------------
+    if (hasAssembly) {
+      let cleanAddress = `${client.addressDetails}, ${client.city}, ${client.county}`;
+      let pieseText = "Așteptăm piesele clientului.";
       
-      const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
-      await sendUnifiedOrderEmail(adminEmail, commonMailData, true, proformaPdfBuffer).catch(err => console.error("Eroare Mail Admin:", err));
+      // 👉 Extragem notele clientului (pe care le-am trimis cu separatorul "|" din Checkout)
+      if (client.addressDetails && client.addressDetails.includes("| Note client:")) {
+          const parts = client.addressDetails.split("| Note client:");
+          cleanAddress = `${parts[0].trim()}, ${client.city}, ${client.county}`;
+          pieseText = parts[1].trim() || "Nu au fost adăugate detalii suplimentare.";
+      }
+
+      // Detalii metodă
+      const modPredare = pickupType === "KarixPersonal" || client.city.toLowerCase().includes("oradea") 
+        ? "Predare Personală Oradea (F2F)" 
+        : "Prin Curier / Comandă furnizor";
+
+      // Mail către CLIENT
+      await sendAssemblyOrderPlaced(uEmail, {
+          customerName: client.isCompany ? client.companyName : client.name,
+          orderId: newOrder.id,
+          deliveryAddress: cleanAddress,
+          phone: client.phone,
+          method: modPredare,
+          issueDescription: pieseText
+      }).catch(err => console.error("Eroare Mail Client Asamblare:", err));
+
+      // Mail către ADMIN
+      await sendAdminAssemblyAlert({
+          productName: "Asamblare PC Premium",
+          orderId: newOrder.id,
+          customerName: client.isCompany ? client.companyName : client.name,
+          customerPhone: client.phone,
+          method: modPredare,
+          address: cleanAddress,
+          issueDescription: pieseText
+      }).catch(err => console.error("Eroare Mail Admin Asamblare:", err));
+
+    } else {
+      // --- LOGICĂ STANDARD PENTRU RESTUL COMENZILOR ---
+      let proformaPdfBuffer = null;
+      if (paymentMethod === 'transfer_bancar') {
+        try {
+          const proformaData = await createSmartBillProforma(newOrder, client, cartItems);
+          if (proformaData && proformaData.series && proformaData.number) {
+            proformaPdfBuffer = await getSmartBillProformaPdf(proformaData.series, proformaData.number);
+          }
+        } catch (err) {
+          console.error("⚠️ Eroare generare proformă SmartBill:", err);
+        }
+      }
+
+      const commonMailData = {
+        client: client,
+        orderId: newOrder.id,
+        total: total,
+        couponCode: couponCode || null,
+        pickupType: pickupType,
+        isServiceOrder: containsServices, 
+        paymentMethod: paymentMethod, // Transmitem și metoda pentru a afișa datele bancare în mail
+        cartItems: cartItems.map(item => {
+          const nameFinal = item.productName || item.name;
+          const nameLower = nameFinal.toLowerCase();
+          const isSrv = (item.category === 'service') || serviceKeywords.some(kw => nameLower.includes(kw));
+          
+          return {
+            ...item,
+            name: nameFinal, 
+            isServiceItem: isSrv,
+            priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
+            qty: item.qty || 1
+          };
+        })
+      };
+
+      if (paymentMethod !== 'online') {
+        if (uEmail) {
+           await sendUnifiedOrderEmail(uEmail, commonMailData, false, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client:", err));
+        }
+        await sendUnifiedOrderEmail(adminEmail, commonMailData, true, proformaPdfBuffer).catch(err => console.error("Eroare Mail Admin:", err));
+      }
     }
 
     res.status(200).json({ success: true, orderId: newOrder.id });

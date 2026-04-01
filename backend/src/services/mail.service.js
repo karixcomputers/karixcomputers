@@ -1006,3 +1006,46 @@ export async function sendWarrantyRejectedEmail(to, data, files = []) {
     console.error("❌ Eroare sendWarrantyRejectedEmail:", err);
   }
 }
+
+export async function sendAssemblyOrderPlaced(to, data) {
+  try {
+    const tpl = loadTemplate("assemblyPlacedClient.html");
+    const subject = `Confirmare Asamblare PC (#${data.orderId}) - Karix Computers`;
+
+    const html = render(tpl, {
+      customerName: data.customerName,
+      orderId: data.orderId,
+      deliveryAddress: data.deliveryAddress,
+      phone: data.phone,
+      method: data.method,
+      issueDescription: data.issueDescription,
+      accountUrl: `https://karixcomputers.ro/orders`
+    });
+
+    await sendHtmlMail({ to, subject, html });
+  } catch (err) {
+    console.error("❌ Eroare sendAssemblyOrderPlaced:", err);
+  }
+}
+
+export async function sendAdminAssemblyAlert(data) {
+  try {
+    const tpl = loadTemplate("adminAssemblyAlert.html");
+    const subject = `⚙️ ASAMBLARE PC: ${data.customerName}`;
+
+    const html = render(tpl, {
+      productName: data.productName,
+      orderId: data.orderId,
+      customerName: data.customerName,
+      customerPhone: data.customerPhone || data.phoneNumber,
+      method: data.method,
+      address: data.address,
+      issueDescription: data.issueDescription || "Nespecificat",
+      adminUrl: `https://karixcomputers.ro/admin/orders`
+    });
+
+    await sendHtmlMail({ to: process.env.ADMIN_EMAIL || "karixcomputers@gmail.com", subject, html });
+  } catch (err) {
+    console.error("❌ Eroare sendAdminAssemblyAlert:", err);
+  }
+}

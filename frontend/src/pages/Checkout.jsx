@@ -131,7 +131,6 @@ export default function Checkout() {
     companyName: "",
     cui: "",
     regCom: "",
-    // 👉 State separat pentru detaliile de la asamblare
     assemblyNotes: "" 
   });
 
@@ -142,7 +141,6 @@ export default function Checkout() {
 
   const appliedCoupon = location.state?.coupon || null;
 
-  // 👉 VERIFICĂM DACĂ E COMANDĂ EXCLUSIV DE ASAMBLARE
   const isAssemblyOrder = useMemo(() => {
     return items.some(i => {
       const n = (i.name || i.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -296,20 +294,17 @@ export default function Checkout() {
   };
 
   const handlePlaceOrder = async () => {
-    // Validări
     if (!shipping.phone) {
       triggerError("Te rugăm să introduci un număr de telefon valid.");
       return;
     }
 
     if (!isAssemblyOrder) {
-      // Validări normale pentru restul comenzilor
       if (!shipping.addressDetails || !shipping.city || !shipping.county) {
         triggerError("Te rugăm să completezi datele complete de livrare.");
         return;
       }
     } else {
-      // La asamblare prin curier, validăm adresa de retur
       if (!pickupByKarix && (!shipping.addressDetails || !shipping.city || !shipping.county)) {
          triggerError("Te rugăm să completezi adresa ta pentru a ști unde să livrăm PC-ul asamblat.");
          return;
@@ -368,10 +363,9 @@ export default function Checkout() {
       };
     });
 
-    // Modificăm cum trimitem addressDetails dacă e asamblare, ca să includă și mesajul clientului
     let finalAddressDetails = shipping.addressDetails;
-    if (isAssemblyOrder && !pickupByKarix && shipping.assemblyNotes) {
-       finalAddressDetails = `${shipping.addressDetails} | Note client: ${shipping.assemblyNotes}`;
+    if (isAssemblyOrder && shipping.assemblyNotes) {
+       finalAddressDetails = `${shipping.addressDetails || "Fără adresă de livrare prestabilită"} | Note client: ${shipping.assemblyNotes}`;
     }
 
     const orderData = { 
@@ -471,7 +465,6 @@ export default function Checkout() {
             
             <div className="lg:col-span-7 space-y-6">
               
-              {/* 1. Date de Contact & Tip Facturare */}
               <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                   <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">1. Date Facturare</h2>
@@ -605,19 +598,28 @@ export default function Checkout() {
                         </button>
                       </div>
 
-                      {!pickupByKarix && (
+                      {pickupByKarix ? (
+                         <div className="md:col-span-2 space-y-2 pt-2">
+                           <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Detalii Preluare Oradea (Opțional)</label>
+                           <textarea 
+                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[60px] resize-none placeholder-gray-600 text-sm" 
+                             value={shipping.assemblyNotes} 
+                             onChange={e => setShipping(s => ({ ...s, assemblyNotes: e.target.value }))} 
+                             placeholder="Ex: Ne vedem la Nufărul / Am și o carcasă foarte mare..." 
+                           />
+                         </div>
+                      ) : (
                         <div className="md:col-span-2 space-y-4 p-5 rounded-2xl bg-indigo-500/5 border border-indigo-500/20">
                            <div>
                               <h4 className="text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-1">Unde trimiți componentele?</h4>
                               <p className="text-white text-sm font-medium leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5">
-                                [Aici pui Adresa ta Completă, Oradea, Bihor]<br/>
-                                <span className="text-gray-400 text-xs">Telefon destinatar: [Aici pui telefonul]</span>
+                                Str. Sovata, Nr. 52, Bl. C6, Ap. 51, Oradea, Bihor<br/>
+                                <span className="text-gray-400 text-xs">Telefon destinatar: 0770619935</span>
                               </p>
                            </div>
 
                            <div className="h-px bg-indigo-500/20 w-full my-4" />
 
-                           {/* 👉 Câmpurile obligatorii pentru adresa de RETUR a PC-ului */}
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-2 relative" ref={dropdownRef}>
                                 <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ Retur PC</label>
