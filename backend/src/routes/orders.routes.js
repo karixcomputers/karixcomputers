@@ -398,26 +398,30 @@ router.post("/", requireAuth, async (req, res, next) => {
         ? "Predare Personală Oradea (F2F)" 
         : "Prin Curier / Comandă furnizor";
 
-      // Mail către CLIENT
-      await sendAssemblyOrderPlaced(uEmail, {
-          customerName: client.isCompany ? client.companyName : client.name,
-          orderId: newOrder.id,
-          deliveryAddress: cleanAddress,
-          phone: client.phone,
-          method: modPredare,
-          issueDescription: pieseText
-      }).catch(err => console.error("Eroare Mail Client Asamblare:", err));
+      // 👉 Dacă se alege transfer bancar sau ramburs, trimitem ACUM
+      // Dacă se alege Netopia, lăsăm Webhook-ul de Netopia să facă treaba asta la confirmarea plății!
+      if (paymentMethod !== 'online') {
+        // Mail către CLIENT
+        await sendAssemblyOrderPlaced(uEmail, {
+            customerName: client.isCompany ? client.companyName : client.name,
+            orderId: newOrder.id,
+            deliveryAddress: cleanAddress,
+            phone: client.phone,
+            method: modPredare,
+            issueDescription: pieseText
+        }).catch(err => console.error("Eroare Mail Client Asamblare:", err));
 
-      // Mail către ADMIN
-      await sendAdminAssemblyAlert({
-          productName: "Asamblare PC Premium",
-          orderId: newOrder.id,
-          customerName: client.isCompany ? client.companyName : client.name,
-          customerPhone: client.phone,
-          method: modPredare,
-          address: cleanAddress,
-          issueDescription: pieseText
-      }).catch(err => console.error("Eroare Mail Admin Asamblare:", err));
+        // Mail către ADMIN
+        await sendAdminAssemblyAlert({
+            productName: "Asamblare PC Premium",
+            orderId: newOrder.id,
+            customerName: client.isCompany ? client.companyName : client.name,
+            customerPhone: client.phone,
+            method: modPredare,
+            address: cleanAddress,
+            issueDescription: pieseText
+        }).catch(err => console.error("Eroare Mail Admin Asamblare:", err));
+      }
 
     } else {
       // --- LOGICĂ STANDARD PENTRU RESTUL COMENZILOR ---
@@ -469,28 +473,6 @@ router.post("/", requireAuth, async (req, res, next) => {
   } catch (error) {
     console.error("Eroare Backend Comandă:", error);
     res.status(500).json({ error: error.message });
-  }
-});
-
-// --- RUTĂ PROXY PENTRU ANAF ---
-router.post("/anaf", async (req, res) => {
-  try {
-    const { cui } = req.body;
-    const numCui = Number(cui);
-    if (!numCui || isNaN(numCui)) return res.status(400).json({ error: "CUI invalid." });
-
-    const response = await fetch("https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
-      body: JSON.stringify([{ cui: numCui, data: new Date().toISOString().split("T")[0] }])
-    });
-
-    if (!response.ok) return res.status(200).json({ cod: 500, message: "ANAF indisponibil" }); 
-    const anafData = await response.json();
-    res.json(anafData);
-  } catch (error) {
-    console.error("❌ Eroare conexiune ANAF:", error.message);
-    res.status(200).json({ cod: 500, message: "Conexiune refuzată de ANAF." });
   }
 });
 

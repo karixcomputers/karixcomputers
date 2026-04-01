@@ -4,7 +4,12 @@ import path from "path";
 import crypto from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
-import { sendUnifiedOrderEmail } from "../services/mail.service.js";
+import { 
+    sendUnifiedOrderEmail,
+    // 👉 IMPORTĂM FUNCȚIILE DE ASAMBLARE AICI
+    sendAssemblyOrderPlaced,
+    sendAdminAssemblyAlert 
+} from "../services/mail.service.js";
 
 // --- IMPORT SMARTBILL ---
 import { createSmartBillInvoice, getSmartBillPdf } from "../services/smartbill.service.js";
@@ -158,72 +163,114 @@ const confirmPayment = async (req, res) => {
             };
             await fetch(discordWebhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(discordMessage) }).catch(e => console.error(e));
 
-            // --- LOGICĂ SMARTBILL ---
-            let invoicePdfBuffer = null;
-            try {
-                console.log("⏳ Generare factură SmartBill...");
-                const invoiceData = await createSmartBillInvoice(updatedOrder);
-                
-                if (invoiceData && invoiceData.series && invoiceData.number) {
-                    console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
-                    // --- ADAUGĂ ASTA (Salvăm factura în baza de date ca să o putem descărca oricând) ---
-                    await prisma.order.update({
-                        where: { id: orderId },
-                        data: { 
-                            smartbillSeries: invoiceData.series,
-                            smartbillNumber: invoiceData.number
-                        }
-                    });
-                    invoicePdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
-                    if (invoicePdfBuffer) {
-                        console.log("✅ PDF-ul facturii a fost preluat cu succes.");
-                    }
-                }
-            } catch (sbError) {
-                console.error("❌ Eroare SmartBill Integration:", sbError.message);
-            }
 
-            // --- EMAIL-URI ---
-            const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
-            const containsServices = updatedOrder.items.some(item => serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)));
+            // 👉 BIFURCAȚIE ASAMBLARE VS STANDARD (La fel ca in orders.routes.js)
+            const hasAssembly = updatedOrder.items.some(item => {
+                const n = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return n.includes("asamblare");
+            });
 
-            const commonMailData = {
-                client: {
-                    name: updatedOrder.shippingName, 
-                    phone: updatedOrder.shippingPhone, 
-                    addressDetails: updatedOrder.shippingAddress,
-                    // ADĂUGĂM ASTA ca să nu mai apară undefined:
-                    city: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'Oradea' : '',
-                    county: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'Bihor' : '',
-                    isCompany: updatedOrder.isCompany, 
-                    companyName: updatedOrder.companyName, 
-                    cui: updatedOrder.cui, 
-                    regCom: updatedOrder.regCom
-                },
-                orderId: updatedOrder.id, 
-                total: updatedOrder.totalCents, 
-                couponCode: null,
-                shippingAddress: updatedOrder.shippingAddress, // Trimitem adresa direct
-                // MODIFICĂM VALOAREA să fie identică cu cea din mail service:
-                pickupType: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'KarixPersonal' : 'curier',
-                isServiceOrder: containsServices,
-                cartItems: updatedOrder.items.map(item => ({
-                    ...item, 
-                    name: item.productName, 
-                    isServiceItem: item.status === 'in_asteptare_ridicare' || serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
-                    qty: item.qty || 1, 
-                    priceCentsAtBuy: item.priceCentsAtBuy || item.priceCents
-                }))
-            };
-
-            // Trimitem mail clientului (cu PDF dacă există)
-            if (updatedOrder.user?.email) {
-                await sendUnifiedOrderEmail(updatedOrder.user.email, commonMailData, false, invoicePdfBuffer).catch(e => console.error(e));
-            }
-            
-            // Trimitem mail admin-ului (cu PDF dacă există)
             const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
-            await sendUnifiedOrderEmail(adminEmail, commonMailData, true, null).catch(e => console.error(e));
+
+            if (hasAssembly) {
+                // LOGICA PENTRU ASAMBLARE
+                let cleanAddress = updatedOrder.shippingAddress;
+                let pieseText = "Așteptăm piesele clientului.";
+                
+                if (cleanAddress.includes("| Note client:")) {
+                    const parts = cleanAddress.split("| Note client:");
+                    cleanAddress = parts[0].trim();
+                    pieseText = parts[1].trim() || "Nu au fost adăugate detalii suplimentare.";
+                }
+
+                const isOradea = cleanAddress.toLowerCase().includes("oradea");
+                const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
+
+                // Trimitem Mail Client
+                if (updatedOrder.user?.email) {
+                    await sendAssemblyOrderPlaced(updatedOrder.user.email, {
+                        customerName: updatedOrder.isCompany ? updatedOrder.companyName : updatedOrder.shippingName,
+                        orderId: updatedOrder.id,
+                        deliveryAddress: cleanAddress,
+                        phone: updatedOrder.shippingPhone,
+                        method: modPredare,
+                        issueDescription: pieseText
+                    }).catch(err => console.error("Eroare Mail Client Asamblare Netopia:", err));
+                }
+
+                // Trimitem Mail Admin
+                await sendAdminAssemblyAlert({
+                    productName: "Asamblare PC Premium (Plată Online Confirmată)",
+                    orderId: updatedOrder.id,
+                    customerName: updatedOrder.isCompany ? updatedOrder.companyName : updatedOrder.shippingName,
+                    customerPhone: updatedOrder.shippingPhone,
+                    method: modPredare,
+                    address: cleanAddress,
+                    issueDescription: pieseText
+                }).catch(err => console.error("Eroare Mail Admin Asamblare Netopia:", err));
+
+            } else {
+                // --- LOGICĂ STANDARD SMARTBILL & UNIFIED EMAIL ---
+                let invoicePdfBuffer = null;
+                try {
+                    console.log("⏳ Generare factură SmartBill...");
+                    const invoiceData = await createSmartBillInvoice(updatedOrder);
+                    
+                    if (invoiceData && invoiceData.series && invoiceData.number) {
+                        console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
+                        await prisma.order.update({
+                            where: { id: orderId },
+                            data: { 
+                                smartbillSeries: invoiceData.series,
+                                smartbillNumber: invoiceData.number
+                            }
+                        });
+                        invoicePdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
+                        if (invoicePdfBuffer) {
+                            console.log("✅ PDF-ul facturii a fost preluat cu succes.");
+                        }
+                    }
+                } catch (sbError) {
+                    console.error("❌ Eroare SmartBill Integration:", sbError.message);
+                }
+
+                // EMAIL-URI STANDARD
+                const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
+                const containsServices = updatedOrder.items.some(item => serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)));
+
+                const commonMailData = {
+                    client: {
+                        name: updatedOrder.shippingName, 
+                        phone: updatedOrder.shippingPhone, 
+                        addressDetails: updatedOrder.shippingAddress,
+                        city: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'Oradea' : '',
+                        county: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'Bihor' : '',
+                        isCompany: updatedOrder.isCompany, 
+                        companyName: updatedOrder.companyName, 
+                        cui: updatedOrder.cui, 
+                        regCom: updatedOrder.regCom
+                    },
+                    orderId: updatedOrder.id, 
+                    total: updatedOrder.totalCents, 
+                    couponCode: null,
+                    shippingAddress: updatedOrder.shippingAddress, 
+                    pickupType: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'KarixPersonal' : 'curier',
+                    isServiceOrder: containsServices,
+                    cartItems: updatedOrder.items.map(item => ({
+                        ...item, 
+                        name: item.productName, 
+                        isServiceItem: item.status === 'in_asteptare_ridicare' || serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
+                        qty: item.qty || 1, 
+                        priceCentsAtBuy: item.priceCentsAtBuy || item.priceCents
+                    }))
+                };
+
+                if (updatedOrder.user?.email) {
+                    await sendUnifiedOrderEmail(updatedOrder.user.email, commonMailData, false, invoicePdfBuffer).catch(e => console.error(e));
+                }
+                
+                await sendUnifiedOrderEmail(adminEmail, commonMailData, true, null).catch(e => console.error(e));
+            }
         }
 
         res.set('Content-Type', 'text/xml');
