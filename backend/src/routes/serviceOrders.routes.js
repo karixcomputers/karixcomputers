@@ -26,14 +26,14 @@ const requireAdmin = (req, res, next) => {
 
 /**
  * 1. POST /api/service-orders
- * Creare cerere service
+ * Creare cerere service / garanție
  */
 router.post("/", requireAuth, async (req, res) => {
   try {
     const { 
       method, 
       productName, 
-      orderId, 
+      orderId, // Referința facturii originale (opțional)
       issueDescription, 
       judet, 
       oras, 
@@ -49,6 +49,7 @@ router.post("/", requireAuth, async (req, res) => {
     const dbUser = await prisma.user.findUnique({ where: { id: userId } });
     const finalName = dbUser?.name || userEmail.split('@')[0];
 
+    // Salvare în baza de date
     const newServiceOrder = await prisma.serviceOrder.create({
       data: {
         orderId: String(orderId || ""),
@@ -59,7 +60,6 @@ router.post("/", requireAuth, async (req, res) => {
         issueDescription,
         judet: method === "curier" ? judet : "Bihor",
         oras: method === "curier" ? oras : "Oradea",
-        // 👉 MODIFICAT: Salvăm adresa reală oferită de client indiferent de metodă
         address: address || "Nespecificat", 
         preferredDate,
         userId: userId,
@@ -68,24 +68,27 @@ router.post("/", requireAuth, async (req, res) => {
     });
 
     try {
-      // 👉 MODIFICAT: Setăm adresa corectă pentru email-ul clientului
+      // Formatăm adresa completă pentru email-ul clientului
       const fullAddress = method === "curier" 
         ? `${address}, ${oras}, ${judet}`
         : `${address}, Oradea, Bihor`;
 
+      // ✉️ Trimitere mail confirmare către CLIENT
       await sendServiceOrderPlaced(userEmail, {
         customerName: finalName,
-        orderId: orderId, 
+        // 👉 REPARAȚIE: Folosim ID-ul unic al cererii (newServiceOrder.id) pentru a evita "N/A"
+        orderId: newServiceOrder.id, 
         serviceList: productName, 
         deliveryAddress: fullAddress,
         phone: phoneNumber,
-        method: method // Îi spunem funcției de mail ce a ales clientul
+        method: method // Trimitem metoda pentru a alege template-ul corect (Curier vs Oradea)
       });
       
+      // ✉️ Trimitere alertă către ADMIN
       if (method === "curier") {
         await sendAdminServiceCourierAlert({
           productName,
-          orderId: orderId,
+          orderId: newServiceOrder.id,
           customerName: finalName,
           customerPhone: phoneNumber,
           judet, oras, address, preferredDate
@@ -93,12 +96,12 @@ router.post("/", requireAuth, async (req, res) => {
       } else {
         await sendAdminServiceOradeaAlert({
           productName,
+          orderId: newServiceOrder.id,
           customerName: finalName,
           customerPhone: phoneNumber,
           preferredDate,
           issueDescription,
-          // 👉 MODIFICAT: Trimitem adresa către funcția de mail pentru Admin
-          address: address
+          address: address // Adresa din Oradea de unde trebuie ridicat
         });
       }
     } catch (mailErr) {
@@ -114,7 +117,7 @@ router.post("/", requireAuth, async (req, res) => {
 
 /**
  * 2. GET /api/service-orders/my-requests
- * RUTA NOUĂ: Permite clientului să își vadă istoricul de service
+ * Permite clientului să își vadă istoricul de service
  */
 router.get("/my-requests", requireAuth, async (req, res) => {
   try {
@@ -167,11 +170,12 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
     const userEmail = updatedOrder.user.email;
     const emailData = {
       customerName: updatedOrder.customerName,
-      orderId: updatedOrder.orderId,
+      orderId: updatedOrder.id, // Folosim ID-ul înregistrării
       productName: updatedOrder.productName,
       awb: awb || updatedOrder.awb
     };
 
+    // Notificări automate la schimbarea statusului
     if (status === "in_service") {
       await sendServiceInPossessionEmail(userEmail, emailData).catch(() => {});
     } 
