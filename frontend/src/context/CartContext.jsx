@@ -74,7 +74,7 @@ export const CartProvider = ({ children }) => {
     });
   };
 
-  const addItem = (product) => {
+const addItem = (product) => {
     const incomingName = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const isIncomingAssembly = incomingName.includes("asamblare");
 
@@ -86,17 +86,18 @@ export const CartProvider = ({ children }) => {
     // Cazul 1: Ai asamblare în coș și vrei să adaugi o componentă
     if (hasAssemblyInCart && !isIncomingAssembly) {
       setConflictModal({ isOpen: true, type: 'WANTS_NORMAL', pendingProduct: product });
-      return;
+      return false; // 👉 ADĂUGAT: Returnează explicit false ca să oprească toast-ul din UI
     }
 
     // Cazul 2: Ai componente în coș și vrei să adaugi asamblarea
     if (!hasAssemblyInCart && isIncomingAssembly && items.length > 0) {
       setConflictModal({ isOpen: true, type: 'WANTS_ASSEMBLY', pendingProduct: product });
-      return;
+      return false; // 👉 ADĂUGAT: Returnează explicit false
     }
 
     // Dacă nu există conflicte, adaugă normal
     performAdd(product, false);
+    return true; // 👉 ADĂUGAT: Returnează true pentru a declanșa toast-ul
   };
 
   const removeFromCart = (id) => {
