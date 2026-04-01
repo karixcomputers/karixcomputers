@@ -29,14 +29,38 @@ export const CartProvider = ({ children }) => {
   }, [items]);
 
   const addItem = (product) => {
+    // --- LOGICĂ EXCLUSIVITATE ASAMBLARE ---
+    const incomingName = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const isIncomingAssembly = incomingName.includes("asamblare");
+
+    const hasAssemblyInCart = items.some(i => {
+      const n = (i.name || i.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return n.includes("asamblare");
+    });
+
+    // Cazul 1: Ai asamblare în coș și vrei să adaugi o componentă
+    if (hasAssemblyInCart && !isIncomingAssembly) {
+      alert("⚠️ Serviciul de Asamblare PC se comandă separat pe o comandă unică. Nu poți adăuga alte produse în acest coș.");
+      return;
+    }
+
+    // Cazul 2: Ai componente în coș și vrei să adaugi asamblarea
+    let shouldClearCart = false;
+    if (!hasAssemblyInCart && isIncomingAssembly && items.length > 0) {
+      const confirmClear = window.confirm("⚠️ Serviciul de Asamblare PC se comandă separat.\n\nDorești să golești coșul actual pentru a adăuga acest serviciu?");
+      if (!confirmClear) return; // Dacă clientul dă Cancel, anulăm acțiunea
+      shouldClearCart = true;    // Altfel, golim coșul
+    }
+
     setItems((prev) => {
-      const exists = prev.find((i) => i.id === product.id);
+      const currentCart = shouldClearCart ? [] : prev;
+      const exists = currentCart.find((i) => i.id === product.id);
       
       const actualPrice = product.priceCents || product.price || product.totalCents || 0;
       const qtyToAdd = product.qty || 1;
 
       if (exists) {
-        return prev.map((i) =>
+        return currentCart.map((i) =>
           i.id === product.id ? { ...i, qty: i.qty + qtyToAdd } : i
         );
       }
@@ -51,7 +75,7 @@ export const CartProvider = ({ children }) => {
       // Salvăm explicit și imageUrl pentru a fi siguri că e accesibil în UI
       const finalImageUrl = product.imageUrl || finalImages[0] || null;
 
-      return [...prev, { 
+      return [...currentCart, { 
         id: product.id, 
         productName: product.name || product.productName, 
         name: product.name || product.productName,
@@ -59,7 +83,7 @@ export const CartProvider = ({ children }) => {
         priceCents: actualPrice,
         priceCentsAtBuy: actualPrice,
         images: finalImages, 
-        imageUrl: finalImageUrl, // Adăugat explicit aici!
+        imageUrl: finalImageUrl, 
         specs: product.specs || {},
         warrantyMonths: product.warrantyMonths, 
         qty: qtyToAdd 
