@@ -65,9 +65,7 @@ export default function VerifyEmail() {
 
       <div className="min-h-screen pt-12 pb-24 px-4 relative overflow-hidden flex justify-center bg-transparent">
         
-        {/* Glow-uri de fundal Karix */}
-        <div className="absolute top-0 -left-20 w-[400px] h-[400px] bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none" />
-        <div className="absolute top-0 -right-20 w-[400px] h-[400px] bg-pink-500/10 blur-[100px] rounded-full pointer-events-none" />
+
 
         <div className="max-w-md w-full relative z-10">
           <div className="rounded-[40px] border border-white/10 bg-white/[0.03] backdrop-blur-2xl p-8 sm:p-12 shadow-2xl text-center">

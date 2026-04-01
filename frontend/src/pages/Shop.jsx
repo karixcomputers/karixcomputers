@@ -253,9 +253,6 @@ export default function Shop() {
           }
         `}</style>
 
-        {/* Elemente Decorative Background */}
-        <div className="absolute top-0 -left-20 w-[600px] h-[600px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
-        <div className="absolute bottom-0 -right-20 w-[500px] h-[500px] bg-pink-500/5 blur-[120px] rounded-full pointer-events-none" />
 
         <div className="max-w-6xl mx-auto relative z-10">
           

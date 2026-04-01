@@ -35,9 +35,7 @@ export default function Warranty() {
 
       <div className="relative isolate min-h-screen pt-32 pb-24 px-4 sm:px-6 overflow-hidden bg-transparent">
         
-        {/* Background Glows */}
-        <div className="absolute top-1/4 -left-20 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
-        <div className="absolute bottom-1/4 -right-20 w-[500px] h-[500px] bg-pink-500/5 blur-[120px] rounded-full pointer-events-none" />
+
 
         <div className="max-w-4xl mx-auto relative z-10">
           

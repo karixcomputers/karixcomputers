@@ -108,7 +108,6 @@ export default function Warranties() {
       />
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent text-left">
-        <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
         
         <div className="max-w-4xl mx-auto relative z-10">
           <header className="mb-12">

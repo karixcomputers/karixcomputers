@@ -95,7 +95,6 @@ export default function Tickets() {
           </div>
         </div>
 
-        <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
 
         <div className="max-w-4xl mx-auto relative z-10">
           <header className="mb-12 flex flex-col md:flex-row justify-between items-end gap-6 text-left">

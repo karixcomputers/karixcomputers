@@ -65,9 +65,7 @@ export default function Contact() {
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent">
         
-        {/* Glows */}
-        <div className="absolute top-1/4 -left-20 w-[600px] h-[600px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
-        <div className="absolute bottom-1/4 -right-20 w-[600px] h-[600px] bg-pink-500/5 blur-[120px] rounded-full pointer-events-none" />
+
 
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center mb-20">
