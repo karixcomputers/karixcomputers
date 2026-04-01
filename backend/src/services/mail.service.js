@@ -952,3 +952,37 @@ export async function sendAdminOrderCanceledEmail(to, data) {
     console.error("❌ Eroare sendAdminOrderCanceledEmail:", err);
   }
 }
+
+
+// ============================================================
+// 🚀 NOU: FUNCȚIE RESPINGERE GARANȚIE CU POZE
+// ============================================================
+export async function sendWarrantyRejectedEmail(to, data, files = []) {
+  try {
+    const tpl = loadTemplate("warrantyRejected.html");
+    const html = render(tpl, {
+      customerName: data.customerName,
+      productName: data.productName,
+      orderId: data.orderId,
+      reason: data.reason,
+      date: new Date().toLocaleDateString('ro-RO')
+    });
+
+    // Transformăm fișierele din Multer în atașamente pentru Nodemailer
+    const attachments = files.map(file => ({
+      filename: file.originalname,
+      content: file.buffer // Folosim buffer-ul direct din memorie
+    }));
+
+    await sendHtmlMail({ 
+      to, 
+      subject: `⚠️ Notificare importantă privind garanția: ${data.productName}`, 
+      html,
+      attachments
+    });
+    
+    console.log(`✅ MAIL RESPINGERE GARANȚIE TRIMIS LA: ${to}`);
+  } catch (err) {
+    console.error("❌ Eroare sendWarrantyRejectedEmail:", err);
+  }
+}
