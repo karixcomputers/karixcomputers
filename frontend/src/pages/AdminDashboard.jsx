@@ -7,16 +7,16 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  // MODIFICARE: Fereastra acum cere detalii despre pachet pentru a genera AWB-ul
   const [awbModal, setAwbModal] = useState({ open: false, itemId: null, orderId: null });
-  const [tempAwb, setTempAwb] = useState("");
+  const [packageWeight, setPackageWeight] = useState(1);
+  const [packageCount, setPackageCount] = useState(1);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const [confirmingOpId, setConfirmingOpId] = useState(null);
   
-  // STĂRI PENTRU ALERTE ȘI MODAL-URI CUSTOM
   const [toastMsg, setToastMsg] = useState({ open: false, type: "success", text: "" });
   const [opModal, setOpModal] = useState({ open: false, orderId: null });
-  
-  // NOU: Stare pentru Modal-ul de Anulare Comandă
   const [cancelModal, setCancelModal] = useState({ open: false, orderId: null });
 
   const showToast = (text, type = "success") => {
@@ -41,25 +41,32 @@ export default function AdminDashboard() {
   useEffect(() => { fetchOrders(); }, []);
 
   const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
-    // Am eliminat interceptarea care deschidea modalul pentru AWB manual.
-    // Acum, selectarea "predat_curier" trimite cererea direct la backend pentru auto-generare.
-    await executeItemUpdate(orderId, itemId, newStatus, null);
+    if (newStatus === "predat_curier") {
+      // Deschidem modalul ca să cerem greutatea înainte să generăm AWB-ul
+      setAwbModal({ open: true, itemId, orderId });
+      return;
+    }
+    await executeItemUpdate(orderId, itemId, newStatus);
   };
 
-  const executeItemUpdate = async (orderId, itemId, status, awb) => {
+  const executeItemUpdate = async (orderId, itemId, status, weight = 1, packages = 1) => {
+    if (status === "predat_curier") setIsGenerating(true);
+    
     try {
       const res = await apiFetch(`/orders/item/${itemId}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ status, awb })
+        body: JSON.stringify({ status, weight, packages }) // Trimitem detaliile către backend
       });
 
-      if (!res.ok) throw new Error("Eroare la server");
+      const resData = await res.json();
+
+      if (!res.ok) throw new Error(resData.error || "Eroare la server");
 
       setOrders(prev => {
         const updatedOrders = prev.map(order => {
           if (order.id === orderId) {
             const updatedItems = order.items.map(item => 
-              item.id === itemId ? { ...item, status, awb: awb || item.awb } : item
+              item.id === itemId ? { ...item, status, awb: resData.item?.awb || item.awb } : item
             );
             
             const allDelivered = updatedItems.every(i => i.status === "livrat");
@@ -81,10 +88,13 @@ export default function AdminDashboard() {
       });
 
       setAwbModal({ open: false, itemId: null, orderId: null });
-      setTempAwb("");
+      setPackageWeight(1);
+      setPackageCount(1);
       showToast("Status actualizat cu succes!");
     } catch (err) {
       showToast(err.message, "error");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -146,7 +156,6 @@ export default function AdminDashboard() {
     const isOradea = order.shippingAddress?.toLowerCase().includes('oradea');
     const isBankTransfer = order.paymentMethod === 'transfer_bancar';
 
-    // Generăm prima opțiune din listă pe baza metodei de plată
     const initialOption = isBankTransfer 
       ? <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
       : <option value="in_asteptare">⏳ În Așteptare (Plătit)</option>;
@@ -175,7 +184,7 @@ export default function AdminDashboard() {
             <option value="diagnosticare">🔍 Diagnosticare</option>
             <option value="reparat">✅ Reparat / Gata</option>
             <option value="ireparabil">❌ Ireparabil</option>
-            <option value="predat_curier">📦 Predat Curier (Retur Către Client)</option>
+            <option value="predat_curier">📦 Predat Curier (GENEREAZĂ AWB)</option>
             <option value="livrat">🏁 Livrat Final</option>
             <option value="anulat">❌ Anulat</option>
           </>
@@ -218,7 +227,6 @@ export default function AdminDashboard() {
   return (
     <div className="relative min-h-screen pt-32 pb-24 px-4 sm:px-8 bg-transparent">
       <div className="max-w-7xl mx-auto relative z-10">
-        
         <header className="mb-16 flex flex-col lg:flex-row justify-between items-end gap-8">
           <div>
             <p className="text-indigo-500 font-black text-[10px] uppercase tracking-[0.4em] mb-2 drop-shadow-md">Control Panel</p>
@@ -350,24 +358,49 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* MODAL PENTRU AWB (Ascuns momentan de pe fluxul automat) */}
+      {/* MODAL PENTRU AWB GENERATOR (Cere greutate și colete) */}
       {awbModal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setAwbModal({ open: false, itemId: null, orderId: null })}></div>
           <div className="relative w-full max-w-md p-10 rounded-[40px] bg-[#12192c]/95 backdrop-blur-3xl border border-white/10 shadow-2xl animate-in zoom-in duration-300">
-            <h2 className="text-2xl font-black text-white uppercase italic mb-2">Introdu AWB</h2>
-            <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest mb-8 italic">Expediere către client prin Curier</p>
-            <input 
-              autoFocus 
-              type="text" 
-              value={tempAwb} 
-              onChange={(e) => setTempAwb(e.target.value)} 
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-black italic mb-6 outline-none focus:border-indigo-500 shadow-inner" 
-              placeholder="Cod Tracking (AWB)..." 
-            />
+            <h2 className="text-2xl font-black text-white uppercase italic mb-2">Detalii Expediere</h2>
+            <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest mb-8 italic">Se va genera AWB FAN Courier</p>
+            
+            <div className="flex gap-4 mb-6">
+                <div className="flex-1">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Greutate (kg)</label>
+                    <input 
+                        autoFocus 
+                        type="number" 
+                        min="1"
+                        value={packageWeight} 
+                        onChange={(e) => setPackageWeight(e.target.value)} 
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-black italic outline-none focus:border-indigo-500 shadow-inner" 
+                        placeholder="Ex: 15" 
+                    />
+                </div>
+                <div className="flex-1">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Nr. Colete</label>
+                    <input 
+                        type="number" 
+                        min="1"
+                        value={packageCount} 
+                        onChange={(e) => setPackageCount(e.target.value)} 
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-black italic outline-none focus:border-indigo-500 shadow-inner" 
+                        placeholder="Ex: 1" 
+                    />
+                </div>
+            </div>
+
             <div className="flex gap-4">
                 <button onClick={() => setAwbModal({ open: false, itemId: null, orderId: null })} className="flex-1 py-4 text-gray-500 font-black uppercase text-[10px] hover:text-white transition-colors">Anulare</button>
-                <button onClick={() => executeItemUpdate(awbModal.orderId, awbModal.itemId, "predat_curier", tempAwb)} className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black uppercase text-[10px] shadow-xl hover:bg-indigo-500 transition-colors">Salvează</button>
+                <button 
+                  disabled={isGenerating}
+                  onClick={() => executeItemUpdate(awbModal.orderId, awbModal.itemId, "predat_curier", packageWeight, packageCount)} 
+                  className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black uppercase text-[10px] shadow-xl hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                >
+                  {isGenerating ? "Se trimite..." : "Generare AWB"}
+                </button>
             </div>
           </div>
         </div>

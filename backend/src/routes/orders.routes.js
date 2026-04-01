@@ -189,7 +189,9 @@ router.patch("/:id/cancel", requireAuth, async (req, res, next) => {
 router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { itemId } = req.params;
-    const { status, awb } = req.body;
+    
+    // 👉 NOU: Am extras weight și packages din request
+    const { status, awb, weight, packages } = req.body; 
 
     // Am schimbat in "let" pentru a putea actualiza awb-ul dupa generare
     let updatedItem = await prisma.orderItem.update({
@@ -268,8 +270,8 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
         // --- LOGICĂ NOUĂ AWB PE STATUS PREDAT CURIER ---
         if (!currentAwb) {
           try {
-            // Generam automat cu funcția (isTestMode din oficiu o să creeze AWB simulat momentan)
-            const newAwb = await createFanAWB(updatedItem.order); 
+            // 👉 NOU: Generăm automat cu funcția, pasând isTestMode = false, plus greutatea și numărul de colete
+            const newAwb = await createFanAWB(updatedItem.order, false, weight, packages); 
             
             // Salvăm noul awb in baza de date si actualizam currentAwb
             updatedItem = await prisma.orderItem.update({
@@ -280,9 +282,11 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
 
             currentAwb = newAwb;
             emailData.awb = newAwb; // Actualizam si pt trimiterea din mail
-            console.log(`🚀 AWB generat automat la predare: ${newAwb}`);
+            console.log(`🚀 AWB generat automat la predare: ${newAwb} | Greutate: ${weight}kg | Colete: ${packages}`);
           } catch (awbError) {
             console.error("❌ Eroare auto-generare AWB:", awbError);
+            // Oprim execuția și returnăm eroarea către Frontend pentru a fi afișată în Toast
+            return res.status(500).json({ error: awbError.message || "Eroare la generarea AWB-ului la FAN Courier" });
           }
         }
         

@@ -39,16 +39,15 @@ export async function getFanToken() {
 }
 
 // ==========================================
-// 2. GENERARE AWB (CU MOD DE TESTARE)
+// 2. GENERARE AWB REAL
 // ==========================================
-export async function createFanAWB(order, isTestMode = true) { // 👈 TEST MODE E ACTIVAT AICI
-    console.log(`📦 Inițiere generare AWB pentru comanda #${order.id}. Test Mode: ${isTestMode}`);
+// Am adăugat weight și packages. Modul de test e dezactivat (false).
+export async function createFanAWB(order, isTestMode = false, weight = 1, packagesCount = 1) { 
+    console.log(`📦 Inițiere generare AWB pentru comanda #${order.id}. Greutate: ${weight}kg, Colete: ${packagesCount}`);
 
     if (isTestMode) {
-        // Simulăm un delay ca și cum ar procesa request-ul
         await new Promise(resolve => setTimeout(resolve, 1000));
         const fakeAwb = `TEST_AWB_${Math.floor(Math.random() * 100000000)}`;
-        console.log(`✅ [TEST MODE] AWB Simulat cu succes: ${fakeAwb}`);
         return fakeAwb; 
     }
 
@@ -58,35 +57,37 @@ export async function createFanAWB(order, isTestMode = true) { // 👈 TEST MODE
 
         if (!clientId) throw new Error("FAN_CLIENT_ID lipsește din .env");
 
-        // Extragem județul și orașul din adresa salvată (salvată ca: Strada, Oraș, Județ)
         const addressParts = order.shippingAddress.split(',').map(s => s.trim());
         const county = addressParts.length >= 3 ? addressParts[addressParts.length - 1] : "Bucuresti";
         const locality = addressParts.length >= 2 ? addressParts[addressParts.length - 2] : "Bucuresti";
         const street = addressParts.length >= 1 ? addressParts[0] : "Adresa nespecificata";
 
-        // Construim payload-ul exact cum cere documentatia API
+        // Calculăm suma de ramburs doar dacă plata nu a fost făcută (ramburs la curier)
+        const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : (order.totalCents / 100);
+
         const payload = {
             clientId: parseInt(clientId),
             shipments: [
                 {
                     info: {
                         service: "Standard",
-                        packages: { parcel: 1, envelopes: 0 },
-                        weight: 2, // Default 2kg
-                        payment: "sender", // Tu platesti transportul
-                        observation: `Comanda Karix #${order.id}`,
-                        content: "Sistem PC / Componente",
-                        dimensions: { length: 20, height: 20, width: 20 }
+                        packages: { parcel: parseInt(packagesCount), envelopes: 0 },
+                        weight: parseInt(weight),
+                        payment: "sender", // Expeditorul plătește transportul
+                        observation: `Comanda Karix #${String(order.id).slice(-8)}`,
+                        content: "Sistem PC / Componente Hardware",
+                        dimensions: { length: 40, height: 40, width: 20 }, // Valori generice
+                        repayment: rambursValue > 0 ? rambursValue : undefined // FAN cere ramburs doar dacă > 0
                     },
                     recipient: {
                         name: order.shippingName,
                         phone: order.shippingPhone,
-                        email: order.user?.email || "fara@email.com",
+                        email: order.user?.email || "contact@karixcomputers.ro",
                         address: {
                             county: county,
                             locality: locality,
                             street: street,
-                            streetNo: "1", 
+                            streetNo: "-", 
                             zipCode: "" 
                         }
                     }
@@ -105,12 +106,10 @@ export async function createFanAWB(order, isTestMode = true) { // 👈 TEST MODE
 
         const data = await response.json();
 
-        // Verificăm dacă FAN a returnat erori
         if (data.status === "error" || !data.data || !data.data[0] || data.data[0].errors) {
              throw new Error(JSON.stringify(data.data[0]?.errors || data.message));
         }
 
-        // Returnăm numărul AWB-ului (FAN îl trimite sub cheia awbNumber conform documentatiei)
         return data.data[0].awbNumber;
 
     } catch (error) {
