@@ -89,7 +89,7 @@ await sendServiceOrderPlaced(userEmail, {
       if (method === "curier") {
         await sendAdminServiceCourierAlert({
           productName,
-          orderId: newServiceOrder.id,
+          orderId: newServiceOrder.orderId,
           customerName: finalName,
           customerPhone: phoneNumber,
           judet, oras, address, preferredDate
@@ -97,7 +97,7 @@ await sendServiceOrderPlaced(userEmail, {
       } else {
         await sendAdminServiceOradeaAlert({
           productName,
-          orderId: newServiceOrder.id,
+          orderId: newServiceOrder.orderId,
           customerName: finalName,
           customerPhone: phoneNumber,
           preferredDate,
