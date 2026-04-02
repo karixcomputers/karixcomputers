@@ -137,12 +137,44 @@ export default function Checkout() {
   const [pickupByKarix, setPickupByKarix] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("online"); 
   
-  // 👉 NOU: Stări pentru metodele de expediere a service-ului
+  // 👉 Stări Service & FANbox
   const [serviceDeliveryMethod, setServiceDeliveryMethod] = useState("courier"); 
-  const [fanboxLocation, setFanboxLocation] = useState("");
+  const [selectedFanbox, setSelectedFanbox] = useState(null);
+  const [returnToSameFanbox, setReturnToSameFanbox] = useState(true); // Bifa inteligenta
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const appliedCoupon = location.state?.coupon || null;
+
+  // 👉 NOU: Inițializare Script Harta FANbox
+  useEffect(() => {
+    if (!document.getElementById("fanbox-script")) {
+      const script = document.createElement("script");
+      script.id = "fanbox-script";
+      script.src = "https://unpkg.com/map-fanbox-points@latest/umd/map-fanbox-points.js";
+      script.crossOrigin = "anonymous";
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+
+    const handleSelectPoint = (e) => {
+      setSelectedFanbox(e.detail.item);
+    };
+
+    window.addEventListener("map:select-point", handleSelectPoint);
+    return () => {
+      window.removeEventListener("map:select-point", handleSelectPoint);
+    };
+  }, []);
+
+  const openFanboxMap = () => {
+    if (window.LoadMapFanBox) {
+      window.LoadMapFanBox({
+        rootId: "fanbox-map-root", // Div-ul ascuns de la finalul paginii
+      });
+    } else {
+      triggerError("Harta FAN Courier se încarcă. Te rugăm să aștepți 2 secunde și să încerci din nou.");
+    }
+  };
 
   const isAssemblyOrder = useMemo(() => {
     return items.some(i => {
@@ -235,45 +267,31 @@ export default function Checkout() {
     return appliedCoupon.discountValue; 
   }, [appliedCoupon, currentSubtotal]);
 
-  // 👉 NOU: Logica de calcul logistică superioară
   const shippingCents = useMemo(() => {
-    if (pickupByKarix) return 0; // Ridicarea/Livrarea în Oradea este mereu 0.
+    if (pickupByKarix) return 0; 
 
     let cost = 0;
-    
-    // 1. Livrare Hardware (Dacă e sub 1000 RON = 25 RON. Peste 1000 RON = Gratuit)
     if (cartAnalysis.hasPC && cartAnalysis.hardwareSubtotal < 1000 * 100) {
-        cost += 2500; // 25 RON
+        cost += 2500; 
     }
-
-    // 2. Transport Invers pentru Service (Nu se aplică la asamblare)
     if (cartAnalysis.hasService && !isAssemblyOrder) {
         if (serviceDeliveryMethod === "courier") {
-            cost += 3000; // 30 RON Curier la ușă
+            cost += 3000; 
         } else if (serviceDeliveryMethod === "fanbox") {
-            cost += 1500; // 15 RON Predare la Locker
+            cost += 1500; 
         }
     }
-
     return cost;
   }, [pickupByKarix, cartAnalysis, isAssemblyOrder, serviceDeliveryMethod]);
 
   const totalCents = Math.max(0, currentSubtotal - discountCents + shippingCents);
 
   const handleSwitchToCompany = () => {
-    setShipping(s => ({
-      ...s,
-      isCompany: true,
-      phone: "" 
-    }));
+    setShipping(s => ({ ...s, isCompany: true, phone: "" }));
   };
 
   const handleSwitchToPerson = () => {
-    setShipping(s => ({
-      ...s,
-      isCompany: false,
-      phone: user?.phone || user?.phoneNumber || s.phone 
-    }));
+    setShipping(s => ({ ...s, isCompany: false, phone: user?.phone || user?.phoneNumber || s.phone }));
   };
 
   const fetchCompanyData = async (cuiInput) => {
@@ -327,15 +345,26 @@ export default function Checkout() {
       return;
     }
 
-    if (!isAssemblyOrder) {
-      if (!shipping.addressDetails || !shipping.city || !shipping.county) {
-        triggerError("Te rugăm să completezi datele complete de livrare.");
+    // Validare FANbox si Adrese Standard
+    const isFanboxSelected = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && serviceDeliveryMethod === "fanbox";
+    const hideStandardAddress = isFanboxSelected && returnToSameFanbox;
+
+    if (isFanboxSelected && !selectedFanbox) {
+        triggerError("Te rugăm să selectezi un FANbox de pe hartă pentru predarea dispozitivului.");
         return;
-      }
-    } else {
-      if (!pickupByKarix && (!shipping.addressDetails || !shipping.city || !shipping.county)) {
-         triggerError("Te rugăm să completezi adresa ta pentru a ști unde să livrăm PC-ul asamblat.");
-         return;
+    }
+
+    if (!hideStandardAddress) {
+      if (!isAssemblyOrder) {
+        if (!shipping.addressDetails || !shipping.city || !shipping.county) {
+          triggerError("Te rugăm să completezi datele complete de livrare.");
+          return;
+        }
+      } else {
+        if (!pickupByKarix && (!shipping.addressDetails || !shipping.city || !shipping.county)) {
+           triggerError("Te rugăm să completezi adresa ta pentru a ști unde să livrăm PC-ul asamblat.");
+           return;
+        }
       }
     }
 
@@ -361,12 +390,6 @@ export default function Checkout() {
       return;
     }
 
-    // Validare suplimentară FANbox
-    if (cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && serviceDeliveryMethod === "fanbox" && !fanboxLocation) {
-        triggerError("Te rugăm să completezi adresa sau ID-ul FANbox-ului unde vei preda dispozitivul.");
-        return;
-    }
-
     setLoading(true);
 
     const enrichedItems = items.map(item => {
@@ -375,16 +398,10 @@ export default function Checkout() {
                         ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => nameStr.includes(kw));
       
       let finalWarranty = 0;
-      
       if (!isService) {
           let baseWarranty = (item.warrantyMonths !== undefined && item.warrantyMonths !== null) 
-                             ? parseInt(item.warrantyMonths) 
-                             : 24;
-          if (shipping.isCompany) {
-              finalWarranty = Math.min(baseWarranty, 12);
-          } else {
-              finalWarranty = baseWarranty;
-          }
+                             ? parseInt(item.warrantyMonths) : 24;
+          finalWarranty = shipping.isCompany ? Math.min(baseWarranty, 12) : baseWarranty;
       }
 
       return {
@@ -398,21 +415,34 @@ export default function Checkout() {
     });
 
     let finalAddressDetails = shipping.addressDetails;
-    if (isAssemblyOrder && shipping.assemblyNotes) {
+    let finalCity = shipping.city;
+    let finalCounty = shipping.county;
+
+    // Logica inteligenta: Dacă se trimite la FANbox inapoi, inlocuim adresa cu datele FANbox-ului
+    if (hideStandardAddress && selectedFanbox) {
+        finalAddressDetails = `Locker FANbox: ${selectedFanbox.name} (${selectedFanbox.id}) - ${selectedFanbox.address}`;
+        finalCity = "FANbox";
+        finalCounty = "FANbox";
+    } else if (isAssemblyOrder && shipping.assemblyNotes) {
        finalAddressDetails = `${shipping.addressDetails || "Fără adresă de livrare prestabilită"} | Note client: ${shipping.assemblyNotes}`;
     }
 
-    // Înregistrăm opțiunile de service
     const serviceOpts = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix ? {
         serviceDeliveryMethod,
-        fanboxLocation: serviceDeliveryMethod === "fanbox" ? fanboxLocation : null
+        fanboxLocationId: serviceDeliveryMethod === "fanbox" && selectedFanbox ? selectedFanbox.id : null
     } : {};
 
     const orderData = { 
-      client: { ...shipping, addressDetails: finalAddressDetails, ...serviceOpts }, 
+      client: { 
+        ...shipping, 
+        addressDetails: finalAddressDetails, 
+        city: finalCity,
+        county: finalCounty,
+        ...serviceOpts 
+      }, 
       cartItems: enrichedItems,
       total: totalCents, 
-      shippingCents: shippingCents, // Transmitem și taxa logistică pură
+      shippingCents: shippingCents,
       userEmail: user?.email, 
       pickupType: pickupByKarix ? "KarixPersonal" : "Courier",
       paymentMethod: paymentMethod, 
@@ -422,10 +452,7 @@ export default function Checkout() {
     try {
       const response = await fetch("https://api.karixcomputers.ro/api/orders", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json", 
-          "Authorization": `Bearer ${accessToken}` 
-        },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
         credentials: "include", 
         body: JSON.stringify(orderData)
       });
@@ -436,17 +463,11 @@ export default function Checkout() {
       if (paymentMethod === "online") {
         const paymentResponse = await fetch(`https://api.karixcomputers.ro/api/payments/netopia/pay/${data.orderId}`, {
           method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`
-          }
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` }
         });
 
         const paymentData = await paymentResponse.json();
-
-        if (!paymentResponse.ok) {
-          throw new Error(paymentData.error || "Eroare la inițierea plății Netopia. Te rugăm să reîncerci.");
-        }
+        if (!paymentResponse.ok) throw new Error(paymentData.error || "Eroare la inițierea plății Netopia. Te rugăm să reîncerci.");
 
         const form = document.createElement("form");
         form.setAttribute("method", "POST");
@@ -468,7 +489,6 @@ export default function Checkout() {
         sessionStorage.setItem("orderJustPlaced", "true");
         form.submit(); 
         return; 
-
       } else {
         await notifyDiscord(orderData, appliedCoupon);
         if (clearCart) clearCart();
@@ -482,12 +502,18 @@ export default function Checkout() {
     }
   };
 
+  // Variabilă helper ca să știm când ascundem input-urile cu "Scrie judetul..."
+  const hideStandardAddressFields = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && serviceDeliveryMethod === "fanbox" && returnToSameFanbox;
+
   return (
     <>
       <SEO 
         title="Finalizare Comandă"
         description="Ești la un pas de a deține un sistem Karix sau de a-ți repara echipamentul. Finalizează comanda acum pentru livrare rapidă și suport tehnic de elită."
       />
+
+      {/* Containerul obligatoriu pentru Harta FAN Courier */}
+      <div id="fanbox-map-root"></div>
 
       <div className="min-h-screen pt-32 pb-24 px-4 sm:px-6 relative overflow-hidden bg-transparent text-left font-sans">
         <div className="max-w-6xl mx-auto relative z-10">
@@ -713,9 +739,9 @@ export default function Checkout() {
                         </button>
                       </div>
 
-                      {/* 👉 NOU: OPȚIUNI DE EXPEDIERE SERVICE DACA E CAZUL */}
+                      {/* 👉 OPȚIUNI DE EXPEDIERE SERVICE DACA E CAZUL */}
                       {cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && (
-                        <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4">
+                        <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4 transition-all">
                            <h4 className="text-white font-black text-xs uppercase tracking-wider mb-4 flex items-center gap-2">
                               <span>📦</span> Cum ne trimiți dispozitivul defect?
                            </h4>
@@ -723,7 +749,7 @@ export default function Checkout() {
                               <button 
                                 type="button" 
                                 onClick={() => setServiceDeliveryMethod("courier")} 
-                                className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "courier" ? "bg-indigo-500 text-white border-indigo-400" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
+                                className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "courier" ? "bg-indigo-500 text-white border-indigo-400 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
                               >
                                 <div className="font-bold text-sm">Curier la Ușă</div>
                                 <div className="text-xs opacity-70 mt-1">Curierul vine la adresa ta (+30 RON)</div>
@@ -732,7 +758,7 @@ export default function Checkout() {
                               <button 
                                 type="button" 
                                 onClick={() => setServiceDeliveryMethod("fanbox")} 
-                                className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "fanbox" ? "bg-cyan-500 text-black border-cyan-400" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
+                                className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "fanbox" ? "bg-cyan-500 text-black border-cyan-400 shadow-lg shadow-cyan-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
                               >
                                 <div className="font-bold text-sm">Predare la FANbox</div>
                                 <div className="text-xs opacity-70 mt-1">Îl lași la locker (+15 RON)</div>
@@ -740,41 +766,82 @@ export default function Checkout() {
                            </div>
 
                            {serviceDeliveryMethod === "fanbox" && (
-                              <div className="mt-5 space-y-2 animate-in fade-in zoom-in duration-300">
-                                <label className="text-[10px] font-black text-cyan-400 uppercase ml-1 italic">Nume Locker / Adresă FANbox</label>
-                                <input 
-                                  className="w-full bg-black/40 border border-cyan-500/30 rounded-xl p-3 text-white focus:border-cyan-500 outline-none transition-all placeholder-gray-500 text-sm" 
-                                  value={fanboxLocation} 
-                                  onChange={e => setFanboxLocation(e.target.value)} 
-                                  placeholder="Ex: FANbox Kaufland Militari..." 
-                                />
-                                <p className="text-gray-400 text-[10px] ml-1 mt-1">⚠️ <strong className="text-white">Atenție:</strong> Doar pentru Laptopuri sau Console. Dimensiunea maximă admisă la locker este 45 x 44 x 40 cm.</p>
+                              <div className="mt-6 p-4 rounded-xl bg-black/40 border border-cyan-500/20 animate-in fade-in zoom-in duration-300">
+                                {!selectedFanbox ? (
+                                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                    <div className="text-left">
+                                      <p className="text-cyan-400 font-bold text-sm">Niciun Locker Selectat</p>
+                                      <p className="text-gray-400 text-[10px]">Apasă butonul pentru a alege un locker de pe hartă.</p>
+                                    </div>
+                                    <button type="button" onClick={openFanboxMap} className="bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-widest text-[10px] px-4 py-3 rounded-lg transition-colors w-full sm:w-auto">
+                                      🗺️ Deschide Harta
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col gap-3">
+                                    <div className="flex justify-between items-start gap-4">
+                                      <div>
+                                        <p className="text-cyan-400 font-black text-xs uppercase tracking-widest mb-1">Locker Selectat ✓</p>
+                                        <p className="text-white font-bold text-sm">{selectedFanbox.name}</p>
+                                        <p className="text-gray-400 text-xs mt-1">{selectedFanbox.address}</p>
+                                      </div>
+                                      <button type="button" onClick={openFanboxMap} className="text-cyan-400 hover:text-white text-xs underline font-bold whitespace-nowrap">Modifică</button>
+                                    </div>
+
+                                    <div className="h-px bg-white/10 w-full my-2" />
+                                    
+                                    {/* 👉 Bifa care ascunde/arata campurile vechi de adresa */}
+                                    <label className="flex items-center gap-3 cursor-pointer group">
+                                      <div className="relative flex items-center justify-center">
+                                        <input 
+                                          type="checkbox" 
+                                          checked={returnToSameFanbox} 
+                                          onChange={(e) => setReturnToSameFanbox(e.target.checked)} 
+                                          className="sr-only" 
+                                        />
+                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${returnToSameFanbox ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-gray-500 group-hover:border-cyan-400'}`}>
+                                          {returnToSameFanbox && <svg width="12" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 5L4.5 8.5L13 1" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                                        </div>
+                                      </div>
+                                      <span className="text-gray-300 font-bold text-xs italic">
+                                        Vreau ca echipamentul reparat să-mi fie livrat înapoi la acest locker.
+                                      </span>
+                                    </label>
+
+                                  </div>
+                                )}
+                                <p className="text-gray-400 text-[10px] mt-4 border-t border-cyan-500/10 pt-3">⚠️ <strong className="text-white">Atenție:</strong> Doar pentru Laptopuri sau Console. Dimensiunea maximă admisă este 45 x 44 x 40 cm.</p>
                               </div>
                            )}
                         </div>
                       )}
 
-                      <div className="space-y-2 relative" ref={dropdownRef}>
-                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
-                        <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} placeholder="Scrie județul..." value={shipping.county} onFocus={() => !pickupByKarix && setShowJudete(true)} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, county: e.target.value }))} readOnly={pickupByKarix} />
-                        {showJudete && !pickupByKarix && filteredJudete.length > 0 && (
-                          <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
-                            {filteredJudete.map(j => (
-                              <button key={j} className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}>{j}</button>
-                            ))}
+                      {/* ASCUNDEM CÂMPURILE DE ADRESĂ DACA CLIENTUL VREA RETUR LA ACELASI FANBOX */}
+                      {!hideStandardAddressFields && (
+                        <>
+                          <div className="space-y-2 relative" ref={dropdownRef}>
+                            <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
+                            <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} placeholder="Scrie județul..." value={shipping.county} onFocus={() => !pickupByKarix && setShowJudete(true)} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, county: e.target.value }))} readOnly={pickupByKarix} />
+                            {showJudete && !pickupByKarix && filteredJudete.length > 0 && (
+                              <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
+                                {filteredJudete.map(j => (
+                                  <button key={j} className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}>{j}</button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
 
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș</label>
-                        <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} value={shipping.city} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, city: e.target.value }))} placeholder="Orașul tău" readOnly={pickupByKarix} />
-                      </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș</label>
+                            <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} value={shipping.city} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, city: e.target.value }))} placeholder="Orașul tău" readOnly={pickupByKarix} />
+                          </div>
 
-                      <div className="md:col-span-2 space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
-                        <textarea className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc, Apartament..." />
-                      </div>
+                          <div className="md:col-span-2 space-y-2">
+                            <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
+                            <textarea className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc, Apartament..." />
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
