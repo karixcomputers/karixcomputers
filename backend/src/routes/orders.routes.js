@@ -18,7 +18,6 @@ import {
   sendAdminOrderCanceledEmail,
   sendAssemblyOrderPlaced,
   sendAdminAssemblyAlert,
-  // 👉 NOU: Importăm funcțiile pentru FANbox
   sendFanboxInstructionsEmail,
   sendFanboxCheckoutEmail
 } from "../services/mail.service.js";
@@ -418,16 +417,16 @@ router.post("/", requireAuth, async (req, res, next) => {
         }
       }
 
-      // 👉 REPARAȚIE SUPREMĂ FANBOX MAIL
+      // 👉 VERIFICĂM CĂ E FANBOX (Daca serviceDeliveryMethod e fanbox sau adresa contine cuvantul fanbox)
       const rawAddress = client.addressDetails || "";
-      const isFanbox = client.serviceDeliveryMethod === "fanbox" || rawAddress.includes("FANbox");
+      const isFanbox = client.serviceDeliveryMethod === "fanbox" || rawAddress.toLowerCase().includes("fanbox");
 
       const commonMailData = {
         client: client,
         orderId: newOrder.id,
         total: total,
         couponCode: couponCode || null,
-        pickupType: isFanbox ? 'curier' : pickupType, // Oprim Oradea daca e fanbox
+        pickupType: isFanbox ? 'curier' : pickupType, 
         isServiceOrder: containsServices, 
         paymentMethod: paymentMethod,
         cartItems: cartItems.map(item => {
@@ -444,6 +443,7 @@ router.post("/", requireAuth, async (req, res, next) => {
       }
 
       if (paymentMethod !== 'online') {
+        // 👉 EXECUTĂM DOAR UNUL DIN CELE DOUĂ EMAIL-URI
         if (isFanbox) {
            if (uEmail) {
                await sendFanboxCheckoutEmail(uEmail, {
@@ -542,7 +542,7 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
     
     // 👉 REPARAȚIE ORADEA: Verificăm sigur că nu e FANbox.
     const rawOrderAddress = order.shippingAddress || "";
-    const isFanbox = order.serviceDeliveryMethod === "fanbox" || rawOrderAddress.includes("FANbox");
+    const isFanbox = order.serviceDeliveryMethod === "fanbox" || rawOrderAddress.toLowerCase().includes("fanbox");
     const isOradea = !isFanbox && rawOrderAddress.toLowerCase().includes("oradea");
 
     let reverseAwb = null;
