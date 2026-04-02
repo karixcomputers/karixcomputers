@@ -1107,3 +1107,37 @@ export async function sendFanboxInstructionsEmail(to, orderData, returnToFanbox 
     console.error("❌ Eroare sendFanboxInstructionsEmail:", err);
   }
 }
+
+// ============================================================
+// 🚀 NOU: MAIL CHECKOUT FANBOX (Înainte de plata OP)
+// ============================================================
+export async function sendFanboxCheckoutEmail(to, orderData) {
+  try {
+    const tpl = loadTemplate("serviceFanboxCheckout.html");
+
+    let fanboxName = orderData.fanboxLocation || "";
+    if (fanboxName.includes("Locker FANbox:")) {
+        fanboxName = fanboxName.split("-")[0].trim(); 
+    }
+
+    const html = render(tpl, {
+      customerName: orderData.customerName,
+      orderId: orderData.orderId,
+      fanboxLocation: fanboxName,
+      total: (orderData.total / 100).toFixed(2),
+      accountUrl: `https://karixcomputers.ro/orders`
+    });
+
+    const mailOptions = {
+      to,
+      subject: `Solicitare Înregistrată FANbox (#${orderData.orderId}) - Așteptăm Plata`,
+      html,
+      attachments: []
+    };
+
+    await sendHtmlMail(mailOptions);
+    console.log(`✅ MAIL CHECKOUT FANBOX TRIMIS LA: ${to}`);
+  } catch (err) {
+    console.error("❌ Eroare sendFanboxCheckoutEmail:", err);
+  }
+}
