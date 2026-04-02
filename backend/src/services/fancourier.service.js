@@ -60,17 +60,50 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         
         const clientIdNum = parseInt(String(clientIdString).trim(), 10);
 
-        // Curățăm adresa de separatorul "| Note:"
+        // 👉 1. Curățăm adresa de separatorul "| Note:"
         let rawAddress = order.shippingAddress || "";
         if (rawAddress.includes("| Note:")) {
             rawAddress = rawAddress.split("| Note:")[0].trim();
         }
 
-        const addressParts = rawAddress.split(',').map(s => s.trim());
-        const county = addressParts.length >= 3 ? addressParts[addressParts.length - 1] : "Bucuresti";
-        const locality = addressParts.length >= 2 ? addressParts[addressParts.length - 2] : "Bucuresti";
-        const street = addressParts.length >= 1 ? addressParts[0] : "Adresa nespecificata";
+        // 👉 2. Extragem corect Strada, Orașul și Județul (indiferent câte virgule sunt în stradă)
+        const addressParts = rawAddress.split(',').map(s => s.trim()).filter(Boolean);
+        
+        let county = "Bucuresti";
+        let locality = "Bucuresti";
+        let street = rawAddress;
 
+        if (addressParts.length >= 3) {
+            county = addressParts.pop(); // Ultimul element este mereu județul
+            locality = addressParts.pop(); // Penultimul este orașul
+            street = addressParts.join(', '); // Restul reconstruim ca fiind strada completă
+        } else if (addressParts.length === 2) {
+            county = addressParts[1];
+            locality = addressParts[1];
+            street = addressParts[0];
+        }
+
+        // 👉 3. Funcție pentru Auto-Corectarea numelor pentru FAN Courier
+        const formatForFan = (str) => {
+            // Face prima literă mare la fiecare cuvânt
+            let formatted = str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+            
+            // Corecții specifice (FAN e sensibil la cratime)
+            const noSpaces = formatted.replace(/\s+/g, '');
+            if (noSpaces === "ClujNapoca") return "Cluj-Napoca";
+            if (noSpaces === "BistritaNasaud") return "Bistrita-Nasaud";
+            if (noSpaces === "CarasSeverin") return "Caras-Severin";
+            
+            // București are mereu localitatea "Bucuresti"
+            if (noSpaces.includes("Bucuresti") || noSpaces.includes("Sector")) return "Bucuresti";
+
+            return formatted;
+        };
+
+        locality = formatForFan(locality);
+        county = formatForFan(county);
+
+        // Suma ramburs
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : (order.totalCents / 100);
         const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
 
@@ -104,6 +137,8 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
             ]
         };
 
+        console.log("📤 PAYLOAD FINAL:", JSON.stringify(payload.shipments[0].recipient.address));
+
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
             headers: {
@@ -116,14 +151,12 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const data = await response.json();
         console.log("🔍 Răspuns FAN Courier Creare AWB:", JSON.stringify(data, null, 2));
 
-        // 👉 AICI ESTE REPARAȚIA - Verificăm dacă avem un response valid cu awbNumber
         if (data.response && Array.isArray(data.response) && data.response[0].awbNumber) {
              const awbGenerated = data.response[0].awbNumber;
              console.log(`✅ AWB GENERAT CU SUCCES: ${awbGenerated}`);
              return awbGenerated;
         }
 
-        // Dacă nu se încadrează în formatul de succes, considerăm eroare
         const errorMessage = data?.response?.[0]?.errors || data?.message || JSON.stringify(data);
         throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
 
