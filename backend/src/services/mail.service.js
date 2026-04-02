@@ -72,13 +72,24 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invo
       displayName: i.productName || i.name || "Produs/Serviciu Karix"
     }));
 
-    const isOradea = orderData.pickupType === "KarixPersonal" || 
-                     orderData.client?.city?.toLowerCase().includes("oradea");
+    const rawAddress = (orderData.shippingAddress || (orderData.client ? `${orderData.client.addressDetails}, ${orderData.client.city}, ${orderData.client.county}` : "")).toLowerCase();
     
-    const hasService = orderData.isServiceOrder === true || products.some(i => i.isServiceItem === true || i.category === 'service');
-    const hasPC = products.some(i => !i.isServiceItem && i.category !== 'service');
+    // 👉 Verificăm dacă e FANbox (orice adresă care conține 'fanbox' sau metoda e fanbox)
+    const isFanbox = orderData.pickupType === "fanbox" || orderData.serviceDeliveryMethod === "fanbox" || rawAddress.includes("fanbox");
+    
+    // 👉 Oradea doar dacă nu e fanbox
+    const isOradea = !isFanbox && (orderData.pickupType === "KarixPersonal" || rawAddress.includes("oradea"));
+    
+    // 👉 Verificăm dacă e serviciu folosind lowercase și fără diacritice
+    const hasService = orderData.isServiceOrder === true || products.some(i => {
+        if (i.isServiceItem === true || i.category === 'service') return true;
+        const n = (i.displayName || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        return ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall', 'stick'].some(kw => n.includes(kw));
+    });
+    
+    const hasPC = products.some(i => !i.isServiceItem && i.category !== 'service' && !['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall', 'stick'].some(kw => (i.displayName || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(kw)));
 
-    console.log(`[MAIL SYSTEM] #${orderData.orderId}: hasService=${hasService}, hasPC=${hasPC}, isOradea=${isOradea}`);
+    console.log(`[MAIL SYSTEM] #${orderData.orderId}: hasService=${hasService}, hasPC=${hasPC}, isOradea=${isOradea}, isFanbox=${isFanbox}`);
 
     let templateName = "orderPlaced.html"; 
     let subject = isAdmin ? "🟢 VÂNZARE NOUĂ" : "Confirmare Comandă - Karix Computers";
@@ -88,6 +99,11 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invo
         templateName = isOradea ? "oradeaHybridOrder.html" : "serviceOradeaNotification.html";
         subject = isAdmin ? "🟣 MIXED ORDER" : "Confirmare Comandă Mix (PC + Service) - Karix Computers";
       } else {
+        // 👉 AICI ESTE PROTECȚIA! Dacă e FANbox și e mail către client, nu trimitem mail-ul ăsta vechi!
+        if (isFanbox && !isAdmin) {
+             console.log(`[MAIL SYSTEM] Interceptare: Comanda e FANbox, OPRIM sendUnifiedOrderEmail către client.`);
+             return; 
+        }
         templateName = isOradea ? "oradeaPickup.html" : "servicePlaced.html";
         subject = isAdmin ? "🛠️ SERVICE NOU" : "Instrucțiuni Expediere Service - Karix Computers";
       }
@@ -97,7 +113,7 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invo
     }
 
     // 👉 Dacă e plată prin transfer bancar și nu e admin, trimitem instrucțiunile cu Proforma!
-    if (!isAdmin && orderData.paymentMethod === 'transfer_bancar') {
+    if (!isAdmin && orderData.paymentMethod === 'transfer_bancar' && !isFanbox) {
       templateName = "orderPlacedBankTransfer.html";
       subject = `Așteptăm Plata (Proformă Atașată) - Comanda #${orderData.id || orderData.orderId}`;
     }
@@ -108,7 +124,8 @@ export async function sendUnifiedOrderEmail(to, orderData, isAdmin = false, invo
     }
 
     const itemsHtml = products.map(item => {
-      const isActuallyService = item.isServiceItem || item.category === 'service';
+      const n = (item.displayName || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const isActuallyService = item.isServiceItem || item.category === 'service' || ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall', 'stick'].some(kw => n.includes(kw));
       
       let details = !isActuallyService 
         ? `<div style="font-size: 11px; color: #94a3b8; margin-top: 4px; font-style: italic;">⚡ PC</div>`

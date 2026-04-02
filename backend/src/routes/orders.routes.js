@@ -18,6 +18,7 @@ import {
   sendAdminOrderCanceledEmail,
   sendAssemblyOrderPlaced,
   sendAdminAssemblyAlert,
+  // 👉 NOU: Importăm funcțiile pentru FANbox
   sendFanboxInstructionsEmail,
   sendFanboxCheckoutEmail
 } from "../services/mail.service.js";
@@ -33,6 +34,9 @@ import {
 
 const prisma = new PrismaClient();
 const router = express.Router();
+
+// 👉 FUNCȚIE SUPREMĂ PENTRU ELIMINARE DIACRITICE ȘI LOWERCASE
+const normalizeTxt = (txt) => (txt || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 async function generateUniqueOrderId() {
   let isUnique = false;
@@ -224,15 +228,15 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
     });
 
     const userEmail = updatedItem.order.user.email;
-    const itemName = (updatedItem.productName || "").toLowerCase();
+    const itemName = updatedItem.productName || "";
     
-    // EXCLUDEM "asamblare" pentru mail-ul de livrare reparatie
-    const isService = ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'].some(kw => itemName.includes(kw));
+    // 👉 NORMALIZARE AICI!
+    const isService = ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'].some(kw => normalizeTxt(itemName).includes(kw));
     
     // 👉 REPARAȚIE ORADEA: Daca e FANbox, nu il tratam ca ridicare personala din Oradea.
     const rawOrderAddress = updatedItem.order.shippingAddress || "";
-    const isFanbox = updatedItem.order.serviceDeliveryMethod === "fanbox" || rawOrderAddress.includes("FANbox");
-    const isOradea = !isFanbox && rawOrderAddress.toLowerCase().includes('oradea');
+    const isFanbox = updatedItem.order.serviceDeliveryMethod === "fanbox" || normalizeTxt(rawOrderAddress).includes("fanbox");
+    const isOradea = !isFanbox && normalizeTxt(rawOrderAddress).includes('oradea');
     
     let currentAwb = awb || updatedItem.awb || "";
 
@@ -299,14 +303,15 @@ router.post("/", requireAuth, async (req, res, next) => {
 
     const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
     
+    // 👉 NORMALIZARE AICI PENTRU ASAMBLARE ȘI SERVICII!
     const hasAssembly = cartItems.some(item => {
-        const name = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        return name.includes("asamblare");
+        return normalizeTxt(item.productName || item.name).includes("asamblare");
     });
 
     const containsServices = cartItems.some(item => {
-        const name = (item.productName || item.name || "").toLowerCase();
-        return item.category === 'service' || serviceKeywords.some(kw => name.includes(kw));
+        const isSrvCategory = item.category === 'service';
+        const hasSrvKeyword = serviceKeywords.some(kw => normalizeTxt(item.productName || item.name).includes(kw));
+        return isSrvCategory || hasSrvKeyword;
     });
 
     const initialStatus = paymentMethod === 'transfer_bancar' ? 'in_asteptare_plata' : 'in_asteptare';
@@ -334,10 +339,9 @@ router.post("/", requireAuth, async (req, res, next) => {
         items: {
           create: cartItems.map(item => {
             const nameFinal = item.productName || item.name;
-            const nameLower = nameFinal.toLowerCase();
             const isServiceItem = (item.category === 'service') || 
-                                  serviceKeywords.some(kw => nameLower.includes(kw)) ||
-                                  nameLower.includes("asamblare");
+                                  serviceKeywords.some(kw => normalizeTxt(nameFinal).includes(kw)) ||
+                                  normalizeTxt(nameFinal).includes("asamblare");
             
             return {
               productId: String(item.id),
@@ -417,22 +421,21 @@ router.post("/", requireAuth, async (req, res, next) => {
         }
       }
 
-      // 👉 VERIFICĂM CĂ E FANBOX (Daca serviceDeliveryMethod e fanbox sau adresa contine cuvantul fanbox)
+      // 👉 REPARAȚIE SUPREMĂ FANBOX MAIL
       const rawAddress = client.addressDetails || "";
-      const isFanbox = client.serviceDeliveryMethod === "fanbox" || rawAddress.toLowerCase().includes("fanbox");
+      const isFanbox = client.serviceDeliveryMethod === "fanbox" || normalizeTxt(rawAddress).includes("fanbox");
 
       const commonMailData = {
         client: client,
         orderId: newOrder.id,
         total: total,
         couponCode: couponCode || null,
-        pickupType: isFanbox ? 'curier' : pickupType, 
+        pickupType: isFanbox ? 'curier' : pickupType, // Oprim Oradea daca e fanbox
         isServiceOrder: containsServices, 
         paymentMethod: paymentMethod,
         cartItems: cartItems.map(item => {
           const nameFinal = item.productName || item.name;
-          const nameLower = nameFinal.toLowerCase();
-          const isSrv = (item.category === 'service') || serviceKeywords.some(kw => nameLower.includes(kw));
+          const isSrv = (item.category === 'service') || serviceKeywords.some(kw => normalizeTxt(nameFinal).includes(kw));
           return { ...item, name: nameFinal, isServiceItem: isSrv, priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy, qty: item.qty || 1 };
         })
       };
@@ -443,7 +446,7 @@ router.post("/", requireAuth, async (req, res, next) => {
       }
 
       if (paymentMethod !== 'online') {
-        // 👉 EXECUTĂM DOAR UNUL DIN CELE DOUĂ EMAIL-URI
+        // 👉 AICI DECIDEM CE MAIL PRIMEȘTE LA CHECKOUT!
         if (isFanbox) {
            if (uEmail) {
                await sendFanboxCheckoutEmail(uEmail, {
@@ -536,14 +539,16 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
     }
 
     // 2. LOGICĂ AUTOMATĂ RIDICARE (AWB INVERS)
+    // 👉 NORMALIZARE AICI!
+    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'];
     const hasService = order.items.some(item => 
-        ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'].some(kw => item.productName.toLowerCase().includes(kw))
+        serviceKeywords.some(kw => normalizeTxt(item.productName).includes(kw))
     );
     
     // 👉 REPARAȚIE ORADEA: Verificăm sigur că nu e FANbox.
     const rawOrderAddress = order.shippingAddress || "";
-    const isFanbox = order.serviceDeliveryMethod === "fanbox" || rawOrderAddress.toLowerCase().includes("fanbox");
-    const isOradea = !isFanbox && rawOrderAddress.toLowerCase().includes("oradea");
+    const isFanbox = order.serviceDeliveryMethod === "fanbox" || normalizeTxt(rawOrderAddress).includes("fanbox");
+    const isOradea = !isFanbox && normalizeTxt(rawOrderAddress).includes("oradea");
 
     let reverseAwb = null;
     if (hasService && !isOradea) {
@@ -574,7 +579,7 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
 
     // 4. TRIMITEM EMAIL-UL DE CONFIRMARE (Diferențiat pe FANbox vs Curier Normal)
     if (hasService && isFanbox) {
-        const isReturnToLocker = rawOrderAddress.includes("Locker FANbox");
+        const isReturnToLocker = normalizeTxt(rawOrderAddress).includes("locker fanbox");
         await sendFanboxInstructionsEmail(order.user.email, order, isReturnToLocker, pdfBuffer);
     } else {
         await sendFinalInvoiceEmail(order.user.email, order, pdfBuffer);

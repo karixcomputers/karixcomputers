@@ -8,24 +8,21 @@ import {
     sendUnifiedOrderEmail,
     sendAssemblyOrderPlaced,
     sendAdminAssemblyAlert,
-    sendFanboxInstructionsEmail // 👉 IMPORTĂM NOUA FUNCȚIE DE MAIL FANBOX
+    sendFanboxInstructionsEmail
 } from "../services/mail.service.js";
 
-// --- IMPORT SMARTBILL ---
 import { createSmartBillInvoice, getSmartBillPdf } from "../services/smartbill.service.js";
-
-// 👉 IMPORTĂM LOGICA DE FAN COURIER PENTRU AWB INVERS (RIDICARE LA PLATA ONLINE)
 import { createReverseFanAWB } from "../services/fancourier.service.js";
 
 const router = express.Router();
 router.use(express.urlencoded({ extended: true }));
 
 const prisma = new PrismaClient();
-
 const privateKeyPath = path.resolve(process.env.NETOPIA_PRIVATE_KEY_PATH);
 const publicKeyPath = path.resolve(process.env.NETOPIA_PUBLIC_KEY_PATH);
 
-// --- FUNCȚIE RC4 NATIVĂ ---
+const normalizeTxt = (txt) => (txt || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 function rc4(keyBuf, dataBuf) {
     let S = Array.from({length: 256}, (_, i) => i);
     let j = 0;
@@ -54,7 +51,21 @@ function escapeXml(unsafe) {
     });
 }
 
-// --- 1. CREARE PLATĂ ---
+function checkIsService(items) {
+    return items.some(item => {
+        if (item.status === 'in_asteptare_ridicare') return true;
+        if (item.category === 'service') return true;
+        const n = normalizeTxt(item.productName || item.name);
+        return ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall', 'stick'].some(kw => n.includes(kw));
+    });
+}
+
+function checkIsFanbox(deliveryMethod, addressStr) {
+    if (deliveryMethod === "fanbox") return true;
+    const addr = normalizeTxt(addressStr);
+    return addr.includes("fanbox") || addr.includes("locker");
+}
+
 const createPayment = async (req, res) => {
     try {
         const { orderId } = req.params;
@@ -115,11 +126,9 @@ const createPayment = async (req, res) => {
     }
 };
 
-// --- 2. CONFIRMARE PLATĂ ---
 const confirmPayment = async (req, res) => {
     try {
         const { env_key, data } = req.body;
-
         if (!env_key || !data) return res.status(400).send("Missing keys");
 
         const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
@@ -147,23 +156,21 @@ const confirmPayment = async (req, res) => {
 
             if (!currentOrder) throw new Error("Comanda nu există.");
 
-            // 👉 NOU: VERIFICĂM DACĂ E SERVICE ȘI GENERĂM AWB INVERS (Ridicarea de la client)
-            const isService = currentOrder.items.some(item => 
-                ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'].some(kw => (item.productName || "").toLowerCase().includes(kw))
-            );
-            const isOradea = currentOrder.shippingAddress.toLowerCase().includes("oradea");
+            const isService = checkIsService(currentOrder.items);
+            const rawAddress = currentOrder.shippingAddress || "";
+            const isFanbox = checkIsFanbox(currentOrder.serviceDeliveryMethod, rawAddress);
+            const isOradea = !isFanbox && normalizeTxt(rawAddress).includes("oradea");
 
             let reverseAwbGenerated = null;
             if (isService && !isOradea) {
                 try {
-                    console.log(`🔄 Netopia IPN: Generare AWB Invers (Drop-off/Pick-up) pt comanda #${currentOrder.id}`);
+                    console.log(`🔄 Netopia IPN: Generare AWB Invers pt comanda #${currentOrder.id} (FANbox: ${isFanbox})`);
                     reverseAwbGenerated = await createReverseFanAWB(currentOrder); 
                 } catch (e) {
                     console.error("⚠️ Eroare generare AWB Invers (Plată Online):", e.message);
                 }
             }
 
-            // ACTUALIZĂM STATUSUL ȘI AWB-UL
             const updatedOrder = await prisma.order.update({
                 where: { id: orderId },
                 data: { 
@@ -175,7 +182,6 @@ const confirmPayment = async (req, res) => {
             
             console.log(`✅ Plata confirmată NATIV pentru comanda ${orderId}`);
 
-            // --- DISCORD ---
             const discordWebhookUrl = "https://discord.com/api/webhooks/1483959911363772491/v08mslfmiPRvt5VXqImwxKD3IABfgcVm5JuoY_vDlPOqqGh1qLgBHxPuNi2E4e3v4oNj";
             const clientInfo = updatedOrder.isCompany ? `🏢 **${updatedOrder.companyName}**\nCUI: ${updatedOrder.cui}` : `👤 **${updatedOrder.shippingName}**`;
             
@@ -193,23 +199,14 @@ const confirmPayment = async (req, res) => {
             };
             await fetch(discordWebhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(discordMessage) }).catch(e => console.error(e));
 
-            // 👉 BIFURCAȚIE ASAMBLARE VS STANDARD VS FANBOX
-            const hasAssembly = updatedOrder.items.some(item => {
-                const n = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                return n.includes("asamblare");
-            });
-
+            const hasAssembly = updatedOrder.items.some(item => normalizeTxt(item.productName).includes("asamblare"));
             const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
 
             if (hasAssembly) {
-                // LOGICA PENTRU ASAMBLARE
                 let invoicePdfBuffer = null;
                 try {
-                    console.log("⏳ Generare factură SmartBill pentru Asamblare...");
                     const invoiceData = await createSmartBillInvoice(updatedOrder);
-                    
                     if (invoiceData && invoiceData.series && invoiceData.number) {
-                        console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
                         await prisma.order.update({
                             where: { id: orderId },
                             data: { smartbillSeries: invoiceData.series, smartbillNumber: invoiceData.number }
@@ -217,16 +214,12 @@ const confirmPayment = async (req, res) => {
                         invoicePdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
                     }
                 } catch (sbError) {
-                    console.error("❌ Eroare SmartBill Integration Asamblare:", sbError.message);
+                    console.error("❌ Eroare SmartBill:", sbError.message);
                 }
 
-                let rawAddress = updatedOrder.shippingAddress || "";
                 let cleanAddress = rawAddress.split("| Note:")[0].trim();
                 let pieseText = "Nu au fost adăugate detalii suplimentare."; 
-                
-                if (rawAddress.includes("| Note:")) {
-                    pieseText = rawAddress.split("| Note:")[1].trim() || "Nu au fost adăugate detalii suplimentare.";
-                }
+                if (rawAddress.includes("| Note:")) pieseText = rawAddress.split("| Note:")[1].trim() || "Nu au fost adăugate detalii suplimentare.";
 
                 const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
                 if (isOradea) cleanAddress = modPredare;
@@ -240,11 +233,11 @@ const confirmPayment = async (req, res) => {
                         method: modPredare,
                         issueDescription: pieseText,
                         isOradea: isOradea
-                    }, invoicePdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare Netopia:", err));
+                    }, invoicePdfBuffer).catch(e => console.error(e));
                 }
 
                 await sendAdminAssemblyAlert({
-                    productName: "Asamblare PC Premium (Plată Online Confirmată)",
+                    productName: "Asamblare PC Premium",
                     orderId: updatedOrder.id,
                     customerName: updatedOrder.isCompany ? updatedOrder.companyName : updatedOrder.shippingName,
                     customerPhone: updatedOrder.shippingPhone,
@@ -252,17 +245,13 @@ const confirmPayment = async (req, res) => {
                     address: cleanAddress,
                     issueDescription: pieseText,
                     isOradea: isOradea
-                }).catch(err => console.error("Eroare Mail Admin Asamblare Netopia:", err));
+                }).catch(e => console.error(e));
 
             } else {
-                // --- LOGICĂ STANDARD SMARTBILL & MAIL ---
                 let invoicePdfBuffer = null;
                 try {
-                    console.log("⏳ Generare factură SmartBill...");
                     const invoiceData = await createSmartBillInvoice(updatedOrder);
-                    
                     if (invoiceData && invoiceData.series && invoiceData.number) {
-                        console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
                         await prisma.order.update({
                             where: { id: orderId },
                             data: { smartbillSeries: invoiceData.series, smartbillNumber: invoiceData.number }
@@ -270,20 +259,17 @@ const confirmPayment = async (req, res) => {
                         invoicePdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
                     }
                 } catch (sbError) {
-                    console.error("❌ Eroare SmartBill Integration:", sbError.message);
+                    console.error("❌ Eroare SmartBill:", sbError.message);
                 }
 
-                const rawAddress = updatedOrder.shippingAddress || "";
                 const cleanAddress = rawAddress.split("| Note:")[0].trim();
                 
-                // 👉 TRIMITEM MAIL-URI FANBOX DACA E CAZUL
-                if (isService && updatedOrder.serviceDeliveryMethod === "fanbox") {
+                if (isService && isFanbox) {
                     if (updatedOrder.user?.email) {
                         const isReturnToLocker = rawAddress.includes("Locker FANbox");
                         await sendFanboxInstructionsEmail(updatedOrder.user.email, updatedOrder, isReturnToLocker, invoicePdfBuffer).catch(e => console.error(e));
                     }
                 } else {
-                    // 👉 DACA NU E FANBOX (E PC NOU, SAU SERVICE LA USA), TRIMITEM MAILUL UNIFIED CLASIC
                     const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
                     
                     const commonMailData = {
@@ -307,7 +293,7 @@ const confirmPayment = async (req, res) => {
                         cartItems: updatedOrder.items.map(item => ({
                             ...item, 
                             name: item.productName, 
-                            isServiceItem: item.status === 'in_asteptare_ridicare' || serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
+                            isServiceItem: item.status === 'in_asteptare_ridicare' || serviceKeywords.some(kw => normalizeTxt(item.productName).includes(kw)),
                             qty: item.qty || 1, 
                             priceCentsAtBuy: item.priceCentsAtBuy || item.priceCents
                         }))
