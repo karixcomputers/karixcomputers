@@ -379,11 +379,11 @@ router.post("/", requireAuth, async (req, res, next) => {
     const uEmail = userEmail || (req.user && req.user.email);
     const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
 
-    // ------------------------------------------------------------
+// ------------------------------------------------------------
     // 🚀 BIFURCAȚIE: ASAMBLARE vs STANDARD
     // ------------------------------------------------------------
     if (hasAssembly) {
-      // 👉 1. GENERĂM PROFORMA SMARTBILL PENTRU ASAMBLARE OP
+      // 1. GENERĂM PROFORMA SMARTBILL PENTRU ASAMBLARE OP
       let proformaPdfBuffer = null;
       if (paymentMethod === 'transfer_bancar') {
         try {
@@ -396,21 +396,22 @@ router.post("/", requireAuth, async (req, res, next) => {
         }
       }
 
-      let cleanAddress = `${client.addressDetails}, ${client.city}, ${client.county}`;
+      // 👉 REPARAȚIE: Folosim pickupType pentru a ști sigur ce buton a ales!
+      const isOradea = pickupType === "KarixPersonal"; 
+
+      let cleanAddress = isOradea ? "Predare Personală Oradea (F2F)" : `${client.addressDetails}, ${client.city}, ${client.county}`;
       let pieseText = "Așteptăm piesele clientului.";
       
-      // 👉 Extragem notele clientului (pe care le-am trimis cu separatorul "|" din Checkout)
+      // Extragem notele clientului (dacă există)
       if (client.addressDetails && client.addressDetails.includes("| Note client:")) {
           const parts = client.addressDetails.split("| Note client:");
-          cleanAddress = `${parts[0].trim()}, ${client.city}, ${client.county}`;
+          // Dacă NU e Oradea (adică a dat adresa fizică), punem prima parte. Dacă E Oradea, păstrăm numele "Predare Personală Oradea (F2F)"
+          cleanAddress = isOradea ? "Predare Personală Oradea (F2F)" : `${parts[0].trim()}, ${client.city}, ${client.county}`;
           pieseText = parts[1].trim() || "Nu au fost adăugate detalii suplimentare.";
       }
 
-      // Verificăm dacă clientul e din Oradea (foarte robust)
-      const isOradea = pickupType === "KarixPersonal" || client.city.toLowerCase().includes("oradea");
       const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
 
-      // 👉 Dacă se alege transfer bancar sau ramburs, trimitem ACUM
       if (paymentMethod !== 'online') {
         // Mail către CLIENT cu PROFORMA atașată (dacă e cazul)
         await sendAssemblyOrderPlaced(uEmail, {
@@ -420,7 +421,7 @@ router.post("/", requireAuth, async (req, res, next) => {
             phone: client.phone,
             method: modPredare,
             issueDescription: pieseText,
-            isOradea: isOradea // 👉 REPARAȚIA! Acum funcția de mail primește variabila corectă
+            isOradea: isOradea // 👉 ACUM E SIGUR TRUE dacă a ales F2F Oradea!
         }, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare:", err));
 
         // Mail către ADMIN
@@ -431,7 +432,8 @@ router.post("/", requireAuth, async (req, res, next) => {
             customerPhone: client.phone,
             method: modPredare,
             address: cleanAddress,
-            issueDescription: pieseText
+            issueDescription: pieseText,
+            isOradea: isOradea 
         }).catch(err => console.error("Eroare Mail Admin Asamblare:", err));
       }
 

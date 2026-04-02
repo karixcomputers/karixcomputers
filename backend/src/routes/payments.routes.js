@@ -164,7 +164,7 @@ const confirmPayment = async (req, res) => {
             await fetch(discordWebhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(discordMessage) }).catch(e => console.error(e));
 
 
-            // 👉 BIFURCAȚIE ASAMBLARE VS STANDARD
+// 👉 BIFURCAȚIE ASAMBLARE VS STANDARD
             const hasAssembly = updatedOrder.items.some(item => {
                 const n = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                 return n.includes("asamblare");
@@ -175,14 +175,13 @@ const confirmPayment = async (req, res) => {
             if (hasAssembly) {
                 // LOGICA PENTRU ASAMBLARE
                 
-                // 👉 1. GENERĂM FACTURA SMARTBILL PENTRU ASAMBLARE
+                // 1. GENERĂM FACTURA SMARTBILL PENTRU ASAMBLARE
                 let invoicePdfBuffer = null;
                 try {
                     console.log("⏳ Generare factură SmartBill pentru Asamblare...");
                     const invoiceData = await createSmartBillInvoice(updatedOrder);
                     
                     if (invoiceData && invoiceData.series && invoiceData.number) {
-                        console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
                         await prisma.order.update({
                             where: { id: orderId },
                             data: { 
@@ -196,20 +195,21 @@ const confirmPayment = async (req, res) => {
                     console.error("❌ Eroare SmartBill Integration Asamblare:", sbError.message);
                 }
 
-                // 👉 2. PREGĂTIM DATELE DE ADRESĂ
-                let cleanAddress = updatedOrder.shippingAddress;
+                // 👉 REPARAȚIE: Verificăm string-ul salvat în BD
+                const isOradea = updatedOrder.pickupType === "KarixPersonal" || updatedOrder.shippingAddress.toLowerCase().includes("predare personala");
+                const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
+
+                // PREGĂTIM DATELE DE ADRESĂ
+                let cleanAddress = isOradea ? modPredare : updatedOrder.shippingAddress;
                 let pieseText = "Așteptăm piesele clientului.";
                 
-                if (cleanAddress.includes("| Note client:")) {
-                    const parts = cleanAddress.split("| Note client:");
-                    cleanAddress = parts[0].trim();
+                if (updatedOrder.shippingAddress.includes("| Note client:")) {
+                    const parts = updatedOrder.shippingAddress.split("| Note client:");
+                    cleanAddress = isOradea ? modPredare : parts[0].trim();
                     pieseText = parts[1].trim() || "Nu au fost adăugate detalii suplimentare.";
                 }
 
-                const isOradea = cleanAddress.toLowerCase().includes("oradea");
-                const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
-
-                // 👉 3. TRIMITEM MAILURILE
+                // 3. TRIMITEM MAILURILE
                 if (updatedOrder.user?.email) {
                     await sendAssemblyOrderPlaced(updatedOrder.user.email, {
                         customerName: updatedOrder.isCompany ? updatedOrder.companyName : updatedOrder.shippingName,
@@ -218,7 +218,7 @@ const confirmPayment = async (req, res) => {
                         phone: updatedOrder.shippingPhone,
                         method: modPredare,
                         issueDescription: pieseText,
-                        isOradea: isOradea
+                        isOradea: isOradea // 👉 TRIMIS CORECT!
                     }, invoicePdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare Netopia:", err));
                 }
 
@@ -229,7 +229,8 @@ const confirmPayment = async (req, res) => {
                     customerPhone: updatedOrder.shippingPhone,
                     method: modPredare,
                     address: cleanAddress,
-                    issueDescription: pieseText
+                    issueDescription: pieseText,
+                    isOradea: isOradea
                 }).catch(err => console.error("Eroare Mail Admin Asamblare Netopia:", err));
 
             } else {
