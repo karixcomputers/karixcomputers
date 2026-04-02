@@ -94,8 +94,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : orderTotalRon;
         
         let serviceType = isLocker ? "FANbox" : (rambursValue > 0 ? "Cont Colector" : "Standard");
-        let optionsArray = isLocker ? ["X"] : []; // X = Livrare la Locker
-
+        
         const payload = {
             clientId: clientIdNum,
             shipments: [
@@ -109,7 +108,8 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         content: "Sistem PC / Componente Hardware",
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: rambursValue,
-                        declaredValue: isInsured ? orderTotalRon : 0
+                        declaredValue: isInsured ? orderTotalRon : 0,
+                        options: isLocker ? ["X"] : []
                     },
                     recipient: {
                         name: order.shippingName,
@@ -120,15 +120,13 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                             locality: formatForFan(locality),
                             street: street,
                             streetNo: "-", 
-                            zipCode: "" 
+                            zipCode: "",
+                            ...(isLocker && order.fanboxLocationId && { pudoLocationId: order.fanboxLocationId })
                         }
                     }
                 }
             ]
         };
-
-        if (optionsArray.length > 0) payload.shipments[0].info.options = optionsArray;
-        if (isLocker && order.fanboxLocationId) payload.shipments[0].recipient.pudoLocationId = order.fanboxLocationId;
 
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
@@ -162,7 +160,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
 
         let rawAddress = order.shippingAddress || "";
         
-        // 👉 Detecție automată dacă e Locker
+        // Detecție automată dacă e Locker
         const isLocker = (order.serviceDeliveryMethod === "fanbox") || rawAddress.toLowerCase().includes("fanbox") || rawAddress.toLowerCase().includes("locker");
 
         let county = "Bucuresti";
@@ -187,23 +185,9 @@ export async function createReverseFanAWB(order, isTestMode = false) {
              }
         }
 
-        // 👉 Configurare Serviciu FANbox pentru Reverse
+        // Configurare Serviciu FANbox pentru Reverse
         let serviceType = isLocker ? "FANbox" : "Standard";
-        let optionsArray = isLocker ? ["W"] : []; // W = Drop-off la Locker de către client
         
-        let senderAddress = {
-            county: formatForFan(county),
-            locality: formatForFan(locality),
-            street: street,
-            streetNo: "-", 
-            zipCode: ""
-        };
-
-        if (isLocker && order.fanboxLocationId) {
-            senderAddress.pudoLocationId = order.fanboxLocationId;
-            senderAddress.street = "Predare la FANbox Locker";
-        }
-
         const payload = {
             clientId: clientIdNum,
             shipments: [
@@ -217,13 +201,22 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         content: "Laptop / Consola (Service)",
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: 0,
-                        declaredValue: 0
+                        declaredValue: 0,
+                        options: isLocker ? ["W"] : []
                     },
                     sender: {
                         name: order.shippingName,
                         phone: order.shippingPhone,
                         email: order.user?.email || "contact@karixcomputers.ro",
-                        address: senderAddress
+                        address: {
+                            county: formatForFan(county),
+                            locality: formatForFan(locality),
+                            street: isLocker ? "Predare la locker FANbox" : street,
+                            streetNo: "-", 
+                            zipCode: "",
+                            // 👉 FIX: FAN Courier cere dropOffLocationId în interiorul adresei pt ridicări din locker
+                            ...(isLocker && order.fanboxLocationId && { dropOffLocationId: order.fanboxLocationId })
+                        }
                     },
                     recipient: {
                         name: "Karix Computers",
@@ -240,8 +233,6 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                 }
             ]
         };
-
-        if (optionsArray.length > 0) payload.shipments[0].info.options = optionsArray;
 
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
