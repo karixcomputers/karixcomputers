@@ -58,7 +58,6 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
              throw new Error("FAN_CLIENT_ID lipsește din .env");
         }
         
-        // Asigurăm formatul cerut de FAN (Strict INTEGER)
         const clientIdNum = parseInt(String(clientIdString).trim(), 10);
 
         // Curățăm adresa de separatorul "| Note:"
@@ -76,7 +75,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
 
         const payload = {
-            clientId: clientIdNum, // 👈 Acum e garantat număr, ex: 7349386
+            clientId: clientIdNum,
             shipments: [
                 {
                     info: {
@@ -117,15 +116,19 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const data = await response.json();
         console.log("🔍 Răspuns FAN Courier Creare AWB:", JSON.stringify(data, null, 2));
 
-        if (data.status === "error" || !data.data || !Array.isArray(data.data) || data.data.length === 0 || data.data[0].errors) {
-             const errorMessage = data?.data?.[0]?.errors || data?.message || JSON.stringify(data);
-             throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+        // 👉 AICI ESTE REPARAȚIA - Verificăm dacă avem un response valid cu awbNumber
+        if (data.response && Array.isArray(data.response) && data.response[0].awbNumber) {
+             const awbGenerated = data.response[0].awbNumber;
+             console.log(`✅ AWB GENERAT CU SUCCES: ${awbGenerated}`);
+             return awbGenerated;
         }
 
-        return data.data[0].awbNumber;
+        // Dacă nu se încadrează în formatul de succes, considerăm eroare
+        const errorMessage = data?.response?.[0]?.errors || data?.message || JSON.stringify(data);
+        throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
 
     } catch (error) {
-        console.error("❌ Eroare creare AWB FAN:", error.message);
+        console.error("❌ Eroare auto-generare AWB:", error.message);
         throw error;
     }
 }
