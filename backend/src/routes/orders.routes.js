@@ -421,7 +421,8 @@ router.post("/", requireAuth, async (req, res, next) => {
             deliveryAddress: cleanAddress,
             phone: client.phone,
             method: modPredare,
-            issueDescription: pieseText
+            issueDescription: pieseText,
+            isOradea: isOradea
         }, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare:", err));
 
         // Mail către ADMIN

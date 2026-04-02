@@ -217,7 +217,8 @@ const confirmPayment = async (req, res) => {
                         deliveryAddress: cleanAddress,
                         phone: updatedOrder.shippingPhone,
                         method: modPredare,
-                        issueDescription: pieseText
+                        issueDescription: pieseText,
+                        isOradea: isOradea
                     }, invoicePdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare Netopia:", err));
                 }
 

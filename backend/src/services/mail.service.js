@@ -1009,7 +1009,10 @@ export async function sendWarrantyRejectedEmail(to, data, files = []) {
 
 export async function sendAssemblyOrderPlaced(to, data, pdfBuffer = null) {
   try {
-    const tpl = loadTemplate("assemblyPlacedClient.html");
+    // 👉 Selectăm template-ul în funcție de locație
+    const templateName = data.isOradea ? "assemblyPlacedOradea.html" : "assemblyPlacedClient.html";
+    const tpl = loadTemplate(templateName);
+    
     const subject = `Confirmare Asamblare PC (#${data.orderId}) - Karix Computers`;
 
     const html = render(tpl, {
@@ -1024,7 +1027,7 @@ export async function sendAssemblyOrderPlaced(to, data, pdfBuffer = null) {
 
     const mailOptions = { to, subject, html };
 
-    // 👉 Dacă avem un PDF generat (Factură/Proformă), îl atașăm!
+    // 👉 Dacă avem un PDF generat (Factură/Proformă), îl atașăm
     if (pdfBuffer) {
       mailOptions.attachments = [{
         filename: `Document_Karix_${data.orderId}.pdf`,
