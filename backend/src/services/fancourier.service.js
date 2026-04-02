@@ -53,15 +53,13 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
     try {
         const token = await getFanToken();
         const clientIdString = process.env.FAN_CLIENT_ID;
-        
-        // 👉 AICI VEDEM EXACT CE CITEȘTE BACKEND-UL DIN .ENV
-        console.log("🏷️ CLIENT ID CITIT DIN .ENV ESTE:", clientIdString);
 
         if (!clientIdString) {
-             throw new Error("FAN_CLIENT_ID lipsește complet! Te rog rulează: pm2 restart all --update-env");
+             throw new Error("FAN_CLIENT_ID lipsește din .env");
         }
         
-        const clientId = String(clientIdString).trim();
+        // Asigurăm formatul cerut de FAN (Strict INTEGER)
+        const clientIdNum = parseInt(String(clientIdString).trim(), 10);
 
         // Curățăm adresa de separatorul "| Note:"
         let rawAddress = order.shippingAddress || "";
@@ -78,14 +76,14 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
 
         const payload = {
-            clientId: clientId, // ID-ul tău de client FAN
+            clientId: clientIdNum, // 👈 Acum e garantat număr, ex: 7349386
             shipments: [
                 {
                     info: {
                         service: serviceType,
                         packages: { parcel: parseInt(packagesCount), envelopes: 0 },
                         weight: parseInt(weight),
-                        payment: "sender", // Plata o faci tu la curier
+                        payment: "sender", 
                         observation: `Comanda Karix #${String(order.id).slice(-8)}`,
                         content: "Sistem PC / Componente Hardware",
                         dimensions: { length: 40, height: 40, width: 20 }, 
@@ -106,9 +104,6 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                 }
             ]
         };
-
-        // 👉 AICI PRINTĂM TOT JSON-UL SĂ-L VEDEM
-        console.log("📤 PAYLOAD TRIMIS SPRE FAN:", JSON.stringify(payload, null, 2));
 
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
