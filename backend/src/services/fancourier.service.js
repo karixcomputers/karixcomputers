@@ -59,46 +59,53 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
 
         if (!clientId) throw new Error("FAN_CLIENT_ID lipsește din .env");
 
-        const addressParts = order.shippingAddress.split(',').map(s => s.trim());
+        // Curățăm adresa de separatorul "| Note:" înainte de a o trimite la FAN Courier
+        let rawAddress = order.shippingAddress || "";
+        if (rawAddress.includes("| Note:")) {
+            rawAddress = rawAddress.split("| Note:")[0].trim();
+        }
+
+        const addressParts = rawAddress.split(',').map(s => s.trim());
         const county = addressParts.length >= 3 ? addressParts[addressParts.length - 1] : "Bucuresti";
         const locality = addressParts.length >= 2 ? addressParts[addressParts.length - 2] : "Bucuresti";
+        // Toată prima parte a adresei intră la stradă
         const street = addressParts.length >= 1 ? addressParts[0] : "Adresa nespecificata";
 
         // Suma de ramburs (0 daca e platit online/OP, valoarea comenzii daca e ramburs curier)
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : (order.totalCents / 100);
 
-        // Stabilim tipul serviciului corect conform documentatiei
+        // Stabilim tipul serviciului corect conform documentatiei (dacă ai ramburs pui Cont Colector)
         const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
 
-        const payload = {
-            clientId: parseInt(clientId),
-            shipments: [
-                {
-                    info: {
-                        service: serviceType, // 'Standard' sau 'Cont Colector'
-                        packages: { parcel: parseInt(packagesCount), envelopes: 0 },
-                        weight: parseInt(weight),
-                        payment: "sender", // Tu platesti curierul (conform contractului tau)
-                        observation: `Comanda Karix #${String(order.id).slice(-8)}`,
-                        content: "Sistem PC / Componente Hardware",
-                        dimensions: { length: 40, height: 40, width: 20 }, 
-                        cod: rambursValue // Aici e cheia reparata conform PDF-ului (Cash On Delivery)
-                    },
-                    recipient: {
-                        name: order.shippingName,
-                        phone: order.shippingPhone,
-                        email: order.user?.email || "contact@karixcomputers.ro",
-                        address: {
-                            county: county,
-                            locality: locality,
-                            street: street,
-                            streetNo: "-", 
-                            zipCode: "" 
-                        }
+        // Construim payload-ul corect pentru noul API v2
+        const payload = [
+            {
+                info: {
+                    service: serviceType, // 'Standard' sau 'Cont Colector'
+                    packages: { parcel: parseInt(packagesCount), envelopes: 0 },
+                    weight: parseInt(weight),
+                    payment: "sender", // Tu platesti curierul (conform contractului tau)
+                    observation: `Comanda Karix #${String(order.id).slice(-8)}`,
+                    content: "Sistem PC / Componente Hardware",
+                    dimensions: { length: 40, height: 40, width: 20 }, 
+                    cod: rambursValue // Cash On Delivery
+                },
+                // 👉 AICI ESTE REPARAȚIA: clientId se trimite direct în obiectul de shipment
+                clientId: parseInt(clientId),
+                recipient: {
+                    name: order.shippingName,
+                    phone: order.shippingPhone,
+                    email: order.user?.email || "contact@karixcomputers.ro",
+                    address: {
+                        county: county,
+                        locality: locality,
+                        street: street,
+                        streetNo: "-", 
+                        zipCode: "" 
                     }
                 }
-            ]
-        };
+            }
+        ];
 
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
@@ -118,6 +125,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
              throw new Error(`Refuzat de FAN Courier: ${typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)}`);
         }
 
+        // Preluăm awbNumber-ul generat
         return data.data[0].awbNumber;
 
     } catch (error) {
