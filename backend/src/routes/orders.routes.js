@@ -18,8 +18,9 @@ import {
   sendAdminOrderCanceledEmail,
   sendAssemblyOrderPlaced,
   sendAdminAssemblyAlert,
+  // 👉 NOU: Importăm funcțiile pentru FANbox
   sendFanboxInstructionsEmail,
-  sendFanboxCheckoutEmail // 👉 NOU
+  sendFanboxCheckoutEmail
 } from "../services/mail.service.js";
 
 import { createFanAWB, createReverseFanAWB } from "../services/fancourier.service.js";
@@ -230,8 +231,9 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
     const isService = ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'].some(kw => itemName.includes(kw));
     
     // 👉 REPARAȚIE ORADEA: Daca e FANbox, nu il tratam ca ridicare personala din Oradea.
-    const isFanbox = updatedItem.order.serviceDeliveryMethod === "fanbox";
-    const isOradea = !isFanbox && updatedItem.order.shippingAddress?.toLowerCase().includes('oradea');
+    const rawOrderAddress = updatedItem.order.shippingAddress || "";
+    const isFanbox = updatedItem.order.serviceDeliveryMethod === "fanbox" || rawOrderAddress.includes("FANbox");
+    const isOradea = !isFanbox && rawOrderAddress.toLowerCase().includes('oradea');
     
     let currentAwb = awb || updatedItem.awb || "";
 
@@ -416,8 +418,9 @@ router.post("/", requireAuth, async (req, res, next) => {
         }
       }
 
-      // 👉 REPARAȚIE ORADEA LA CHECKOUT MAIL
-      const isFanbox = client.serviceDeliveryMethod === "fanbox";
+      // 👉 REPARAȚIE SUPREMĂ FANBOX MAIL
+      const rawAddress = client.addressDetails || "";
+      const isFanbox = client.serviceDeliveryMethod === "fanbox" || rawAddress.includes("FANbox");
 
       const commonMailData = {
         client: client,
@@ -441,7 +444,6 @@ router.post("/", requireAuth, async (req, res, next) => {
       }
 
       if (paymentMethod !== 'online') {
-        // 👉 AICI DECIDEM CE MAIL PRIMEȘTE LA CHECKOUT!
         if (isFanbox) {
            if (uEmail) {
                await sendFanboxCheckoutEmail(uEmail, {
@@ -538,9 +540,10 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
         ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'].some(kw => item.productName.toLowerCase().includes(kw))
     );
     
-    // 👉 REPARAȚIE ORADEA: Daca e FANbox in Oradea, chemam AWB-ul la el.
-    const isFanbox = order.serviceDeliveryMethod === "fanbox";
-    const isOradea = !isFanbox && order.shippingAddress.toLowerCase().includes("oradea");
+    // 👉 REPARAȚIE ORADEA: Verificăm sigur că nu e FANbox.
+    const rawOrderAddress = order.shippingAddress || "";
+    const isFanbox = order.serviceDeliveryMethod === "fanbox" || rawOrderAddress.includes("FANbox");
+    const isOradea = !isFanbox && rawOrderAddress.toLowerCase().includes("oradea");
 
     let reverseAwb = null;
     if (hasService && !isOradea) {
@@ -571,7 +574,7 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
 
     // 4. TRIMITEM EMAIL-UL DE CONFIRMARE (Diferențiat pe FANbox vs Curier Normal)
     if (hasService && isFanbox) {
-        const isReturnToLocker = order.shippingAddress.includes("Locker FANbox");
+        const isReturnToLocker = rawOrderAddress.includes("Locker FANbox");
         await sendFanboxInstructionsEmail(order.user.email, order, isReturnToLocker, pdfBuffer);
     } else {
         await sendFinalInvoiceEmail(order.user.email, order, pdfBuffer);
