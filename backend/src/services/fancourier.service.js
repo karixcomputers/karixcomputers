@@ -264,7 +264,11 @@ export async function createReverseFanAWB(order, isTestMode = false) {
         if (data.response && Array.isArray(data.response) && data.response[0].awbNumber) {
              return String(data.response[0].awbNumber); 
         }
-        throw new Error(data?.response?.[0]?.errors || data?.message || "Eroare FAN");
+        
+        // 👉 EXTRAGEM EROAREA CA SĂ O PUTEM CITI
+        const errObj = data?.response?.[0]?.errors || data?.message || data;
+        const errString = typeof errObj === 'object' ? JSON.stringify(errObj) : String(errObj);
+        throw new Error(errString);
 
     } catch (error) {
         console.error("❌ Eroare auto-generare REVERSE AWB:", error.message);
