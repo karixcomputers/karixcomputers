@@ -164,7 +164,7 @@ const confirmPayment = async (req, res) => {
             await fetch(discordWebhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(discordMessage) }).catch(e => console.error(e));
 
 
-// 👉 BIFURCAȚIE ASAMBLARE VS STANDARD
+            // 👉 BIFURCAȚIE ASAMBLARE VS STANDARD
             const hasAssembly = updatedOrder.items.some(item => {
                 const n = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                 return n.includes("asamblare");
@@ -182,6 +182,7 @@ const confirmPayment = async (req, res) => {
                     const invoiceData = await createSmartBillInvoice(updatedOrder);
                     
                     if (invoiceData && invoiceData.series && invoiceData.number) {
+                        console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
                         await prisma.order.update({
                             where: { id: orderId },
                             data: { 
@@ -195,14 +196,15 @@ const confirmPayment = async (req, res) => {
                     console.error("❌ Eroare SmartBill Integration Asamblare:", sbError.message);
                 }
 
-                // 👉 REPARAȚIE: Verificăm string-ul salvat în BD
-                const isOradea = updatedOrder.pickupType === "KarixPersonal" || updatedOrder.shippingAddress.toLowerCase().includes("predare personala");
+                // 👉 REPARAȚIE: Evaluăm Oradea pe string-ul brut, înainte de a-l despărți!
+                const isOradea = updatedOrder.shippingAddress.toLowerCase().includes("oradea");
                 const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
 
                 // PREGĂTIM DATELE DE ADRESĂ
                 let cleanAddress = isOradea ? modPredare : updatedOrder.shippingAddress;
                 let pieseText = "Așteptăm piesele clientului.";
                 
+                // Acum putem despărți liniștit notele clientului
                 if (updatedOrder.shippingAddress.includes("| Note client:")) {
                     const parts = updatedOrder.shippingAddress.split("| Note client:");
                     cleanAddress = isOradea ? modPredare : parts[0].trim();
@@ -218,7 +220,7 @@ const confirmPayment = async (req, res) => {
                         phone: updatedOrder.shippingPhone,
                         method: modPredare,
                         issueDescription: pieseText,
-                        isOradea: isOradea // 👉 TRIMIS CORECT!
+                        isOradea: isOradea // 👉 Acum va fi evaluat corect!
                     }, invoicePdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare Netopia:", err));
                 }
 
