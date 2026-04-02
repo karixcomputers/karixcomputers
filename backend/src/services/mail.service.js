@@ -1089,37 +1089,17 @@ export async function sendFanboxInstructionsEmail(to, orderData, returnToFanbox 
     const templateName = returnToFanbox ? "serviceFanboxToFanbox.html" : "serviceFanboxToHome.html";
     const tpl = loadTemplate(templateName);
 
-    let rawAddress = orderData.shippingAddress || "";
-    let fanboxName = rawAddress;
-    let homeAddress = rawAddress;
-
-    // 1. Verificăm dacă adresa principală conține textul locker-ului
-    if (rawAddress.includes("Locker FANbox:")) {
-        // Extragem doar numele lockerului (până la cratimă)
-        fanboxName = rawAddress.split("-")[0].trim(); 
-        
-        // Dacă există o adresă de acasă în notițe, o extragem
-        if (rawAddress.includes("| Note:")) {
-            homeAddress = rawAddress.split("| Note:")[1].trim();
-        } else {
-            homeAddress = "Adresa de domiciliu salvată în cont";
-        }
-    } else {
-        // 2. Dacă în adresă este strada de acasă (ex: Margareta 52), înseamnă că asta e adresa de livrare
-        homeAddress = rawAddress;
-        // La locker punem ID-ul FANbox-ului din comandă
-        if (orderData.fanboxLocationId) {
-            fanboxName = `Locker FANbox (ID: ${orderData.fanboxLocationId})`;
-        } else {
-            fanboxName = "Locker-ul FANbox selectat pe hartă";
-        }
+    // Extragem numele locker-ului din adresă (sau punem toată adresa)
+    let fanboxName = orderData.shippingAddress;
+    if (orderData.shippingAddress.includes("Locker FANbox:")) {
+        fanboxName = orderData.shippingAddress.split("-")[0].trim(); // Luăm doar bucata cu numele
     }
 
     const html = render(tpl, {
       customerName: orderData.shippingName || "Client Karix",
       orderId: orderData.id,
-      fanboxLocation: fanboxName, // Se va afișa la Pasul 3 (Predare)
-      deliveryAddress: returnToFanbox ? fanboxName : homeAddress, // Se va afișa jos la (Livrare/Retur)
+      fanboxLocation: fanboxName,
+      deliveryAddress: orderData.shippingAddress,
       accountUrl: `https://karixcomputers.ro/orders`
     });
 
