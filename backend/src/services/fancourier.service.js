@@ -2,7 +2,6 @@ import fetch from "node-fetch";
 
 let currentToken = null;
 let tokenExpiration = null;
-let cachedClientId = null; // Vom salva ID-ul intern aici ca să nu-l cerem mereu
 
 // ==========================================
 // 1. AUTENTIFICARE ȘI OBȚINERE TOKEN
@@ -23,6 +22,8 @@ export async function getFanToken() {
         const url = `https://api.fancourier.ro/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
         const response = await fetch(url, { method: "POST" });
         const data = await response.json();
+        
+        console.log("🔍 Răspuns Autentificare FAN:", data);
 
         const extractedToken = data?.data?.token || data?.token;
         if (extractedToken) {
@@ -39,39 +40,7 @@ export async function getFanToken() {
 }
 
 // ==========================================
-// 2. OBȚINERE AUTOMATĂ CLIENT ID INTERN
-// ==========================================
-export async function getFanClientId(token) {
-    if (cachedClientId) return cachedClientId;
-
-    try {
-        const response = await fetch("https://api.fancourier.ro/clients", {
-            method: "GET",
-            headers: {
-                "Authorization": `Bearer ${token}`,
-                "Accept": "application/json"
-            }
-        });
-        
-        const data = await response.json();
-        console.log("🔍 Răspuns API /clients (Ce vede FAN de fapt):", JSON.stringify(data, null, 2));
-
-        if (data.status === 'success' && data.data && data.data.length > 0) {
-            // Preluăm primul profil de client valid asociat contului tău
-            cachedClientId = data.data[0].id;
-            console.log(`✅ Am extras automat Client ID-ul corect: ${cachedClientId}`);
-            return cachedClientId;
-        }
-
-        throw new Error("Contul tău de FAN Courier nu are niciun profil de client asociat în API. Trimite-le logul de mai sus celor de la IT.");
-    } catch (error) {
-        console.error("❌ Eroare obținere Client ID:", error.message);
-        throw error;
-    }
-}
-
-// ==========================================
-// 3. GENERARE AWB REAL
+// 2. GENERARE AWB REAL
 // ==========================================
 export async function createFanAWB(order, isTestMode = false, weight = 1, packagesCount = 1) { 
     console.log(`📦 Inițiere generare AWB pentru comanda #${order.id}. Greutate: ${weight}kg, Colete: ${packagesCount}`);
@@ -83,9 +52,14 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
 
     try {
         const token = await getFanToken();
+        const clientIdString = process.env.FAN_CLIENT_ID;
+
+        if (!clientIdString) {
+             throw new Error("FAN_CLIENT_ID lipsește din .env");
+        }
         
-        // 👉 AICI ESTE MAGIA: Preluăm automat ID-ul real de pe serverele lor!
-        const clientId = await getFanClientId(token);
+        // Asigurăm formatul cerut de FAN (Strict INTEGER)
+        const clientIdNum = parseInt(String(clientIdString).trim(), 10);
 
         // Curățăm adresa de separatorul "| Note:"
         let rawAddress = order.shippingAddress || "";
@@ -102,7 +76,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
 
         const payload = {
-            clientId: clientId, // Folosim ID-ul intern descărcat de la ei
+            clientId: clientIdNum, // 👈 Acum e garantat număr, ex: 7349386
             shipments: [
                 {
                     info: {
@@ -141,17 +115,17 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         });
 
         const data = await response.json();
-        
+        console.log("🔍 Răspuns FAN Courier Creare AWB:", JSON.stringify(data, null, 2));
+
         if (data.status === "error" || !data.data || !Array.isArray(data.data) || data.data.length === 0 || data.data[0].errors) {
              const errorMessage = data?.data?.[0]?.errors || data?.message || JSON.stringify(data);
              throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
         }
 
-        console.log("✅ AWB GENERAT CU SUCCES:", data.data[0].awbNumber);
         return data.data[0].awbNumber;
 
     } catch (error) {
-        console.error("❌ Eroare auto-generare AWB:", error.message);
+        console.error("❌ Eroare creare AWB FAN:", error.message);
         throw error;
     }
 }
