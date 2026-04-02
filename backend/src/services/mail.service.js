@@ -1062,3 +1062,48 @@ export async function sendAdminAssemblyAlert(data) {
     console.error("❌ Eroare sendAdminAssemblyAlert:", err);
   }
 }
+
+// ============================================================
+// 🚀 NOU: MAIL INSTRUCȚIUNI FANBOX DUPĂ CONFIRMARE PLATĂ
+// ============================================================
+export async function sendFanboxInstructionsEmail(to, orderData, returnToFanbox = false, pdfBuffer = null) {
+  try {
+    // Alegem template-ul potrivit în funcție de locația de retur dorită de client
+    const templateName = returnToFanbox ? "serviceFanboxToFanbox.html" : "serviceFanboxToHome.html";
+    const tpl = loadTemplate(templateName);
+
+    // Extragem numele locker-ului din adresă (sau punem toată adresa)
+    let fanboxName = orderData.shippingAddress;
+    if (orderData.shippingAddress.includes("Locker FANbox:")) {
+        fanboxName = orderData.shippingAddress.split("-")[0].trim(); // Luăm doar bucata cu numele
+    }
+
+    const html = render(tpl, {
+      customerName: orderData.shippingName || "Client Karix",
+      orderId: orderData.id,
+      fanboxLocation: fanboxName,
+      deliveryAddress: orderData.shippingAddress,
+      accountUrl: `https://karixcomputers.ro/orders`
+    });
+
+    const mailOptions = {
+      to,
+      subject: `Plată Confirmată + Instrucțiuni Predare FANbox (#${orderData.id})`,
+      html,
+      attachments: []
+    };
+
+    if (pdfBuffer) {
+      mailOptions.attachments.push({
+        filename: `Factura_Karix_${orderData.id}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      });
+    }
+
+    await sendHtmlMail(mailOptions);
+    console.log(`✅ MAIL INSTRUCȚIUNI FANBOX TRIMIS LA: ${to}`);
+  } catch (err) {
+    console.error("❌ Eroare sendFanboxInstructionsEmail:", err);
+  }
+}

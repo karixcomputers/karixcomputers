@@ -6,13 +6,16 @@ import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
 import { 
     sendUnifiedOrderEmail,
-    // 👉 IMPORTĂM FUNCȚIILE DE ASAMBLARE AICI
     sendAssemblyOrderPlaced,
-    sendAdminAssemblyAlert 
+    sendAdminAssemblyAlert,
+    sendFanboxInstructionsEmail // 👉 IMPORTĂM NOUA FUNCȚIE DE MAIL FANBOX
 } from "../services/mail.service.js";
 
 // --- IMPORT SMARTBILL ---
 import { createSmartBillInvoice, getSmartBillPdf } from "../services/smartbill.service.js";
+
+// 👉 IMPORTĂM LOGICA DE FAN COURIER PENTRU AWB INVERS (RIDICARE LA PLATA ONLINE)
+import { createReverseFanAWB } from "../services/fancourier.service.js";
 
 const router = express.Router();
 router.use(express.urlencoded({ extended: true }));
@@ -137,9 +140,36 @@ const confirmPayment = async (req, res) => {
         const orderId = parseInt(orderIdMatch[1]);
 
         if (action === 'confirmed' || action === 'confirmed_pending') {
+            const currentOrder = await prisma.order.findUnique({
+                where: { id: orderId },
+                include: { items: true, user: true }
+            });
+
+            if (!currentOrder) throw new Error("Comanda nu există.");
+
+            // 👉 NOU: VERIFICĂM DACĂ E SERVICE ȘI GENERĂM AWB INVERS (Ridicarea de la client)
+            const isService = currentOrder.items.some(item => 
+                ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'].some(kw => (item.productName || "").toLowerCase().includes(kw))
+            );
+            const isOradea = currentOrder.shippingAddress.toLowerCase().includes("oradea");
+
+            let reverseAwbGenerated = null;
+            if (isService && !isOradea) {
+                try {
+                    console.log(`🔄 Netopia IPN: Generare AWB Invers (Drop-off/Pick-up) pt comanda #${currentOrder.id}`);
+                    reverseAwbGenerated = await createReverseFanAWB(currentOrder); 
+                } catch (e) {
+                    console.error("⚠️ Eroare generare AWB Invers (Plată Online):", e.message);
+                }
+            }
+
+            // ACTUALIZĂM STATUSUL ȘI AWB-UL
             const updatedOrder = await prisma.order.update({
                 where: { id: orderId },
-                data: { status: "in_procesare" },
+                data: { 
+                    status: "in_procesare",
+                    reverseAwb: reverseAwbGenerated
+                },
                 include: { items: true, user: true }
             });
             
@@ -163,8 +193,7 @@ const confirmPayment = async (req, res) => {
             };
             await fetch(discordWebhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(discordMessage) }).catch(e => console.error(e));
 
-
-            // 👉 BIFURCAȚIE ASAMBLARE VS STANDARD
+            // 👉 BIFURCAȚIE ASAMBLARE VS STANDARD VS FANBOX
             const hasAssembly = updatedOrder.items.some(item => {
                 const n = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                 return n.includes("asamblare");
@@ -174,8 +203,6 @@ const confirmPayment = async (req, res) => {
 
             if (hasAssembly) {
                 // LOGICA PENTRU ASAMBLARE
-                
-                // 1. GENERĂM FACTURA SMARTBILL PENTRU ASAMBLARE
                 let invoicePdfBuffer = null;
                 try {
                     console.log("⏳ Generare factură SmartBill pentru Asamblare...");
@@ -185,10 +212,7 @@ const confirmPayment = async (req, res) => {
                         console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
                         await prisma.order.update({
                             where: { id: orderId },
-                            data: { 
-                                smartbillSeries: invoiceData.series,
-                                smartbillNumber: invoiceData.number
-                            }
+                            data: { smartbillSeries: invoiceData.series, smartbillNumber: invoiceData.number }
                         });
                         invoicePdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
                     }
@@ -196,23 +220,17 @@ const confirmPayment = async (req, res) => {
                     console.error("❌ Eroare SmartBill Integration Asamblare:", sbError.message);
                 }
 
-                // 👉 REPARAȚIE: EXTRAGEM ADRESA ȘI NOTELE DIRECT ȘI CURAT
                 let rawAddress = updatedOrder.shippingAddress || "";
                 let cleanAddress = rawAddress.split("| Note:")[0].trim();
-                let pieseText = "Nu au fost adăugate detalii suplimentare."; // TEXT DEFAULT CORECT
+                let pieseText = "Nu au fost adăugate detalii suplimentare."; 
                 
                 if (rawAddress.includes("| Note:")) {
                     pieseText = rawAddress.split("| Note:")[1].trim() || "Nu au fost adăugate detalii suplimentare.";
                 }
 
-                const isOradea = updatedOrder.pickupType === "KarixPersonal" || cleanAddress.toLowerCase().includes("oradea");
                 const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
-                
-                if (isOradea) {
-                    cleanAddress = modPredare;
-                }
+                if (isOradea) cleanAddress = modPredare;
 
-                // 3. TRIMITEM MAILURILE
                 if (updatedOrder.user?.email) {
                     await sendAssemblyOrderPlaced(updatedOrder.user.email, {
                         customerName: updatedOrder.isCompany ? updatedOrder.companyName : updatedOrder.shippingName,
@@ -237,7 +255,7 @@ const confirmPayment = async (req, res) => {
                 }).catch(err => console.error("Eroare Mail Admin Asamblare Netopia:", err));
 
             } else {
-                // --- LOGICĂ STANDARD SMARTBILL & UNIFIED EMAIL ---
+                // --- LOGICĂ STANDARD SMARTBILL & MAIL ---
                 let invoicePdfBuffer = null;
                 try {
                     console.log("⏳ Generare factură SmartBill...");
@@ -247,10 +265,7 @@ const confirmPayment = async (req, res) => {
                         console.log(`✅ Factură creată: ${invoiceData.series} ${invoiceData.number}`);
                         await prisma.order.update({
                             where: { id: orderId },
-                            data: { 
-                                smartbillSeries: invoiceData.series,
-                                smartbillNumber: invoiceData.number
-                            }
+                            data: { smartbillSeries: invoiceData.series, smartbillNumber: invoiceData.number }
                         });
                         invoicePdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
                     }
@@ -258,45 +273,51 @@ const confirmPayment = async (req, res) => {
                     console.error("❌ Eroare SmartBill Integration:", sbError.message);
                 }
 
-                // EMAIL-URI STANDARD
-                const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
-                const containsServices = updatedOrder.items.some(item => serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)));
-                
                 const rawAddress = updatedOrder.shippingAddress || "";
                 const cleanAddress = rawAddress.split("| Note:")[0].trim();
-
-                const commonMailData = {
-                    client: {
-                        name: updatedOrder.shippingName, 
-                        phone: updatedOrder.shippingPhone, 
-                        addressDetails: cleanAddress,
-                        city: cleanAddress.toLowerCase().includes('oradea') ? 'Oradea' : '',
-                        county: cleanAddress.toLowerCase().includes('oradea') ? 'Bihor' : '',
-                        isCompany: updatedOrder.isCompany, 
-                        companyName: updatedOrder.companyName, 
-                        cui: updatedOrder.cui, 
-                        regCom: updatedOrder.regCom
-                    },
-                    orderId: updatedOrder.id, 
-                    total: updatedOrder.totalCents, 
-                    couponCode: null,
-                    shippingAddress: cleanAddress, 
-                    pickupType: cleanAddress.toLowerCase().includes('oradea') ? 'KarixPersonal' : 'curier',
-                    isServiceOrder: containsServices,
-                    cartItems: updatedOrder.items.map(item => ({
-                        ...item, 
-                        name: item.productName, 
-                        isServiceItem: item.status === 'in_asteptare_ridicare' || serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
-                        qty: item.qty || 1, 
-                        priceCentsAtBuy: item.priceCentsAtBuy || item.priceCents
-                    }))
-                };
-
-                if (updatedOrder.user?.email) {
-                    await sendUnifiedOrderEmail(updatedOrder.user.email, commonMailData, false, invoicePdfBuffer).catch(e => console.error(e));
-                }
                 
-                await sendUnifiedOrderEmail(adminEmail, commonMailData, true, null).catch(e => console.error(e));
+                // 👉 TRIMITEM MAIL-URI FANBOX DACA E CAZUL
+                if (isService && updatedOrder.serviceDeliveryMethod === "fanbox") {
+                    if (updatedOrder.user?.email) {
+                        const isReturnToLocker = rawAddress.includes("Locker FANbox");
+                        await sendFanboxInstructionsEmail(updatedOrder.user.email, updatedOrder, isReturnToLocker, invoicePdfBuffer).catch(e => console.error(e));
+                    }
+                } else {
+                    // 👉 DACA NU E FANBOX (E PC NOU, SAU SERVICE LA USA), TRIMITEM MAILUL UNIFIED CLASIC
+                    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
+                    
+                    const commonMailData = {
+                        client: {
+                            name: updatedOrder.shippingName, 
+                            phone: updatedOrder.shippingPhone, 
+                            addressDetails: cleanAddress,
+                            city: isOradea ? 'Oradea' : '',
+                            county: isOradea ? 'Bihor' : '',
+                            isCompany: updatedOrder.isCompany, 
+                            companyName: updatedOrder.companyName, 
+                            cui: updatedOrder.cui, 
+                            regCom: updatedOrder.regCom
+                        },
+                        orderId: updatedOrder.id, 
+                        total: updatedOrder.totalCents, 
+                        couponCode: null,
+                        shippingAddress: cleanAddress, 
+                        pickupType: isOradea ? 'KarixPersonal' : 'curier',
+                        isServiceOrder: isService,
+                        cartItems: updatedOrder.items.map(item => ({
+                            ...item, 
+                            name: item.productName, 
+                            isServiceItem: item.status === 'in_asteptare_ridicare' || serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)),
+                            qty: item.qty || 1, 
+                            priceCentsAtBuy: item.priceCentsAtBuy || item.priceCents
+                        }))
+                    };
+
+                    if (updatedOrder.user?.email) {
+                        await sendUnifiedOrderEmail(updatedOrder.user.email, commonMailData, false, invoicePdfBuffer).catch(e => console.error(e));
+                    }
+                    await sendUnifiedOrderEmail(adminEmail, commonMailData, true, null).catch(e => console.error(e));
+                }
             }
         }
 

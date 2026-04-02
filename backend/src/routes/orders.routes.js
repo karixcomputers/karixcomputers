@@ -17,13 +17,13 @@ import {
   sendFinalInvoiceEmail,
   sendAdminOrderCanceledEmail,
   sendAssemblyOrderPlaced,
-  sendAdminAssemblyAlert
+  sendAdminAssemblyAlert,
+  // 👉 NOU: Importăm funcția pentru FANbox
+  sendFanboxInstructionsEmail
 } from "../services/mail.service.js";
 
-// 👉 IMPORTĂM createFanAWB (Livrare) ȘI createReverseFanAWB (Ridicare de la client)
 import { createFanAWB, createReverseFanAWB } from "../services/fancourier.service.js";
 
-// --- IMPORT FACTURI & PROFORME SMARTBILL ---
 import { 
   getSmartBillPdf,
   createSmartBillProforma, 
@@ -34,7 +34,6 @@ import {
 const prisma = new PrismaClient();
 const router = express.Router();
 
-// --- FUNCȚIE HELPER: Generare ID de 5 cifre unic ---
 async function generateUniqueOrderId() {
   let isUnique = false;
   let newId;
@@ -227,7 +226,6 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
     const userEmail = updatedItem.order.user.email;
     const itemName = (updatedItem.productName || "").toLowerCase();
     
-    // EXCLUDEM "asamblare" pentru mail-ul de livrare reparatie
     const isService = ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'].some(kw => itemName.includes(kw));
     const isOradea = updatedItem.order.shippingAddress?.toLowerCase().includes('oradea');
     let currentAwb = awb || updatedItem.awb || "";
@@ -312,12 +310,11 @@ router.post("/", requireAuth, async (req, res, next) => {
         id: randomOrderId,
         userId: req.user.sub,
         totalCents: total,
-        shippingCents: shippingCents || 0, // NOU: Salvăm taxa de transport calculată
+        shippingCents: shippingCents || 0,
         shippingName: client.isCompany ? client.companyName : client.name,
         shippingPhone: client.phone,
-        shippingAddress: client.addressDetails, // Vine curățată/inlocuită cu FANbox din frontend dacă e bifat retur la fel
+        shippingAddress: client.addressDetails, 
         
-        // 👉 DATE NOI PENTRU FANBOX & LOGISTICĂ
         serviceDeliveryMethod: client.serviceDeliveryMethod || "courier",
         fanboxLocationId: client.fanboxLocationId || null,
 
@@ -360,7 +357,6 @@ router.post("/", requireAuth, async (req, res, next) => {
     const uEmail = userEmail || (req.user && req.user.email);
     const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
 
-    // 🚀 BIFURCAȚIE: ASAMBLARE vs STANDARD
     if (hasAssembly) {
       let proformaPdfBuffer = null;
       if (paymentMethod === 'transfer_bancar') {
@@ -403,7 +399,6 @@ router.post("/", requireAuth, async (req, res, next) => {
       }
 
     } else {
-      // LOGICĂ STANDARD
       let proformaPdfBuffer = null;
       if (paymentMethod === 'transfer_bancar') {
         try {
@@ -493,7 +488,7 @@ router.get("/:id/invoice", requireAuth, async (req, res, next) => {
   }
 });
 
-// 9. POST: Confirmare Plată OP (Admin) + GENERARE AWB RIDICARE AUTOMATĂ
+// 9. POST: Confirmare Plată OP (Admin) + GENERARE AWB RIDICARE AUTOMATĂ + MAIL-URI FANBOX
 router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -517,8 +512,8 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
         ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'].some(kw => item.productName.toLowerCase().includes(kw))
     );
     const isOradea = order.shippingAddress.toLowerCase().includes("oradea");
-
     let reverseAwb = null;
+
     if (hasService && !isOradea) {
         try {
             console.log(`🔄 Generare AWB Invers (Ridicare de la client) pentru comanda #${order.id}`);
@@ -535,7 +530,7 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
         status: "in_procesare",
         smartbillSeries: invoiceData.series,
         smartbillNumber: invoiceData.number,
-        reverseAwb: reverseAwb, // 👉 Salvăm AWB-ul de ridicare
+        reverseAwb: reverseAwb, 
         items: {
           updateMany: {
             where: { status: "in_asteptare_plata" },
@@ -545,8 +540,15 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
       }
     });
 
-    // 4. Trimitem Email clientului cu Factura
-    await sendFinalInvoiceEmail(order.user.email, order, pdfBuffer);
+    // 4. TRIMITEM EMAIL-UL DE CONFIRMARE (Diferențiat pe FANbox vs Curier Normal)
+    if (hasService && order.serviceDeliveryMethod === "fanbox") {
+        // Dacă clientul a ales predare la locker, îi dăm mailul special cu instrucțiuni
+        const isReturnToLocker = order.shippingAddress.includes("Locker FANbox");
+        await sendFanboxInstructionsEmail(order.user.email, order, isReturnToLocker, pdfBuffer);
+    } else {
+        // Altfel, dacă a fost doar PC/Curier clasic, îi dăm factura normală
+        await sendFinalInvoiceEmail(order.user.email, order, pdfBuffer);
+    }
 
     res.json({ success: true, reverseAwb: reverseAwb });
 
