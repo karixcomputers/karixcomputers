@@ -21,19 +21,17 @@ export async function getFanToken() {
     try {
         const url = `https://api.fancourier.ro/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
         const response = await fetch(url, { method: "POST" });
-
         const data = await response.json();
         
-        console.log("🔍 Răspuns Autentificare FAN Courier:", data);
+        console.log("🔍 Răspuns Autentificare FAN:", data);
 
         const extractedToken = data?.data?.token || data?.token;
-
         if (extractedToken) {
             currentToken = extractedToken;
             tokenExpiration = new Date(new Date().getTime() + 23 * 60 * 60 * 1000);
             return currentToken;
         } else {
-            throw new Error(data.message || JSON.stringify(data) || "Nu s-a putut extrage token-ul.");
+            throw new Error(data.message || "Eroare token");
         }
     } catch (error) {
         console.error("❌ Eroare FAN Courier Auth:", error.message);
@@ -49,17 +47,23 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
 
     if (isTestMode) {
         await new Promise(resolve => setTimeout(resolve, 1000));
-        const fakeAwb = `TEST_AWB_${Math.floor(Math.random() * 100000000)}`;
-        return fakeAwb; 
+        return `TEST_AWB_${Math.floor(Math.random() * 100000000)}`; 
     }
 
     try {
         const token = await getFanToken();
-        const clientId = process.env.FAN_CLIENT_ID;
+        const clientIdString = process.env.FAN_CLIENT_ID;
+        
+        // 👉 AICI VEDEM EXACT CE CITEȘTE BACKEND-UL DIN .ENV
+        console.log("🏷️ CLIENT ID CITIT DIN .ENV ESTE:", clientIdString);
 
-        if (!clientId) throw new Error("FAN_CLIENT_ID lipsește din .env");
+        if (!clientIdString) {
+             throw new Error("FAN_CLIENT_ID lipsește complet! Te rog rulează: pm2 restart all --update-env");
+        }
+        
+        const clientId = String(clientIdString).trim();
 
-        // Curățăm adresa de separatorul "| Note:" înainte de a o trimite la FAN Courier
+        // Curățăm adresa de separatorul "| Note:"
         let rawAddress = order.shippingAddress || "";
         if (rawAddress.includes("| Note:")) {
             rawAddress = rawAddress.split("| Note:")[0].trim();
@@ -68,44 +72,43 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const addressParts = rawAddress.split(',').map(s => s.trim());
         const county = addressParts.length >= 3 ? addressParts[addressParts.length - 1] : "Bucuresti";
         const locality = addressParts.length >= 2 ? addressParts[addressParts.length - 2] : "Bucuresti";
-        // Toată prima parte a adresei intră la stradă
         const street = addressParts.length >= 1 ? addressParts[0] : "Adresa nespecificata";
 
-        // Suma de ramburs (0 daca e platit online/OP, valoarea comenzii daca e ramburs curier)
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : (order.totalCents / 100);
-
-        // Stabilim tipul serviciului corect conform documentatiei (dacă ai ramburs pui Cont Colector)
         const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
 
-        // Construim payload-ul corect pentru noul API v2
-        const payload = [
-            {
-                info: {
-                    service: serviceType, // 'Standard' sau 'Cont Colector'
-                    packages: { parcel: parseInt(packagesCount), envelopes: 0 },
-                    weight: parseInt(weight),
-                    payment: "sender", // Tu platesti curierul (conform contractului tau)
-                    observation: `Comanda Karix #${String(order.id).slice(-8)}`,
-                    content: "Sistem PC / Componente Hardware",
-                    dimensions: { length: 40, height: 40, width: 20 }, 
-                    cod: rambursValue // Cash On Delivery
-                },
-                // 👉 AICI ESTE REPARAȚIA: clientId se trimite direct în obiectul de shipment
-                clientId: parseInt(clientId),
-                recipient: {
-                    name: order.shippingName,
-                    phone: order.shippingPhone,
-                    email: order.user?.email || "contact@karixcomputers.ro",
-                    address: {
-                        county: county,
-                        locality: locality,
-                        street: street,
-                        streetNo: "-", 
-                        zipCode: "" 
+        const payload = {
+            clientId: clientId, // ID-ul tău de client FAN
+            shipments: [
+                {
+                    info: {
+                        service: serviceType,
+                        packages: { parcel: parseInt(packagesCount), envelopes: 0 },
+                        weight: parseInt(weight),
+                        payment: "sender", // Plata o faci tu la curier
+                        observation: `Comanda Karix #${String(order.id).slice(-8)}`,
+                        content: "Sistem PC / Componente Hardware",
+                        dimensions: { length: 40, height: 40, width: 20 }, 
+                        cod: rambursValue
+                    },
+                    recipient: {
+                        name: order.shippingName,
+                        phone: order.shippingPhone,
+                        email: order.user?.email || "contact@karixcomputers.ro",
+                        address: {
+                            county: county,
+                            locality: locality,
+                            street: street,
+                            streetNo: "-", 
+                            zipCode: "" 
+                        }
                     }
                 }
-            }
-        ];
+            ]
+        };
+
+        // 👉 AICI PRINTĂM TOT JSON-UL SĂ-L VEDEM
+        console.log("📤 PAYLOAD TRIMIS SPRE FAN:", JSON.stringify(payload, null, 2));
 
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
@@ -117,15 +120,13 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         });
 
         const data = await response.json();
-        
         console.log("🔍 Răspuns FAN Courier Creare AWB:", JSON.stringify(data, null, 2));
 
         if (data.status === "error" || !data.data || !Array.isArray(data.data) || data.data.length === 0 || data.data[0].errors) {
              const errorMessage = data?.data?.[0]?.errors || data?.message || JSON.stringify(data);
-             throw new Error(`Refuzat de FAN Courier: ${typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)}`);
+             throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
         }
 
-        // Preluăm awbNumber-ul generat
         return data.data[0].awbNumber;
 
     } catch (error) {
