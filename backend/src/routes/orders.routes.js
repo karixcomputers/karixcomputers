@@ -406,12 +406,11 @@ router.post("/", requireAuth, async (req, res, next) => {
           pieseText = parts[1].trim() || "Nu au fost adăugate detalii suplimentare.";
       }
 
-      // Verificăm orașul
+      // Verificăm dacă clientul e din Oradea (foarte robust)
       const isOradea = pickupType === "KarixPersonal" || client.city.toLowerCase().includes("oradea");
       const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
 
       // 👉 Dacă se alege transfer bancar sau ramburs, trimitem ACUM
-      // Dacă se alege Netopia, lăsăm Webhook-ul de Netopia să facă treaba asta la confirmarea plății!
       if (paymentMethod !== 'online') {
         // Mail către CLIENT cu PROFORMA atașată (dacă e cazul)
         await sendAssemblyOrderPlaced(uEmail, {
@@ -421,7 +420,7 @@ router.post("/", requireAuth, async (req, res, next) => {
             phone: client.phone,
             method: modPredare,
             issueDescription: pieseText,
-            isOradea: isOradea // 👉 AICI E REPARAȚIA! Transmitem asta către mail.service
+            isOradea: isOradea // 👉 REPARAȚIA! Acum funcția de mail primește variabila corectă
         }, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare:", err));
 
         // Mail către ADMIN
@@ -432,8 +431,7 @@ router.post("/", requireAuth, async (req, res, next) => {
             customerPhone: client.phone,
             method: modPredare,
             address: cleanAddress,
-            issueDescription: pieseText,
-            isOradea: isOradea // Trimitem și către Admin în caz că vrei să schimbi template-ul ulterior
+            issueDescription: pieseText
         }).catch(err => console.error("Eroare Mail Admin Asamblare:", err));
       }
 
@@ -487,6 +485,28 @@ router.post("/", requireAuth, async (req, res, next) => {
   } catch (error) {
     console.error("Eroare Backend Comandă:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// --- RUTĂ PROXY PENTRU ANAF ---
+router.post("/anaf", async (req, res) => {
+  try {
+    const { cui } = req.body;
+    const numCui = Number(cui);
+    if (!numCui || isNaN(numCui)) return res.status(400).json({ error: "CUI invalid." });
+
+    const response = await fetch("https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
+      body: JSON.stringify([{ cui: numCui, data: new Date().toISOString().split("T")[0] }])
+    });
+
+    if (!response.ok) return res.status(200).json({ cod: 500, message: "ANAF indisponibil" }); 
+    const anafData = await response.json();
+    res.json(anafData);
+  } catch (error) {
+    console.error("❌ Eroare conexiune ANAF:", error.message);
+    res.status(200).json({ cod: 500, message: "Conexiune refuzată de ANAF." });
   }
 });
 
