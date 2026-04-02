@@ -7,10 +7,11 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // MODIFICARE: Fereastra acum cere detalii despre pachet pentru a genera AWB-ul
+  // MODIFICARE: Fereastra acum cere detalii despre pachet și opțiunea de asigurare colet
   const [awbModal, setAwbModal] = useState({ open: false, itemId: null, orderId: null });
   const [packageWeight, setPackageWeight] = useState(1);
   const [packageCount, setPackageCount] = useState(1);
+  const [insurance, setInsurance] = useState(false); // 👉 NOU: Starea pentru asigurarea FAN Courier
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [confirmingOpId, setConfirmingOpId] = useState(null);
@@ -42,20 +43,20 @@ export default function AdminDashboard() {
 
   const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
     if (newStatus === "predat_curier") {
-      // Deschidem modalul ca să cerem greutatea înainte să generăm AWB-ul
       setAwbModal({ open: true, itemId, orderId });
       return;
     }
     await executeItemUpdate(orderId, itemId, newStatus);
   };
 
-  const executeItemUpdate = async (orderId, itemId, status, weight = 1, packages = 1) => {
+  // 👉 NOU: Am adăugat parametrul `insurance` în trimiterea spre backend
+  const executeItemUpdate = async (orderId, itemId, status, weight = 1, packages = 1, isInsured = false) => {
     if (status === "predat_curier") setIsGenerating(true);
     
     try {
       const res = await apiFetch(`/orders/item/${itemId}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ status, weight, packages }) // Trimitem detaliile către backend
+        body: JSON.stringify({ status, weight, packages, insurance: isInsured }) 
       });
 
       const resData = await res.json();
@@ -90,6 +91,7 @@ export default function AdminDashboard() {
       setAwbModal({ open: false, itemId: null, orderId: null });
       setPackageWeight(1);
       setPackageCount(1);
+      setInsurance(false); // Resetăm checkbox-ul
       showToast("Status actualizat cu succes!");
     } catch (err) {
       showToast(err.message, "error");
@@ -147,7 +149,6 @@ export default function AdminDashboard() {
   };
 
   const renderStatusOptions = (item, order) => {
-    // Normalizăm textul ca să scăpăm de diacritice (ex: MENTENANȚĂ -> mentenanta)
     const itemName = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const isService = itemName.includes('service') || 
                       itemName.includes('mentenanta') ||
@@ -295,7 +296,6 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      {/* BLOC ACȚIUNI ADMIN */}
                       <div className="mt-8 pt-6 border-t border-white/10 flex flex-col gap-3">
                         {isPendingBankTransfer && (
                             <button 
@@ -319,7 +319,6 @@ export default function AdminDashboard() {
                     <div className="lg:w-2/3 space-y-6">
                       <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 text-center lg:text-left">Status Produse</h4>
                       {order.items?.map((item) => {
-                         // Normalizăm și aici ca să afișeze corect tag-ul roz de "Serviciu"
                          const itemName = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                          const isService = itemName.includes('service') || 
                                            itemName.includes('mentenanta') ||
@@ -362,10 +361,14 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* MODAL PENTRU AWB GENERATOR (Cere greutate și colete) */}
+      {/* MODAL PENTRU AWB GENERATOR */}
       {awbModal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setAwbModal({ open: false, itemId: null, orderId: null })}></div>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => {
+            setAwbModal({ open: false, itemId: null, orderId: null });
+            setInsurance(false);
+          }}></div>
+          
           <div className="relative w-full max-w-md p-10 rounded-[40px] bg-[#12192c]/95 backdrop-blur-3xl border border-white/10 shadow-2xl animate-in zoom-in duration-300">
             <h2 className="text-2xl font-black text-white uppercase italic mb-2">Detalii Expediere</h2>
             <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest mb-8 italic">Se va genera AWB FAN Courier</p>
@@ -396,11 +399,40 @@ export default function AdminDashboard() {
                 </div>
             </div>
 
+            {/* 👉 NOU: Bifa pentru Asigurare Colet */}
+            <div className="mb-8">
+              <label className="flex items-center cursor-pointer group">
+                <div className="relative flex items-center justify-center">
+                  <input 
+                    type="checkbox" 
+                    checked={insurance} 
+                    onChange={(e) => setInsurance(e.target.checked)} 
+                    className="sr-only" 
+                  />
+                  <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${insurance ? 'bg-indigo-500 border-indigo-500' : 'bg-transparent border-gray-600 group-hover:border-indigo-400'}`}>
+                    {insurance && (
+                      <svg width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 5L4.5 8.5L13 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                <div className="ml-4 flex flex-col">
+                  <span className="text-white font-bold text-sm italic">Adaugă Asigurare Colet 🛡️</span>
+                  <span className="text-gray-500 text-[10px] uppercase font-black tracking-widest mt-1">Protecție în caz de deteriorare</span>
+                </div>
+              </label>
+            </div>
+
             <div className="flex gap-4">
-                <button onClick={() => setAwbModal({ open: false, itemId: null, orderId: null })} className="flex-1 py-4 text-gray-500 font-black uppercase text-[10px] hover:text-white transition-colors">Anulare</button>
+                <button onClick={() => {
+                  setAwbModal({ open: false, itemId: null, orderId: null });
+                  setInsurance(false);
+                }} className="flex-1 py-4 text-gray-500 font-black uppercase text-[10px] hover:text-white transition-colors">Anulare</button>
                 <button 
                   disabled={isGenerating}
-                  onClick={() => executeItemUpdate(awbModal.orderId, awbModal.itemId, "predat_curier", packageWeight, packageCount)} 
+                  // 👉 NOU: Trimitem și parametrul insurance!
+                  onClick={() => executeItemUpdate(awbModal.orderId, awbModal.itemId, "predat_curier", packageWeight, packageCount, insurance)} 
                   className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black uppercase text-[10px] shadow-xl hover:bg-indigo-500 transition-colors disabled:opacity-50"
                 >
                   {isGenerating ? "Se trimite..." : "Generare AWB"}

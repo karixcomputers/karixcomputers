@@ -42,8 +42,8 @@ export async function getFanToken() {
 // ==========================================
 // 2. GENERARE AWB REAL
 // ==========================================
-export async function createFanAWB(order, isTestMode = false, weight = 1, packagesCount = 1) { 
-    console.log(`📦 Inițiere generare AWB pentru comanda #${order.id}. Greutate: ${weight}kg, Colete: ${packagesCount}`);
+export async function createFanAWB(order, isTestMode = false, weight = 1, packagesCount = 1, isInsured = false) { 
+    console.log(`📦 Inițiere generare AWB pentru comanda #${order.id}. Greutate: ${weight}kg, Colete: ${packagesCount}, Asigurat: ${isInsured}`);
 
     if (isTestMode) {
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -97,9 +97,13 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         locality = formatForFan(locality);
         county = formatForFan(county);
 
-        // Suma ramburs
-        const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : (order.totalCents / 100);
+        // Suma ramburs și valoarea totală a comenzii
+        const orderTotalRon = (order.totalCents / 100);
+        const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : orderTotalRon;
         const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
+
+        // 👉 4. Valoarea declarată pentru asigurare (Dacă isInsured e true, punem valoarea comenzii, altfel 0)
+        const declaredValue = isInsured ? orderTotalRon : 0;
 
         const payload = {
             clientId: clientIdNum,
@@ -113,7 +117,8 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         observation: `Comanda Karix #${String(order.id).slice(-8)}`,
                         content: "Sistem PC / Componente Hardware",
                         dimensions: { length: 40, height: 40, width: 20 }, 
-                        cod: rambursValue
+                        cod: rambursValue,
+                        declaredValue: declaredValue // 👉 Aici setăm valoarea asigurată
                     },
                     recipient: {
                         name: order.shippingName,
@@ -142,10 +147,10 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
 
         const data = await response.json();
         
-        // 👉 4. AICI AM REPARAT: Convertim numărul în TEXT cu String() ca să-l accepte baza de date!
+        // Convertim numărul în TEXT cu String() ca să-l accepte baza de date!
         if (data.response && Array.isArray(data.response) && data.response[0].awbNumber) {
-             const awbGenerated = String(data.response[0].awbNumber); // <--- AICI ESTE MAGIA
-             console.log(`✅ AWB GENERAT CU SUCCES: ${awbGenerated}`);
+             const awbGenerated = String(data.response[0].awbNumber); 
+             console.log(`✅ AWB GENERAT CU SUCCES: ${awbGenerated} | Asigurat la valoarea: ${declaredValue} RON`);
              return awbGenerated;
         }
 
