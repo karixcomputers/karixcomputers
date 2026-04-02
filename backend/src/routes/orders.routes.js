@@ -315,7 +315,6 @@ router.post("/", requireAuth, async (req, res, next) => {
 
     const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
     
-    // Verificăm dacă măcar UN produs din coș are "asamblare" în nume
     const hasAssembly = cartItems.some(item => {
         const name = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         return name.includes("asamblare");
@@ -326,8 +325,24 @@ router.post("/", requireAuth, async (req, res, next) => {
         return item.category === 'service' || serviceKeywords.some(kw => name.includes(kw));
     });
 
-    // Stabilim statusul inițial (Dacă e OP, așteptăm plata)
     const initialStatus = paymentMethod === 'transfer_bancar' ? 'in_asteptare_plata' : 'in_asteptare';
+
+    // 👉 Salvăm baza adresei + Separatorul pentru BAZA DE DATE (ca să-l citească Netopia și Mailurile)
+    const baseAddress = `${client.addressDetails}, ${client.city}, ${client.county}`;
+    // Aici verificăm variabila pe care o trimite efectiv frontend-ul.
+    // Cum ai spus că ai lăsat checkout-ul default, nota clientului vine ca "client.assemblyNotes" 
+    // SAU ca parte din client.addressDetails. Le captăm pe amândouă:
+    let finalNote = client.assemblyNotes ? client.assemblyNotes : "";
+    let cleanAddressDetails = client.addressDetails || "";
+
+    if (cleanAddressDetails.includes("| Note client:")) {
+        const parts = cleanAddressDetails.split("| Note client:");
+        cleanAddressDetails = parts[0].trim();
+        finalNote = parts[1].trim();
+    }
+
+    const cleanBaseAddress = `${cleanAddressDetails}, ${client.city}, ${client.county}`;
+    const dbShippingAddress = finalNote ? `${cleanBaseAddress} | Note: ${finalNote}` : cleanBaseAddress;
 
     const newOrder = await prisma.order.create({
       data: {
@@ -336,17 +351,13 @@ router.post("/", requireAuth, async (req, res, next) => {
         totalCents: total,
         shippingName: client.isCompany ? client.companyName : client.name,
         shippingPhone: client.phone,
-        shippingAddress: `${client.addressDetails}, ${client.city}, ${client.county}`,
-        
+        shippingAddress: dbShippingAddress, // Salvat în DB cu "| Note:"
         isCompany: client.isCompany || false,
         companyName: client.isCompany ? client.companyName : null,
         cui: client.isCompany ? client.cui : null,
         regCom: client.isCompany ? client.regCom : null,
-
-        // Salvăm metoda de plată venită din checkout (online, ramburs, transfer_bancar)
         paymentMethod: paymentMethod,
         status: initialStatus,
-
         items: {
           create: cartItems.map(item => {
             const nameFinal = item.productName || item.name;
@@ -354,7 +365,6 @@ router.post("/", requireAuth, async (req, res, next) => {
             const isServiceItem = (item.category === 'service') || 
                                   serviceKeywords.some(kw => nameLower.includes(kw)) ||
                                   nameLower.includes("asamblare");
-            
             return {
               productId: String(item.id),
               productName: nameFinal, 
@@ -379,11 +389,10 @@ router.post("/", requireAuth, async (req, res, next) => {
     const uEmail = userEmail || (req.user && req.user.email);
     const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
 
-// ------------------------------------------------------------
+    // ------------------------------------------------------------
     // 🚀 BIFURCAȚIE: ASAMBLARE vs STANDARD
     // ------------------------------------------------------------
     if (hasAssembly) {
-      // 1. GENERĂM PROFORMA SMARTBILL PENTRU ASAMBLARE OP
       let proformaPdfBuffer = null;
       if (paymentMethod === 'transfer_bancar') {
         try {
@@ -391,33 +400,27 @@ router.post("/", requireAuth, async (req, res, next) => {
           if (proformaData && proformaData.series && proformaData.number) {
             proformaPdfBuffer = await getSmartBillProformaPdf(proformaData.series, proformaData.number);
           }
-        } catch (err) {
-          console.error("⚠️ Eroare generare proformă SmartBill Asamblare:", err);
-        }
+        } catch (err) {}
       }
 
-      const isOradea = pickupType === "KarixPersonal"; 
+      const isOradea = pickupType === "KarixPersonal" || client.city.toLowerCase().includes("oradea");
       const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
 
-      // Adresa clientului
-      let cleanAddress = isOradea ? "Predare Personală Oradea (F2F)" : `${client.addressDetails}, ${client.city}, ${client.county}`;
-      
-      // 👉 Acum preluăm notele direct din variabila assemblyNotes, dacă există
-      let pieseText = client.assemblyNotes ? client.assemblyNotes : "Nu au fost adăugate detalii suplimentare.";
+      // Adresa finală de preluat pentru EMAIL (fără Note)
+      let cleanAddress = isOradea ? modPredare : cleanBaseAddress;
+      let pieseText = finalNote ? finalNote : "Nu au fost adăugate detalii suplimentare.";
 
       if (paymentMethod !== 'online') {
-        // Mail către CLIENT cu PROFORMA atașată (dacă e cazul)
         await sendAssemblyOrderPlaced(uEmail, {
             customerName: client.isCompany ? client.companyName : client.name,
             orderId: newOrder.id,
             deliveryAddress: cleanAddress,
             phone: client.phone,
             method: modPredare,
-            issueDescription: pieseText, // Trimitem notele
-            isOradea: isOradea 
-        }, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare:", err));
+            issueDescription: pieseText,
+            isOradea: isOradea
+        }, proformaPdfBuffer).catch(e => console.error(e));
 
-        // Mail către ADMIN
         await sendAdminAssemblyAlert({
             productName: "Asamblare PC Premium",
             orderId: newOrder.id,
@@ -426,12 +429,10 @@ router.post("/", requireAuth, async (req, res, next) => {
             method: modPredare,
             address: cleanAddress,
             issueDescription: pieseText,
-            isOradea: isOradea 
-        }).catch(err => console.error("Eroare Mail Admin Asamblare:", err));
+            isOradea: isOradea
+        }).catch(e => console.error(e));
       }
-
     } else {
-      // --- LOGICĂ STANDARD PENTRU RESTUL COMENZILOR ---
       let proformaPdfBuffer = null;
       if (paymentMethod === 'transfer_bancar') {
         try {
@@ -439,9 +440,7 @@ router.post("/", requireAuth, async (req, res, next) => {
           if (proformaData && proformaData.series && proformaData.number) {
             proformaPdfBuffer = await getSmartBillProformaPdf(proformaData.series, proformaData.number);
           }
-        } catch (err) {
-          console.error("⚠️ Eroare generare proformă SmartBill:", err);
-        }
+        } catch (err) {}
       }
 
       const commonMailData = {
@@ -451,27 +450,18 @@ router.post("/", requireAuth, async (req, res, next) => {
         couponCode: couponCode || null,
         pickupType: pickupType,
         isServiceOrder: containsServices, 
-        paymentMethod: paymentMethod, // Transmitem și metoda pentru a afișa datele bancare în mail
+        paymentMethod: paymentMethod, 
         cartItems: cartItems.map(item => {
           const nameFinal = item.productName || item.name;
           const nameLower = nameFinal.toLowerCase();
           const isSrv = (item.category === 'service') || serviceKeywords.some(kw => nameLower.includes(kw));
-          
-          return {
-            ...item,
-            name: nameFinal, 
-            isServiceItem: isSrv,
-            priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
-            qty: item.qty || 1
-          };
+          return { ...item, name: nameFinal, isServiceItem: isSrv, priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy, qty: item.qty || 1 };
         })
       };
 
       if (paymentMethod !== 'online') {
-        if (uEmail) {
-           await sendUnifiedOrderEmail(uEmail, commonMailData, false, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client:", err));
-        }
-        await sendUnifiedOrderEmail(adminEmail, commonMailData, true, proformaPdfBuffer).catch(err => console.error("Eroare Mail Admin:", err));
+        if (uEmail) await sendUnifiedOrderEmail(uEmail, commonMailData, false, proformaPdfBuffer).catch(e => console.error(e));
+        await sendUnifiedOrderEmail(adminEmail, commonMailData, true, proformaPdfBuffer).catch(e => console.error(e));
       }
     }
 
@@ -483,83 +473,48 @@ router.post("/", requireAuth, async (req, res, next) => {
   }
 });
 
-// --- RUTĂ PROXY PENTRU ANAF ---
 router.post("/anaf", async (req, res) => {
   try {
     const { cui } = req.body;
     const numCui = Number(cui);
     if (!numCui || isNaN(numCui)) return res.status(400).json({ error: "CUI invalid." });
-
     const response = await fetch("https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
       body: JSON.stringify([{ cui: numCui, data: new Date().toISOString().split("T")[0] }])
     });
-
     if (!response.ok) return res.status(200).json({ cod: 500, message: "ANAF indisponibil" }); 
     const anafData = await response.json();
     res.json(anafData);
   } catch (error) {
-    console.error("❌ Eroare conexiune ANAF:", error.message);
     res.status(200).json({ cod: 500, message: "Conexiune refuzată de ANAF." });
   }
 });
 
-// 8. GET: Descărcare Factură PDF
 router.get("/:id/invoice", requireAuth, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
     const userId = req.user.sub;
-
-    const order = await prisma.order.findUnique({
-      where: { id }
-    });
-
-    if (!order) {
-      return res.status(404).json({ error: "Comanda nu a fost găsită." });
-    }
-
-    if (order.userId !== userId && req.user.role !== "admin") {
-      return res.status(403).json({ error: "Acces interzis." });
-    }
-
-    if (!order.smartbillSeries || !order.smartbillNumber) {
-      return res.status(404).json({ error: "Factura nu a fost încă emisă pentru această comandă." });
-    }
-
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) return res.status(404).json({ error: "Comanda nu a fost găsită." });
+    if (order.userId !== userId && req.user.role !== "admin") return res.status(403).json({ error: "Acces interzis." });
+    if (!order.smartbillSeries || !order.smartbillNumber) return res.status(404).json({ error: "Factura nu a fost încă emisă pentru această comandă." });
     const pdfBuffer = await getSmartBillPdf(order.smartbillSeries, order.smartbillNumber);
-
-    if (!pdfBuffer) {
-      return res.status(500).json({ error: "Eroare la preluarea facturii de la SmartBill." });
-    }
-
+    if (!pdfBuffer) return res.status(500).json({ error: "Eroare la preluarea facturii de la SmartBill." });
+    
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=Factura_Karix_${order.id}.pdf`);
     res.send(pdfBuffer);
-
-  } catch (error) {
-    console.error("Eroare download factură:", error);
-    res.status(500).json({ error: "Eroare internă la descărcarea facturii." });
-  }
+  } catch (error) { res.status(500).json({ error: "Eroare internă la descărcarea facturii." }); }
 });
 
-// 9. NOU: POST: Confirmare Plată Transfer Bancar (Boton pentru Admin)
 router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-    
-    // Luăm comanda completă
-    const order = await prisma.order.findUnique({
-      where: { id },
-      include: { items: true, user: true }
-    });
-
+    const order = await prisma.order.findUnique({ where: { id }, include: { items: true, user: true } });
     if (!order) return res.status(404).json({ error: "Comanda nu a fost găsită." });
-    if (order.paymentMethod !== "transfer_bancar") {
-      return res.status(400).json({ error: "Această acțiune este doar pentru comenzile cu plată prin Transfer Bancar." });
-    }
+    if (order.paymentMethod !== "transfer_bancar") return res.status(400).json({ error: "Această acțiune este doar pentru OP." });
 
-    // 1. Generăm Factura Finală în SmartBill pe baza proformei (sau ca factură nouă)
     let invoiceData;
     let pdfBuffer;
     try {
@@ -567,36 +522,20 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
       if (invoiceData && invoiceData.series && invoiceData.number) {
         pdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
       }
-    } catch (smartbillError) {
-      console.error("Eroare SmartBill la emitere factură finală:", smartbillError);
-      return res.status(500).json({ error: "Plata nu a fost confirmată deoarece emiterea facturii în SmartBill a eșuat." });
-    }
+    } catch (e) { return res.status(500).json({ error: "Plata nu a fost confirmată deoarece emiterea facturii a eșuat." }); }
 
-    // 2. Actualizăm Comanda în Baza de Date
     await prisma.order.update({
       where: { id },
       data: {
-        status: "in_procesare", // Trecem comanda din 'in_asteptare_plata' in 'in_procesare'
+        status: "in_procesare",
         smartbillSeries: invoiceData.series,
         smartbillNumber: invoiceData.number,
-        items: {
-          updateMany: {
-            where: { status: "in_asteptare_plata" },
-            data: { status: "in_procesare" }
-          }
-        }
+        items: { updateMany: { where: { status: "in_asteptare_plata" }, data: { status: "in_procesare" } } }
       }
     });
-
-    // 3. Trimitem Email-ul clientului cu Factura Fiscală atașată
     await sendFinalInvoiceEmail(order.user.email, order, pdfBuffer);
-
     res.json({ success: true, message: "Plata a fost confirmată, iar factura a fost trimisă clientului." });
-
-  } catch (error) {
-    console.error("Eroare la confirmarea plății OP:", error);
-    res.status(500).json({ error: "Eroare internă." });
-  }
+  } catch (error) { res.status(500).json({ error: "Eroare internă." }); }
 });
 
 export default router;

@@ -15,9 +15,13 @@ export const createSmartBillInvoice = async (order) => {
         const SERIA = (process.env.SMARTBILL_SERIA || "").trim();
         const auth = getAuthHeaders();
         
+        // 👉 TĂIEM NOTIȚA CA SĂ NU APARĂ PE FACTURĂ
+        const rawAddress = order.shippingAddress || "România";
+        const cleanAddress = rawAddress.split("| Note:")[0].trim();
+
         const clientObj = {
             name: order.isCompany ? order.companyName : (order.shippingName || "Client Karix"),
-            address: order.shippingAddress || "România",
+            address: cleanAddress,
             country: "Romania",
             isTaxPayer: !!order.isCompany,
             saveToDb: false
@@ -108,9 +112,13 @@ export const createSmartBillProforma = async (order, clientData, cartItems) => {
         const SERIA_PROFORMA = (process.env.SMARTBILL_PROFORMA_SERIA || process.env.SMARTBILL_SERIA || "").trim();
         const auth = getAuthHeaders();
         
+        // 👉 TĂIEM NOTIȚA CA SĂ NU APARĂ PE PROFORMĂ
+        const rawAddress = `${clientData.addressDetails}, ${clientData.city}, ${clientData.county}`;
+        const cleanAddress = rawAddress.split("| Note:")[0].trim();
+
         const clientObj = {
             name: clientData.isCompany ? clientData.companyName : (clientData.name || "Client Karix"),
-            address: `${clientData.addressDetails}, ${clientData.city}, ${clientData.county}` || "România",
+            address: cleanAddress || "România",
             country: "Romania",
             isTaxPayer: !!clientData.isCompany,
             saveToDb: false
