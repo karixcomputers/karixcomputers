@@ -84,32 +84,38 @@ model Review {
 }
 
 model Order {
-  id                Int             @id 
-  userId            String
-  user              User            @relation(fields: [userId], references: [id])
-  items             OrderItem[]
-  shippingName      String
-  shippingPhone     String
-  shippingAddress   String
-  totalCents        Int
-  status            String          @default("in_asteptare")
-  stripeSessionId   String?         @unique
-  paymentIntentId   String?
-  createdAt         DateTime        @default(now())
-  returnRequests    ReturnRequest[]
+  id                    Int             @id 
+  userId                String
+  user                  User            @relation(fields: [userId], references: [id])
+  items                 OrderItem[]
+  shippingName          String
+  shippingPhone         String
+  shippingAddress       String
+  totalCents            Int
+  status                String          @default("in_asteptare")
+  stripeSessionId       String?         @unique
+  paymentIntentId       String?
+  createdAt             DateTime        @default(now())
+  returnRequests        ReturnRequest[]
 
   // --- NOU: Metoda de plată ---
-  paymentMethod     String          @default("ramburs") // Poate fi "ramburs" sau "online"
+  paymentMethod         String          @default("ramburs") // Poate fi "ramburs", "online", "transfer_bancar"
 
   // --- NOU: Date pentru SmartBill ---
-  smartbillSeries   String?
-  smartbillNumber   String?
+  smartbillSeries       String?
+  smartbillNumber       String?
 
   // --- DATE FACTURARE PERSOANĂ JURIDICĂ ---
-  isCompany         Boolean         @default(false)
-  companyName       String?
-  cui               String?
-  regCom            String?
+  isCompany             Boolean         @default(false)
+  companyName           String?
+  cui                   String?
+  regCom                String?
+
+  // --- 🚀 NOU: LOGISTICĂ & FANBOX & RETUR SERVICE ---
+  shippingCents         Int             @default(0)
+  serviceDeliveryMethod String?         // Poate fi "courier" sau "fanbox"
+  fanboxLocationId      String?         // ID-ul locker-ului (ex: "4920")
+  reverseAwb            String?         // AWB-ul de ridicare a dispozitivului defect de la client
 }
 
 model OrderItem {
