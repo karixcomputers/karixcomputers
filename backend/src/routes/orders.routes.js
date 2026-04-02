@@ -406,10 +406,9 @@ router.post("/", requireAuth, async (req, res, next) => {
           pieseText = parts[1].trim() || "Nu au fost adăugate detalii suplimentare.";
       }
 
-      // Detalii metodă
-      const modPredare = pickupType === "KarixPersonal" || client.city.toLowerCase().includes("oradea") 
-        ? "Predare Personală Oradea (F2F)" 
-        : "Prin Curier / Comandă furnizor";
+      // Verificăm orașul
+      const isOradea = pickupType === "KarixPersonal" || client.city.toLowerCase().includes("oradea");
+      const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
 
       // 👉 Dacă se alege transfer bancar sau ramburs, trimitem ACUM
       // Dacă se alege Netopia, lăsăm Webhook-ul de Netopia să facă treaba asta la confirmarea plății!
@@ -422,7 +421,7 @@ router.post("/", requireAuth, async (req, res, next) => {
             phone: client.phone,
             method: modPredare,
             issueDescription: pieseText,
-            isOradea: isOradea
+            isOradea: isOradea // 👉 AICI E REPARAȚIA! Transmitem asta către mail.service
         }, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare:", err));
 
         // Mail către ADMIN
@@ -433,7 +432,8 @@ router.post("/", requireAuth, async (req, res, next) => {
             customerPhone: client.phone,
             method: modPredare,
             address: cleanAddress,
-            issueDescription: pieseText
+            issueDescription: pieseText,
+            isOradea: isOradea // Trimitem și către Admin în caz că vrei să schimbi template-ul ulterior
         }).catch(err => console.error("Eroare Mail Admin Asamblare:", err));
       }
 
