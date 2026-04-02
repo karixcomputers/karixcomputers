@@ -81,7 +81,7 @@ const createPayment = async (req, res) => {
                 <last_name>${escapeXml(nameParts.slice(1).join(' ') || 'Karix')}</last_name>
                 <email>${escapeXml(order.user?.email || req.user?.email || 'client@karix.ro')}</email>
                 <mobile_phone>${escapeXml(order.shippingPhone || '0000000000')}</mobile_phone>
-                <address>${escapeXml(order.shippingAddress || 'Adresa nedefinită')}</address>
+                <address>${escapeXml(order.shippingAddress.split("| Note:")[0].trim() || 'Adresa nedefinită')}</address>
             </billing>
         </contact_info>
     </invoice>
@@ -196,19 +196,20 @@ const confirmPayment = async (req, res) => {
                     console.error("❌ Eroare SmartBill Integration Asamblare:", sbError.message);
                 }
 
-                // 👉 REPARAȚIE: Evaluăm Oradea pe string-ul brut, înainte de a-l despărți!
-                const isOradea = updatedOrder.shippingAddress.toLowerCase().includes("oradea");
-                const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
-
-                // PREGĂTIM DATELE DE ADRESĂ
-                let cleanAddress = isOradea ? modPredare : updatedOrder.shippingAddress;
-                let pieseText = "Așteptăm piesele clientului.";
+                // 👉 REPARAȚIE: EXTRAGEM ADRESA ȘI NOTELE DIRECT ȘI CURAT
+                let rawAddress = updatedOrder.shippingAddress || "";
+                let cleanAddress = rawAddress.split("| Note:")[0].trim();
+                let pieseText = "Nu au fost adăugate detalii suplimentare."; // TEXT DEFAULT CORECT
                 
-                // Acum putem despărți liniștit notele clientului
-                if (updatedOrder.shippingAddress.includes("| Note client:")) {
-                    const parts = updatedOrder.shippingAddress.split("| Note client:");
-                    cleanAddress = isOradea ? modPredare : parts[0].trim();
-                    pieseText = parts[1].trim() || "Nu au fost adăugate detalii suplimentare.";
+                if (rawAddress.includes("| Note:")) {
+                    pieseText = rawAddress.split("| Note:")[1].trim() || "Nu au fost adăugate detalii suplimentare.";
+                }
+
+                const isOradea = updatedOrder.pickupType === "KarixPersonal" || cleanAddress.toLowerCase().includes("oradea");
+                const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
+                
+                if (isOradea) {
+                    cleanAddress = modPredare;
                 }
 
                 // 3. TRIMITEM MAILURILE
@@ -220,7 +221,7 @@ const confirmPayment = async (req, res) => {
                         phone: updatedOrder.shippingPhone,
                         method: modPredare,
                         issueDescription: pieseText,
-                        isOradea: isOradea // 👉 Acum va fi evaluat corect!
+                        isOradea: isOradea
                     }, invoicePdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare Netopia:", err));
                 }
 
@@ -260,14 +261,17 @@ const confirmPayment = async (req, res) => {
                 // EMAIL-URI STANDARD
                 const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
                 const containsServices = updatedOrder.items.some(item => serviceKeywords.some(kw => (item.productName || "").toLowerCase().includes(kw)));
+                
+                const rawAddress = updatedOrder.shippingAddress || "";
+                const cleanAddress = rawAddress.split("| Note:")[0].trim();
 
                 const commonMailData = {
                     client: {
                         name: updatedOrder.shippingName, 
                         phone: updatedOrder.shippingPhone, 
-                        addressDetails: updatedOrder.shippingAddress,
-                        city: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'Oradea' : '',
-                        county: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'Bihor' : '',
+                        addressDetails: cleanAddress,
+                        city: cleanAddress.toLowerCase().includes('oradea') ? 'Oradea' : '',
+                        county: cleanAddress.toLowerCase().includes('oradea') ? 'Bihor' : '',
                         isCompany: updatedOrder.isCompany, 
                         companyName: updatedOrder.companyName, 
                         cui: updatedOrder.cui, 
@@ -276,8 +280,8 @@ const confirmPayment = async (req, res) => {
                     orderId: updatedOrder.id, 
                     total: updatedOrder.totalCents, 
                     couponCode: null,
-                    shippingAddress: updatedOrder.shippingAddress, 
-                    pickupType: updatedOrder.shippingAddress.toLowerCase().includes('oradea') ? 'KarixPersonal' : 'curier',
+                    shippingAddress: cleanAddress, 
+                    pickupType: cleanAddress.toLowerCase().includes('oradea') ? 'KarixPersonal' : 'curier',
                     isServiceOrder: containsServices,
                     cartItems: updatedOrder.items.map(item => ({
                         ...item, 
