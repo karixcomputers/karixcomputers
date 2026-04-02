@@ -35,6 +35,19 @@ export async function getFanToken() {
     }
 }
 
+// Helper formatare text pentru FAN (fără diacritice, prima litera mare)
+const formatForFan = (str) => {
+    if (!str) return "";
+    let cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    let formatted = cleanStr.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    const noSpaces = formatted.replace(/\s+/g, '');
+    if (noSpaces === "ClujNapoca") return "Cluj-Napoca";
+    if (noSpaces === "BistritaNasaud") return "Bistrita-Nasaud";
+    if (noSpaces === "CarasSeverin") return "Caras-Severin";
+    if (noSpaces.includes("Bucuresti") || noSpaces.includes("Sector")) return "Bucuresti";
+    return formatted;
+};
+
 // ==========================================
 // 2. GENERARE AWB STANDARD (Karix -> Client)
 // ==========================================
@@ -48,12 +61,14 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         let rawAddress = order.shippingAddress || "";
         if (rawAddress.includes("| Note:")) rawAddress = rawAddress.split("| Note:")[0].trim();
 
+        // Identificare FANbox
+        const isLocker = (order.serviceDeliveryMethod === "fanbox") || rawAddress.toLowerCase().includes("fanbox") || rawAddress.toLowerCase().includes("locker");
+
         let county = "Bucuresti";
         let locality = "Bucuresti";
         let street = rawAddress;
 
-        if (order.serviceDeliveryMethod === "fanbox" && rawAddress.includes("-")) {
-             // Parsează adresa lungă de la FANbox
+        if (isLocker && rawAddress.includes("-")) {
              const parts = rawAddress.split("-");
              if (parts.length > 1) {
                  const addrParts = parts[1].split(",");
@@ -75,28 +90,11 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
              }
         }
 
-        const formatForFan = (str) => {
-            let cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            let formatted = cleanStr.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-            const noSpaces = formatted.replace(/\s+/g, '');
-            if (noSpaces === "ClujNapoca") return "Cluj-Napoca";
-            if (noSpaces === "BistritaNasaud") return "Bistrita-Nasaud";
-            if (noSpaces === "CarasSeverin") return "Caras-Severin";
-            if (noSpaces.includes("Bucuresti") || noSpaces.includes("Sector")) return "Bucuresti";
-            return formatted;
-        };
-
         const orderTotalRon = (order.totalCents / 100);
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : orderTotalRon;
         
-        let serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
-        let optionsArray = [];
-
-        // Dacă clientul a ales RETUR la FANbox, folosim opțiunea X
-        if (order.serviceDeliveryMethod === "fanbox" && rawAddress.includes("Locker FANbox")) {
-            serviceType = "Standard";
-            optionsArray = ["X"]; 
-        }
+        let serviceType = isLocker ? "FANbox" : (rambursValue > 0 ? "Cont Colector" : "Standard");
+        let optionsArray = isLocker ? ["X"] : []; // X = Livrare la Locker
 
         const payload = {
             clientId: clientIdNum,
@@ -130,7 +128,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         };
 
         if (optionsArray.length > 0) payload.shipments[0].info.options = optionsArray;
-        if (order.fanboxLocationId) payload.shipments[0].recipient.pudoLocationId = order.fanboxLocationId;
+        if (isLocker && order.fanboxLocationId) payload.shipments[0].recipient.pudoLocationId = order.fanboxLocationId;
 
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
@@ -139,14 +137,15 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         });
 
         const data = await response.json();
-        
         if (data.response && Array.isArray(data.response) && data.response[0].awbNumber) {
              return String(data.response[0].awbNumber); 
         }
-        throw new Error(data?.response?.[0]?.errors || data?.message || "Eroare generare AWB FANbox");
+        
+        const errObj = data?.response?.[0]?.errors || data?.message || data;
+        throw new Error(typeof errObj === 'object' ? JSON.stringify(errObj) : String(errObj));
 
     } catch (error) {
-        console.error("❌ Eroare auto-generare AWB:", error.message);
+        console.error("❌ Eroare generare AWB Standard:", error.message);
         throw error;
     }
 }
@@ -162,12 +161,15 @@ export async function createReverseFanAWB(order, isTestMode = false) {
         const clientIdNum = parseInt(String(process.env.FAN_CLIENT_ID).trim(), 10);
 
         let rawAddress = order.shippingAddress || "";
+        
+        // 👉 Detecție automată dacă e Locker
+        const isLocker = (order.serviceDeliveryMethod === "fanbox") || rawAddress.toLowerCase().includes("fanbox") || rawAddress.toLowerCase().includes("locker");
+
         let county = "Bucuresti";
         let locality = "Bucuresti";
         let street = rawAddress;
 
-        // Extragere perfectă pentru string-ul generat de harta FANbox
-        if (order.serviceDeliveryMethod === "fanbox" && rawAddress.includes("-")) {
+        if (isLocker && rawAddress.includes("-")) {
              const parts = rawAddress.split("-");
              if (parts.length > 1) {
                  const addrParts = parts[1].split(",");
@@ -185,19 +187,10 @@ export async function createReverseFanAWB(order, isTestMode = false) {
              }
         }
 
-        const formatForFan = (str) => {
-            let cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            let formatted = cleanStr.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-            const noSpaces = formatted.replace(/\s+/g, '');
-            if (noSpaces === "ClujNapoca") return "Cluj-Napoca";
-            if (noSpaces === "BistritaNasaud") return "Bistrita-Nasaud";
-            if (noSpaces === "CarasSeverin") return "Caras-Severin";
-            if (noSpaces.includes("Bucuresti") || noSpaces.includes("Sector")) return "Bucuresti";
-            return formatted;
-        };
-
-        let serviceType = "Standard";
-        let optionsArray = [];
+        // 👉 Configurare Serviciu FANbox pentru Reverse
+        let serviceType = isLocker ? "FANbox" : "Standard";
+        let optionsArray = isLocker ? ["W"] : []; // W = Drop-off la Locker de către client
+        
         let senderAddress = {
             county: formatForFan(county),
             locality: formatForFan(locality),
@@ -206,9 +199,8 @@ export async function createReverseFanAWB(order, isTestMode = false) {
             zipCode: ""
         };
 
-        // Opțiunea W pentru predare la FANbox
-        if (order.serviceDeliveryMethod === "fanbox" && order.fanboxLocationId) {
-            optionsArray = ["X"]; 
+        if (isLocker && order.fanboxLocationId) {
+            senderAddress.pudoLocationId = order.fanboxLocationId;
             senderAddress.street = "Predare la FANbox Locker";
         }
 
@@ -220,7 +212,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         service: serviceType,
                         packages: { parcel: 1, envelopes: 0 },
                         weight: 5,
-                        payment: "recipient", // Karix plateste
+                        payment: "recipient", // Karix plătește transportul
                         observation: `Retur Service Comanda #${String(order.id).slice(-8)}`,
                         content: "Laptop / Consola (Service)",
                         dimensions: { length: 40, height: 40, width: 20 }, 
@@ -242,7 +234,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                             locality: "Oradea",
                             street: "Str. Sovata",
                             streetNo: "52", 
-                            zipCode: "" 
+                            zipCode: "410290" 
                         }
                     }
                 }
@@ -250,8 +242,6 @@ export async function createReverseFanAWB(order, isTestMode = false) {
         };
 
         if (optionsArray.length > 0) payload.shipments[0].info.options = optionsArray;
-        // PUDO id la expeditor pentru W
-        if (order.fanboxLocationId) payload.shipments[0].sender.pudoLocationId = order.fanboxLocationId;
 
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
@@ -262,16 +252,16 @@ export async function createReverseFanAWB(order, isTestMode = false) {
         const data = await response.json();
         
         if (data.response && Array.isArray(data.response) && data.response[0].awbNumber) {
+             console.log(`✅ AWB INVERS GENERAT: ${data.response[0].awbNumber} (Serviciu: ${serviceType})`);
              return String(data.response[0].awbNumber); 
         }
         
-        // 👉 EXTRAGEM EROAREA CA SĂ O PUTEM CITI
         const errObj = data?.response?.[0]?.errors || data?.message || data;
         const errString = typeof errObj === 'object' ? JSON.stringify(errObj) : String(errObj);
         throw new Error(errString);
 
     } catch (error) {
-        console.error("❌ Eroare auto-generare REVERSE AWB:", error.message);
+        console.error("❌ Eroare generare REVERSE AWB:", error.message);
         throw error;
     }
 }
