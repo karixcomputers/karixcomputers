@@ -1085,21 +1085,35 @@ export async function sendAdminAssemblyAlert(data) {
 // ============================================================
 export async function sendFanboxInstructionsEmail(to, orderData, returnToFanbox = false, pdfBuffer = null) {
   try {
-    // Alegem template-ul potrivit în funcție de locația de retur dorită de client
     const templateName = returnToFanbox ? "serviceFanboxToFanbox.html" : "serviceFanboxToHome.html";
     const tpl = loadTemplate(templateName);
 
-    // Extragem numele locker-ului din adresă (sau punem toată adresa)
-    let fanboxName = orderData.shippingAddress;
-    if (orderData.shippingAddress.includes("Locker FANbox:")) {
-        fanboxName = orderData.shippingAddress.split("-")[0].trim(); // Luăm doar bucata cu numele
+    let rawAddress = orderData.shippingAddress || "";
+    let fanboxName = rawAddress;
+    let homeDeliveryAddress = rawAddress;
+
+    // Logica de separare a adreselor
+    if (rawAddress.includes("Locker FANbox:")) {
+        // Cazul 1: A ales Retur tot la Locker (adresa e efectiv numele lockerului)
+        fanboxName = rawAddress.split("-")[0].trim(); 
+    } else {
+        // Cazul 2: A ales Drop-off Locker + Livrare Acasă
+        // rawAddress conține acum strada, orașul și județul casei sale
+        homeDeliveryAddress = rawAddress; 
+        
+        // Preluăm locația lockerului din ID-ul salvat în comandă
+        if (orderData.fanboxLocationId) {
+            fanboxName = `Locker FANbox (ID: ${orderData.fanboxLocationId})`;
+        } else {
+            fanboxName = "Locker-ul FANbox selectat la checkout";
+        }
     }
 
     const html = render(tpl, {
       customerName: orderData.shippingName || "Client Karix",
       orderId: orderData.id,
-      fanboxLocation: fanboxName,
-      deliveryAddress: orderData.shippingAddress,
+      fanboxLocation: fanboxName,           // 👉 Merge la "Locația de predare" (Punctul 3)
+      deliveryAddress: homeDeliveryAddress, // 👉 Merge la "Returul Dispozitivului"
       accountUrl: `https://karixcomputers.ro/orders`
     });
 
