@@ -208,7 +208,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
 
         // Opțiunea W pentru predare la FANbox
         if (order.serviceDeliveryMethod === "fanbox" && order.fanboxLocationId) {
-            optionsArray = ["W"]; 
+            optionsArray = ["X"]; 
             senderAddress.street = "Predare la FANbox Locker";
         }
 
