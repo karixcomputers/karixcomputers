@@ -137,8 +137,11 @@ export default function Checkout() {
   const [pickupByKarix, setPickupByKarix] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("online"); 
   
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  // 👉 NOU: Stări pentru metodele de expediere a service-ului
+  const [serviceDeliveryMethod, setServiceDeliveryMethod] = useState("courier"); 
+  const [fanboxLocation, setFanboxLocation] = useState("");
 
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const appliedCoupon = location.state?.coupon || null;
 
   const isAssemblyOrder = useMemo(() => {
@@ -149,11 +152,17 @@ export default function Checkout() {
   }, [items]);
 
   const cartAnalysis = useMemo(() => {
-    const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie'];
+    const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick'];
+    
+    let hardwareSubtotal = 0;
     
     const hasPC = items.some(item => {
-      const name = (item.productName || item.name || "").toLowerCase();
-      return (item.specs && (item.specs.cpu || item.specs.gpu)) || item.category === 'pc';
+      const isSrv = item.category === 'service' || isServiceKeywords.some(kw => (item.name || "").toLowerCase().includes(kw));
+      if (!isSrv) {
+        hardwareSubtotal += ((item.priceCentsAtBuy || item.priceCents || 0) * (item.qty || 1));
+        return true;
+      }
+      return false;
     });
 
     const hasService = items.some(item => {
@@ -161,7 +170,7 @@ export default function Checkout() {
       return item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => name.includes(kw)));
     });
 
-    return { hasPC, hasService };
+    return { hasPC, hasService, hardwareSubtotal };
   }, [items]);
 
   const pickupLabel = useMemo(() => {
@@ -226,9 +235,28 @@ export default function Checkout() {
     return appliedCoupon.discountValue; 
   }, [appliedCoupon, currentSubtotal]);
 
+  // 👉 NOU: Logica de calcul logistică superioară
   const shippingCents = useMemo(() => {
-    return 0; 
-  }, []);
+    if (pickupByKarix) return 0; // Ridicarea/Livrarea în Oradea este mereu 0.
+
+    let cost = 0;
+    
+    // 1. Livrare Hardware (Dacă e sub 1000 RON = 25 RON. Peste 1000 RON = Gratuit)
+    if (cartAnalysis.hasPC && cartAnalysis.hardwareSubtotal < 1000 * 100) {
+        cost += 2500; // 25 RON
+    }
+
+    // 2. Transport Invers pentru Service (Nu se aplică la asamblare)
+    if (cartAnalysis.hasService && !isAssemblyOrder) {
+        if (serviceDeliveryMethod === "courier") {
+            cost += 3000; // 30 RON Curier la ușă
+        } else if (serviceDeliveryMethod === "fanbox") {
+            cost += 1500; // 15 RON Predare la Locker
+        }
+    }
+
+    return cost;
+  }, [pickupByKarix, cartAnalysis, isAssemblyOrder, serviceDeliveryMethod]);
 
   const totalCents = Math.max(0, currentSubtotal - discountCents + shippingCents);
 
@@ -333,6 +361,12 @@ export default function Checkout() {
       return;
     }
 
+    // Validare suplimentară FANbox
+    if (cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && serviceDeliveryMethod === "fanbox" && !fanboxLocation) {
+        triggerError("Te rugăm să completezi adresa sau ID-ul FANbox-ului unde vei preda dispozitivul.");
+        return;
+    }
+
     setLoading(true);
 
     const enrichedItems = items.map(item => {
@@ -367,11 +401,18 @@ export default function Checkout() {
     if (isAssemblyOrder && shipping.assemblyNotes) {
        finalAddressDetails = `${shipping.addressDetails || "Fără adresă de livrare prestabilită"} | Note client: ${shipping.assemblyNotes}`;
     }
-// Salvăm datele curat, exact așa cum au fost introduse
+
+    // Înregistrăm opțiunile de service
+    const serviceOpts = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix ? {
+        serviceDeliveryMethod,
+        fanboxLocation: serviceDeliveryMethod === "fanbox" ? fanboxLocation : null
+    } : {};
+
     const orderData = { 
-      client: shipping, 
+      client: { ...shipping, addressDetails: finalAddressDetails, ...serviceOpts }, 
       cartItems: enrichedItems,
       total: totalCents, 
+      shippingCents: shippingCents, // Transmitem și taxa logistică pură
       userEmail: user?.email, 
       pickupType: pickupByKarix ? "KarixPersonal" : "Courier",
       paymentMethod: paymentMethod, 
@@ -672,6 +713,47 @@ export default function Checkout() {
                         </button>
                       </div>
 
+                      {/* 👉 NOU: OPȚIUNI DE EXPEDIERE SERVICE DACA E CAZUL */}
+                      {cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && (
+                        <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4">
+                           <h4 className="text-white font-black text-xs uppercase tracking-wider mb-4 flex items-center gap-2">
+                              <span>📦</span> Cum ne trimiți dispozitivul defect?
+                           </h4>
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <button 
+                                type="button" 
+                                onClick={() => setServiceDeliveryMethod("courier")} 
+                                className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "courier" ? "bg-indigo-500 text-white border-indigo-400" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
+                              >
+                                <div className="font-bold text-sm">Curier la Ușă</div>
+                                <div className="text-xs opacity-70 mt-1">Curierul vine la adresa ta (+30 RON)</div>
+                              </button>
+                              
+                              <button 
+                                type="button" 
+                                onClick={() => setServiceDeliveryMethod("fanbox")} 
+                                className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "fanbox" ? "bg-cyan-500 text-black border-cyan-400" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
+                              >
+                                <div className="font-bold text-sm">Predare la FANbox</div>
+                                <div className="text-xs opacity-70 mt-1">Îl lași la locker (+15 RON)</div>
+                              </button>
+                           </div>
+
+                           {serviceDeliveryMethod === "fanbox" && (
+                              <div className="mt-5 space-y-2 animate-in fade-in zoom-in duration-300">
+                                <label className="text-[10px] font-black text-cyan-400 uppercase ml-1 italic">Nume Locker / Adresă FANbox</label>
+                                <input 
+                                  className="w-full bg-black/40 border border-cyan-500/30 rounded-xl p-3 text-white focus:border-cyan-500 outline-none transition-all placeholder-gray-500 text-sm" 
+                                  value={fanboxLocation} 
+                                  onChange={e => setFanboxLocation(e.target.value)} 
+                                  placeholder="Ex: FANbox Kaufland Militari..." 
+                                />
+                                <p className="text-gray-400 text-[10px] ml-1 mt-1">⚠️ <strong className="text-white">Atenție:</strong> Doar pentru Laptopuri sau Console. Dimensiunea maximă admisă la locker este 45 x 44 x 40 cm.</p>
+                              </div>
+                           )}
+                        </div>
+                      )}
+
                       <div className="space-y-2 relative" ref={dropdownRef}>
                         <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
                         <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} placeholder="Scrie județul..." value={shipping.county} onFocus={() => !pickupByKarix && setShowJudete(true)} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, county: e.target.value }))} readOnly={pickupByKarix} />
@@ -760,10 +842,10 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  <div className="flex justify-between text-gray-400 font-medium text-sm">
-                    <span>{isAssemblyOrder ? "Transport Asamblare" : (cartAnalysis.hasService ? "Transport Service" : "Logistică")}</span>
-                    <span className="text-emerald-400 font-black text-[10px] uppercase tracking-widest">
-                      Gratuit (Inclus)
+                  <div className="flex justify-between text-gray-400 font-medium text-sm items-center">
+                    <span>{isAssemblyOrder ? "Transport Asamblare" : (cartAnalysis.hasService ? "Transport Retur Service" : "Logistică Hardware")}</span>
+                    <span className={`font-black text-[10px] uppercase tracking-widest ${shippingCents === 0 ? "text-emerald-400" : "text-white"}`}>
+                      {shippingCents === 0 ? "Gratuit" : `+ ${formatRON(shippingCents)}`}
                     </span>
                   </div>
 
