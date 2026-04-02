@@ -396,21 +396,14 @@ router.post("/", requireAuth, async (req, res, next) => {
         }
       }
 
-      // 👉 REPARAȚIE: Folosim pickupType pentru a ști sigur ce buton a ales!
       const isOradea = pickupType === "KarixPersonal"; 
-
-      let cleanAddress = isOradea ? "Predare Personală Oradea (F2F)" : `${client.addressDetails}, ${client.city}, ${client.county}`;
-      let pieseText = "Așteptăm piesele clientului.";
-      
-      // Extragem notele clientului (dacă există)
-      if (client.addressDetails && client.addressDetails.includes("| Note client:")) {
-          const parts = client.addressDetails.split("| Note client:");
-          // Dacă NU e Oradea (adică a dat adresa fizică), punem prima parte. Dacă E Oradea, păstrăm numele "Predare Personală Oradea (F2F)"
-          cleanAddress = isOradea ? "Predare Personală Oradea (F2F)" : `${parts[0].trim()}, ${client.city}, ${client.county}`;
-          pieseText = parts[1].trim() || "Nu au fost adăugate detalii suplimentare.";
-      }
-
       const modPredare = isOradea ? "Predare Personală Oradea (F2F)" : "Prin Curier / Comandă furnizor";
+
+      // Adresa clientului
+      let cleanAddress = isOradea ? "Predare Personală Oradea (F2F)" : `${client.addressDetails}, ${client.city}, ${client.county}`;
+      
+      // 👉 Acum preluăm notele direct din variabila assemblyNotes, dacă există
+      let pieseText = client.assemblyNotes ? client.assemblyNotes : "Nu au fost adăugate detalii suplimentare.";
 
       if (paymentMethod !== 'online') {
         // Mail către CLIENT cu PROFORMA atașată (dacă e cazul)
@@ -420,8 +413,8 @@ router.post("/", requireAuth, async (req, res, next) => {
             deliveryAddress: cleanAddress,
             phone: client.phone,
             method: modPredare,
-            issueDescription: pieseText,
-            isOradea: isOradea // 👉 ACUM E SIGUR TRUE dacă a ales F2F Oradea!
+            issueDescription: pieseText, // Trimitem notele
+            isOradea: isOradea 
         }, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare:", err));
 
         // Mail către ADMIN

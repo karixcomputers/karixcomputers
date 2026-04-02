@@ -367,9 +367,9 @@ export default function Checkout() {
     if (isAssemblyOrder && shipping.assemblyNotes) {
        finalAddressDetails = `${shipping.addressDetails || "Fără adresă de livrare prestabilită"} | Note client: ${shipping.assemblyNotes}`;
     }
-
+// Salvăm datele curat, exact așa cum au fost introduse
     const orderData = { 
-      client: { ...shipping, addressDetails: finalAddressDetails }, 
+      client: shipping, 
       cartItems: enrichedItems,
       total: totalCents, 
       userEmail: user?.email, 
