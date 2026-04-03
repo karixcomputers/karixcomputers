@@ -137,15 +137,13 @@ export default function Checkout() {
   const [pickupByKarix, setPickupByKarix] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("online"); 
   
-  // 👉 Stări Service & FANbox
   const [serviceDeliveryMethod, setServiceDeliveryMethod] = useState("courier"); 
   const [selectedFanbox, setSelectedFanbox] = useState(null);
-  const [returnToSameFanbox, setReturnToSameFanbox] = useState(true); // Bifa inteligenta
+  const [returnToSameFanbox, setReturnToSameFanbox] = useState(true);
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const appliedCoupon = location.state?.coupon || null;
 
-  // 👉 NOU: Inițializare Script Harta FANbox
   useEffect(() => {
     if (!document.getElementById("fanbox-script")) {
       const script = document.createElement("script");
@@ -169,7 +167,7 @@ export default function Checkout() {
   const openFanboxMap = () => {
     if (window.LoadMapFanBox) {
       window.LoadMapFanBox({
-        rootId: "fanbox-map-root", // Div-ul ascuns de la finalul paginii
+        rootId: "fanbox-map-root", 
       });
     } else {
       triggerError("Harta FAN Courier se încarcă. Te rugăm să aștepți 2 secunde și să încerci din nou.");
@@ -345,7 +343,6 @@ export default function Checkout() {
       return;
     }
 
-    // Validare FANbox si Adrese Standard
     const isFanboxSelected = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && serviceDeliveryMethod === "fanbox";
     const hideStandardAddress = isFanboxSelected && returnToSameFanbox;
 
@@ -418,7 +415,6 @@ export default function Checkout() {
     let finalCity = shipping.city;
     let finalCounty = shipping.county;
 
-    // Logica inteligenta: Dacă se trimite la FANbox inapoi, inlocuim adresa cu datele FANbox-ului
     if (hideStandardAddress && selectedFanbox) {
         finalAddressDetails = `Locker FANbox: ${selectedFanbox.name} (${selectedFanbox.id}) - ${selectedFanbox.address}`;
         finalCity = "FANbox";
@@ -427,9 +423,14 @@ export default function Checkout() {
        finalAddressDetails = `${shipping.addressDetails || "Fără adresă de livrare prestabilită"} | Note client: ${shipping.assemblyNotes}`;
     }
 
+    // 👉 AICI ESTE SECREUTUL NOSTRU PENTRU LOCKER:
     const serviceOpts = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix ? {
         serviceDeliveryMethod,
-        fanboxLocationId: serviceDeliveryMethod === "fanbox" && selectedFanbox ? selectedFanbox.id : null
+        fanboxLocationId: serviceDeliveryMethod === "fanbox" && selectedFanbox ? selectedFanbox.id : null,
+        // 👉 ADAUGĂM TEXTUL CU NUMELE LOCKERULUI ÎN PAYLOAD DOAR CÂND VREA LIVRARE ACASĂ
+        fanboxAddressText: serviceDeliveryMethod === "fanbox" && selectedFanbox && !returnToSameFanbox
+            ? `Locker FANbox: ${selectedFanbox.name} - ${selectedFanbox.address}` 
+            : null
     } : {};
 
     const orderData = { 
@@ -502,7 +503,6 @@ export default function Checkout() {
     }
   };
 
-  // Variabilă helper ca să știm când ascundem input-urile cu "Scrie judetul..."
   const hideStandardAddressFields = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && serviceDeliveryMethod === "fanbox" && returnToSameFanbox;
 
   return (
@@ -512,7 +512,6 @@ export default function Checkout() {
         description="Ești la un pas de a deține un sistem Karix sau de a-ți repara echipamentul. Finalizează comanda acum pentru livrare rapidă și suport tehnic de elită."
       />
 
-      {/* Containerul obligatoriu pentru Harta FAN Courier */}
       <div id="fanbox-map-root"></div>
 
       <div className="min-h-screen pt-32 pb-24 px-4 sm:px-6 relative overflow-hidden bg-transparent text-left font-sans">
@@ -639,7 +638,6 @@ export default function Checkout() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   
                   {isAssemblyOrder ? (
-                    // 👉 DESIGN SPECIAL PENTRU ASAMBLARE PC
                     <>
                       <div className="md:col-span-2 mb-4 flex flex-col gap-4">
                         <button type="button" onClick={() => { setPickupByKarix(true); setShipping(prev => ({ ...prev, county: "Bihor", city: "Oradea" })); }} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
@@ -722,7 +720,6 @@ export default function Checkout() {
                       )}
                     </>
                   ) : (
-                    // 👉 DESIGN NORMAL PENTRU RESTUL PRODUSELOR
                     <>
                       <div className="md:col-span-2 mb-4">
                         <button type="button" onClick={() => setPickupByKarix(!pickupByKarix)} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
@@ -739,7 +736,6 @@ export default function Checkout() {
                         </button>
                       </div>
 
-                      {/* 👉 OPȚIUNI DE EXPEDIERE SERVICE DACA E CAZUL */}
                       {cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && (
                         <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4 transition-all">
                            <h4 className="text-white font-black text-xs uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -790,7 +786,6 @@ export default function Checkout() {
 
                                     <div className="h-px bg-white/10 w-full my-2" />
                                     
-                                    {/* 👉 Bifa care ascunde/arata campurile vechi de adresa */}
                                     <label className="flex items-center gap-3 cursor-pointer group">
                                       <div className="relative flex items-center justify-center">
                                         <input 
@@ -816,7 +811,6 @@ export default function Checkout() {
                         </div>
                       )}
 
-                      {/* ASCUNDEM CÂMPURILE DE ADRESĂ DACA CLIENTUL VREA RETUR LA ACELASI FANBOX */}
                       {!hideStandardAddressFields && (
                         <>
                           <div className="space-y-2 relative" ref={dropdownRef}>
