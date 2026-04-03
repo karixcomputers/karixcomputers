@@ -95,7 +95,7 @@ const createPayment = async (req, res) => {
                 <last_name>${escapeXml(nameParts.slice(1).join(' ') || 'Karix')}</last_name>
                 <email>${escapeXml(order.user?.email || req.user?.email || 'client@karix.ro')}</email>
                 <mobile_phone>${escapeXml(order.shippingPhone || '0000000000')}</mobile_phone>
-                <address>${escapeXml(order.shippingAddress.split("| Note:")[0].trim() || 'Adresa nedefinită')}</address>
+                <address>${escapeXml(order.shippingAddress.split("| Note:")[0].split("| Locker:")[0].trim() || 'Adresa nedefinită')}</address>
             </billing>
         </contact_info>
     </invoice>
@@ -262,11 +262,12 @@ const confirmPayment = async (req, res) => {
                     console.error("❌ Eroare SmartBill:", sbError.message);
                 }
 
-                const cleanAddress = rawAddress.split("| Note:")[0].trim();
+                const cleanAddress = rawAddress.split("| Locker:")[0].split("| Note:")[0].trim();
                 
                 if (isService && isFanbox) {
                     if (updatedOrder.user?.email) {
-                        const isReturnToLocker = rawAddress.includes("Locker FANbox");
+                        // 👉 REPARAȚIA VITALĂ: Dacă adresa conține delimitatorul "| Locker:", înseamnă clar că omul are o adresă de acasă lipită de numele lockerului. Deci NU vrea retur la locker!
+                        const isReturnToLocker = !rawAddress.includes("| Locker:");
                         await sendFanboxInstructionsEmail(updatedOrder.user.email, updatedOrder, isReturnToLocker, invoicePdfBuffer).catch(e => console.error(e));
                     }
                 } else {
