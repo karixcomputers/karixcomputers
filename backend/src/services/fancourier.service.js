@@ -201,7 +201,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: 0,
                         declaredValue: 0,
-                        options: isLocker ? ["W", "S"] : []
+                        options: isLocker ? ["W"] : []
                     },
                     sender: {
                         name: order.shippingName, // 👉 Aici ar trebui să fie numele clientului
