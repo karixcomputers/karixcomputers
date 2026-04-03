@@ -159,8 +159,8 @@ export async function createReverseFanAWB(order, isTestMode = false) {
         const clientIdNum = parseInt(String(process.env.FAN_CLIENT_ID).trim(), 10);
 
         let rawAddress = order.shippingAddress || "";
+        const cleanPhone = order.shippingPhone.replace(/\D/g, "");
         
-        // Detecție automată dacă e Locker
         const isLocker = (order.serviceDeliveryMethod === "fanbox") || rawAddress.toLowerCase().includes("fanbox") || rawAddress.toLowerCase().includes("locker");
 
         let county = "Bucuresti";
@@ -185,7 +185,6 @@ export async function createReverseFanAWB(order, isTestMode = false) {
              }
         }
 
-        // Configurare Serviciu FANbox pentru Reverse
         let serviceType = isLocker ? "FANbox" : "Standard";
         
         const payload = {
@@ -196,17 +195,17 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         service: serviceType,
                         packages: { parcel: 1, envelopes: 0 },
                         weight: 5,
-                        payment: "recipient", // Karix plătește transportul
+                        payment: "recipient", 
                         observation: `Retur Service Comanda #${String(order.id).slice(-8)}`,
                         content: "Laptop / Consola (Service)",
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: 0,
                         declaredValue: 0,
-                        options: isLocker ? ["W"] : []
+                        options: isLocker ? ["W", "S"] : []
                     },
                     sender: {
-                        name: order.shippingName,
-                        phone: order.shippingPhone,
+                        name: order.shippingName, // 👉 Aici ar trebui să fie numele clientului
+                        phone: cleanPhone,        // 👉 Telefonul clientului
                         email: order.user?.email || "contact@karixcomputers.ro",
                         address: {
                             county: formatForFan(county),
@@ -214,7 +213,6 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                             street: isLocker ? "Predare la locker FANbox" : street,
                             streetNo: "-", 
                             zipCode: "",
-                            // 👉 FIX: FAN Courier cere dropOffLocationId în interiorul adresei pt ridicări din locker
                             ...(isLocker && order.fanboxLocationId && { dropOffLocationId: order.fanboxLocationId })
                         }
                     },
@@ -225,14 +223,20 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         address: {
                             county: "Bihor",
                             locality: "Oradea",
-                            street: "Str. Sovata",
+                            street: "Str. Sovata, Bl. C6, Ap. 51", 
                             streetNo: "52", 
-                            zipCode: "410290" 
+                            zipCode: "410298" 
                         }
                     }
                 }
             ]
         };
+
+        // 👉 NOU: PRINTĂM PAYLOAD-UL EXACT CUM PLEACĂ SPRE FAN COURIER
+        console.log("\n==========================================");
+        console.log(`📦 PAYLOAD TRIMIS SPRE FAN COURIER (COMANDA #${order.id}):`);
+        console.log(JSON.stringify(payload, null, 2));
+        console.log("==========================================\n");
 
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
@@ -243,7 +247,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
         const data = await response.json();
         
         if (data.response && Array.isArray(data.response) && data.response[0].awbNumber) {
-             console.log(`✅ AWB INVERS GENERAT: ${data.response[0].awbNumber} (Serviciu: ${serviceType})`);
+             console.log(`✅ AWB INVERS GENERAT: ${data.response[0].awbNumber}`);
              return String(data.response[0].awbNumber); 
         }
         
