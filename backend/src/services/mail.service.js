@@ -1089,31 +1089,30 @@ export async function sendFanboxInstructionsEmail(to, orderData, returnToFanbox 
     const tpl = loadTemplate(templateName);
 
     let rawAddress = orderData.shippingAddress || "";
-    let fanboxName = rawAddress;
+    let fanboxName = "Locker-ul selectat la comandă";
     let homeDeliveryAddress = rawAddress;
 
-    // Logica de separare a adreselor
-    if (rawAddress.includes("Locker FANbox:")) {
-        // Cazul 1: A ales Retur tot la Locker (adresa e efectiv numele lockerului)
-        fanboxName = rawAddress.split("-")[0].trim(); 
-    } else {
-        // Cazul 2: A ales Drop-off Locker + Livrare Acasă
-        // rawAddress conține acum strada, orașul și județul casei sale
-        homeDeliveryAddress = rawAddress; 
+    // 👉 TĂIEM STRING-UL CA SĂ SEPARĂM ACASĂ DE LOCKER
+    if (rawAddress.includes("| Locker:")) {
+        const parts = rawAddress.split("| Locker:");
         
-        // Preluăm locația lockerului din ID-ul salvat în comandă
-        if (orderData.fanboxLocationId) {
-            fanboxName = `Locker FANbox (ID: ${orderData.fanboxLocationId})`;
-        } else {
-            fanboxName = "Locker-ul FANbox selectat la checkout";
-        }
+        // 1. Adresa de acasă e tot ce e înainte de bară
+        homeDeliveryAddress = parts[0].trim(); 
+        
+        // 2. Numele locker-ului e ce e după bară (tăiem și detaliile lungi cu cratimă de la FAN)
+        let rawFanbox = parts[1].trim();
+        fanboxName = rawFanbox.split("-")[0].trim(); 
+
+    } else if (rawAddress.includes("Locker FANbox:")) {
+        // Cazul în care a ales doar Locker (fără adresă acasă)
+        fanboxName = rawAddress.split("-")[0].trim();
     }
 
     const html = render(tpl, {
       customerName: orderData.shippingName || "Client Karix",
       orderId: orderData.id,
-      fanboxLocation: fanboxName,           // 👉 Merge la "Locația de predare" (Punctul 3)
-      deliveryAddress: homeDeliveryAddress, // 👉 Merge la "Returul Dispozitivului"
+      fanboxLocation: fanboxName,           // 👉 Aici va pune "Locker FANbox: FANbox Clujului 74 AB"
+      deliveryAddress: homeDeliveryAddress, // 👉 Aici va pune "Str. Clujului, Nr. 74, Alba Iulia, Alba"
       accountUrl: `https://karixcomputers.ro/orders`
     });
 
