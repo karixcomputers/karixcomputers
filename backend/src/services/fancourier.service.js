@@ -156,7 +156,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
 
     try {
         const token = await getFanToken();
-        const clientIdNum = parseInt(String(process.env.FAN_CLIENT_ID).trim(), 10);
+        const clientIdNum = parseInt(String(process.env.FAN_RETURN_CLIENT_ID || process.env.FAN_CLIENT_ID).trim(), 10);
 
         let rawAddress = order.shippingAddress || "";
         const cleanPhone = order.shippingPhone.replace(/\D/g, "");
