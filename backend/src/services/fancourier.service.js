@@ -1,10 +1,15 @@
 import fetch from "node-fetch";
 
+// Cache pentru token-ul principal
 let currentToken = null;
 let tokenExpiration = null;
 
+// Cache pentru token-ul ocazional (RETUR)
+let currentReturnToken = null;
+let returnTokenExpiration = null;
+
 // ==========================================
-// 1. AUTENTIFICARE ȘI OBȚINERE TOKEN
+// 1. AUTENTIFICARE ȘI OBȚINERE TOKEN PRINCIPAL
 // ==========================================
 export async function getFanToken() {
     if (currentToken && tokenExpiration && new Date() < tokenExpiration) {
@@ -31,6 +36,37 @@ export async function getFanToken() {
         }
     } catch (error) {
         console.error("❌ Eroare FAN Courier Auth:", error.message);
+        throw error;
+    }
+}
+
+// ==========================================
+// 1.5. AUTENTIFICARE PENTRU CONT OCAZIONAL (RETUR)
+// ==========================================
+export async function getFanReturnToken() {
+    if (currentReturnToken && returnTokenExpiration && new Date() < returnTokenExpiration) {
+        return currentReturnToken;
+    }
+
+    // Fallback: Dacă nu ai pus user de retur în .env, îl va folosi pe cel principal
+    const username = process.env.FAN_RETURN_USERNAME || process.env.FAN_USERNAME;
+    const password = process.env.FAN_RETURN_PASSWORD || process.env.FAN_PASSWORD;
+
+    try {
+        const url = `https://api.fancourier.ro/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+        const response = await fetch(url, { method: "POST" });
+        const data = await response.json();
+        
+        const extractedToken = data?.data?.token || data?.token;
+        if (extractedToken) {
+            currentReturnToken = extractedToken;
+            returnTokenExpiration = new Date(new Date().getTime() + 23 * 60 * 60 * 1000);
+            return currentReturnToken;
+        } else {
+            throw new Error(data.message || "Eroare token retur");
+        }
+    } catch (error) {
+        console.error("❌ Eroare FAN Courier Auth Retur:", error.message);
         throw error;
     }
 }
@@ -155,7 +191,8 @@ export async function createReverseFanAWB(order, isTestMode = false) {
     if (isTestMode) return `TEST_REV_AWB_${Math.floor(Math.random() * 100000000)}`; 
 
     try {
-        const token = await getFanToken();
+        // 👉 AICI ESTE SECRETUL: Folosim token-ul de retur!
+        const token = await getFanReturnToken();
         const clientIdNum = parseInt(String(process.env.FAN_RETURN_CLIENT_ID || process.env.FAN_CLIENT_ID).trim(), 10);
 
         let rawAddress = order.shippingAddress || "";
@@ -204,8 +241,8 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         options: isLocker ? ["W"] : []
                     },
                     sender: {
-                        name: order.shippingName, // 👉 Aici ar trebui să fie numele clientului
-                        phone: cleanPhone,        // 👉 Telefonul clientului
+                        name: order.shippingName,
+                        phone: cleanPhone,
                         email: order.user?.email || "contact@karixcomputers.ro",
                         address: {
                             county: formatForFan(county),
@@ -232,7 +269,6 @@ export async function createReverseFanAWB(order, isTestMode = false) {
             ]
         };
 
-        // 👉 NOU: PRINTĂM PAYLOAD-UL EXACT CUM PLEACĂ SPRE FAN COURIER
         console.log("\n==========================================");
         console.log(`📦 PAYLOAD TRIMIS SPRE FAN COURIER (COMANDA #${order.id}):`);
         console.log(JSON.stringify(payload, null, 2));
