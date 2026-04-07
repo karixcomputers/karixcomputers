@@ -48,7 +48,6 @@ export async function getFanReturnToken() {
         return currentReturnToken;
     }
 
-    // Fallback: Dacă nu ai pus user de retur în .env, îl va folosi pe cel principal
     const username = process.env.FAN_RETURN_USERNAME || process.env.FAN_USERNAME;
     const password = process.env.FAN_RETURN_PASSWORD || process.env.FAN_PASSWORD;
 
@@ -71,7 +70,7 @@ export async function getFanReturnToken() {
     }
 }
 
-// Helper formatare text pentru FAN (fără diacritice, prima litera mare)
+// Helper formatare text pentru FAN
 const formatForFan = (str) => {
     if (!str) return "";
     let cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -85,7 +84,7 @@ const formatForFan = (str) => {
 };
 
 // ==========================================
-// MOTOR DE EXTRAGERE INTELIGENTĂ A ADRESELOR (O singură logică pt ambele funcții)
+// MOTOR DE EXTRAGERE INTELIGENTĂ A ADRESELOR
 // ==========================================
 function parseAddresses(rawAddress, providedPudoId) {
     let homeStr = rawAddress;
@@ -111,6 +110,9 @@ function parseAddresses(rawAddress, providedPudoId) {
         const p = homeStr.split("-");
         if (p.length > 1) homeStr = p.slice(1).join("-").trim();
     }
+
+    // 👉 ELIMINĂM "Romania" pentru a nu strica județul
+    homeStr = homeStr.replace(/,\s*rom[aâ]nia$/i, '').trim();
 
     let county = "Bucuresti", locality = "Bucuresti", street = homeStr;
     const addrParts = homeStr.split(',').map(s => s.trim()).filter(Boolean);
@@ -148,9 +150,6 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const parsedData = parseAddresses(rawAddress, order.fanboxLocationId);
         
         const hasHomeAndLockerSeparately = rawAddress.includes("| Locker:");
-        
-        // Dacă forțăm Fanbox din Frontend SAU a ales doar Locker fără adresă de casă.
-        // Dacă a ales și Casă și Locker (deci e retur hibrid), NU ducem la locker returul dacă nu e forțat.
         const isDeliveryToLocker = forceFanbox || (!hasHomeAndLockerSeparately && Boolean(parsedData.pudoId));
 
         const orderTotalRon = (order.totalCents / 100);
@@ -170,7 +169,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: rambursValue,
                         declaredValue: isInsured ? orderTotalRon : 0,
-                        options: isDeliveryToLocker ? ["X"] : [] // Karix lasa curierul, care duce pachetul in locker (X)
+                        options: isDeliveryToLocker ? ["X"] : []
                     },
                     recipient: {
                         name: order.shippingName,
@@ -189,6 +188,11 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
             ]
         };
 
+        console.log("\n==========================================");
+        console.log(`📦 PAYLOAD TRIMIS SPRE FAN COURIER (STANDARD - COMANDA #${order.id}):`);
+        console.log(JSON.stringify(payload, null, 2));
+        console.log("==========================================\n");
+
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -197,6 +201,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
 
         const data = await response.json();
         if (data.response && Array.isArray(data.response) && data.response[0].awbNumber) {
+             console.log(`✅ AWB STANDARD GENERAT: ${data.response[0].awbNumber}`);
              return String(data.response[0].awbNumber); 
         }
         
@@ -239,7 +244,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: 0,
                         declaredValue: 0,
-                        options: isDropOff ? ["W"] : [] // Client pune in locker, curier aduce la Karix (W)
+                        options: isDropOff ? ["W"] : []
                     },
                     sender: {
                         name: order.shippingName,
@@ -272,7 +277,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
         };
 
         console.log("\n==========================================");
-        console.log(`📦 PAYLOAD TRIMIS SPRE FAN COURIER (COMANDA #${order.id}):`);
+        console.log(`📦 PAYLOAD TRIMIS SPRE FAN COURIER (INVERS - COMANDA #${order.id}):`);
         console.log(JSON.stringify(payload, null, 2));
         console.log("==========================================\n");
 
