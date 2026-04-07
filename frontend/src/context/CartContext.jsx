@@ -36,13 +36,9 @@ export const CartProvider = ({ children }) => {
     }, 0);
   }, [items]);
 
-  // 👉 Am scos filtrul de spam. Acum poți adăuga oricâte mesaje vrei, se vor stivui frumos!
   const triggerToast = (message) => {
-    // Folosim Math.random() pentru a asigura un ID unic la click-uri extrem de rapide
     const id = Date.now() + Math.random(); 
-    
     setToasts((prev) => [...prev, { id, message }]);
-    
     setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
     }, 3000);
@@ -69,11 +65,14 @@ export const CartProvider = ({ children }) => {
       }
       const finalImageUrl = product.imageUrl || finalImages[0] || null;
 
+      // Determinăm dacă produsul adăugat este un serviciu (inclusiv asamblarea)
+      const isSrv = isProductService(product);
+
       return [...currentCart, { 
         id: product.id, 
         productName: product.name || product.productName, 
         name: product.name || product.productName,
-        category: product.category || "pc",
+        category: product.category || (isSrv ? "service" : "pc"),
         priceCents: actualPrice,
         priceCentsAtBuy: actualPrice,
         images: finalImages, 
@@ -84,27 +83,52 @@ export const CartProvider = ({ children }) => {
       }];
     });
 
-    // Declanșăm toast-ul după adăugare
     triggerToast(`Ai adăugat "${product.name || product.productName}" în coș!`);
   };
 
+  // Funcție de helper pentru a stabili exact ce este considerat un Serviciu
+  const isProductService = (product) => {
+    if (product.category === 'service') return true;
+    const nameStr = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj', 'asamblare'];
+    return serviceKeywords.some(kw => nameStr.includes(kw));
+  };
+
+  // Funcție de helper specifică pentru Asamblare
+  const isProductAssembly = (product) => {
+    const nameStr = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return nameStr.includes("asamblare");
+  };
+
   const addItem = (product) => {
-    const incomingName = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const isIncomingAssembly = incomingName.includes("asamblare");
+    const incomingIsService = isProductService(product);
+    const incomingIsAssembly = isProductAssembly(product);
 
-    const hasAssemblyInCart = items.some(i => {
-      const n = (i.name || i.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      return n.includes("asamblare");
-    });
+    const hasServiceInCart = items.some(i => isProductService(i));
+    const hasHardwareInCart = items.some(i => !isProductService(i));
+    const hasAssemblyInCart = items.some(i => isProductAssembly(i));
 
-    if (hasAssemblyInCart && !isIncomingAssembly) {
+    // Regula 1: Daca ai Asamblare in cos, nu mai poti pune nimic (nici hardware, nici alt serviciu)
+    if (hasAssemblyInCart && !incomingIsAssembly) {
       setConflictModal({ isOpen: true, type: 'WANTS_NORMAL', pendingProduct: product });
       return false;
     }
 
-    if (!hasAssemblyInCart && isIncomingAssembly && items.length > 0) {
+    // Regula 2: Daca ai Orice in cos (Hardware sau alt Serviciu), nu poti pune Asamblare peste ele
+    if (!hasAssemblyInCart && incomingIsAssembly && items.length > 0) {
       setConflictModal({ isOpen: true, type: 'WANTS_ASSEMBLY', pendingProduct: product });
       return false;
+    }
+
+    // Regula 3: (NOUA REGULĂ LOGISTICĂ) Nu lăsăm amestecarea între Hardware și Servicii (altele decât Asamblarea pe care o tratăm separat sus)
+    if (hasHardwareInCart && incomingIsService) {
+      setConflictModal({ isOpen: true, type: 'WANTS_SERVICE_OVER_HARDWARE', pendingProduct: product });
+      return false;
+    }
+
+    if (hasServiceInCart && !incomingIsService && !incomingIsAssembly) {
+       setConflictModal({ isOpen: true, type: 'WANTS_HARDWARE_OVER_SERVICE', pendingProduct: product });
+       return false;
     }
 
     performAdd(product, false);
@@ -151,6 +175,7 @@ export const CartProvider = ({ children }) => {
             <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-inner">⚠️</div>
             <h2 className="text-xl font-black text-white uppercase tracking-wider mb-4">Atenție la Coș</h2>
             
+            {/* Modal pentru Asamblare în coș deja */}
             {conflictModal.type === 'WANTS_NORMAL' && (
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
@@ -165,6 +190,7 @@ export const CartProvider = ({ children }) => {
               </>
             )}
 
+            {/* Modal vrea să adauge Asamblare peste produse */}
             {conflictModal.type === 'WANTS_ASSEMBLY' && (
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
@@ -173,16 +199,47 @@ export const CartProvider = ({ children }) => {
                 </p>
                 <div className="flex flex-col gap-3">
                   <button onClick={confirmReplaceCart} className="w-full py-4 rounded-xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-rose-600/20 hover:bg-rose-500 transition-all">Da, golește coșul</button>
-                  <button onClick={goToCheckout} className="w-full py-4 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all">Comandă piesele prima dată</button>
+                  <button onClick={goToCheckout} className="w-full py-4 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all">Comandă produsele prima dată</button>
                   <button onClick={cancelModal} className="w-full py-3 text-gray-500 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-all mt-2">Renunță</button>
                 </div>
               </>
             )}
+
+            {/* 👉 NOU: Modal vrea să adauge SERVICIU peste HARDWARE */}
+            {conflictModal.type === 'WANTS_SERVICE_OVER_HARDWARE' && (
+              <>
+                <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+                  Serviciile de reparație sau mentenanță <strong className="text-white">nu pot fi combinate</strong> cu produsele hardware pe aceeași comandă, deoarece folosesc un sistem diferit de curierat (dus-întors). <br /><br />
+                  Dorești să golești coșul pentru a programa serviciul?
+                </p>
+                <div className="flex flex-col gap-3">
+                  <button onClick={confirmReplaceCart} className="w-full py-4 rounded-xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-rose-600/20 hover:bg-rose-500 transition-all">Golește coșul și programează</button>
+                  <button onClick={goToCheckout} className="w-full py-4 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all">Finalizează produsele mai întâi</button>
+                  <button onClick={cancelModal} className="w-full py-3 text-gray-500 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-all mt-2">Renunță</button>
+                </div>
+              </>
+            )}
+
+            {/* 👉 NOU: Modal vrea să adauge HARDWARE peste SERVICIU */}
+            {conflictModal.type === 'WANTS_HARDWARE_OVER_SERVICE' && (
+              <>
+                <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+                  Ai deja o <strong className="text-white">Reparație / Serviciu</strong> în coș. <br /><br />
+                  Din motive de logistică și transport, produsele hardware (PC-uri, componente) trebuie comandate separat. Golești coșul pentru a adăuga noul produs?
+                </p>
+                <div className="flex flex-col gap-3">
+                  <button onClick={confirmReplaceCart} className="w-full py-4 rounded-xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-rose-600/20 hover:bg-rose-500 transition-all">Golește coșul și adaugă</button>
+                  <button onClick={goToCheckout} className="w-full py-4 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all">Finalizează serviciul mai întâi</button>
+                  <button onClick={cancelModal} className="w-full py-3 text-gray-500 font-bold uppercase text-[10px] tracking-widest hover:text-white transition-all mt-2">Renunță</button>
+                </div>
+              </>
+            )}
+
           </div>
         </div>
       )}
 
-      {/* TOAST-URI GLOBALE STILIZATE (Unul sub altul cu distanță) */}
+      {/* TOAST-URI GLOBALE STILIZATE */}
       <div className="fixed bottom-8 right-4 md:right-8 z-[9999] flex flex-col gap-3 pointer-events-none">
         {toasts.map((t) => (
           <div 
