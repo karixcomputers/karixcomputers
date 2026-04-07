@@ -146,13 +146,12 @@ export default function AdminDashboard() {
     }
   };
 
-  const renderStatusOptions = (item, order) => {
+  // 👉 AICI ESTE NOUA LOGICĂ DINAMICĂ PENTRU DROPDOWN
+  const renderStatusOptions = (item, order, handoverInfo, returnInfo) => {
     const itemName = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    // Corectie: adaugam toate cuvintele cheie pentru a prinde și drift-urile etc.
     const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj', 'asamblare'];
     const isService = serviceKeywords.some(kw => itemName.includes(kw));
                       
-    const isOradea = order.shippingAddress?.toLowerCase().includes('oradea');
     const isBankTransfer = order.paymentMethod === 'transfer_bancar';
 
     const initialOption = isBankTransfer 
@@ -161,61 +160,65 @@ export default function AdminDashboard() {
           ? <option value="in_asteptare">✅ Plătit</option>
           : <option value="in_asteptare">⏳ În Așteptare</option>);
 
+    // Logica pentru STATUS DE PRELUARE (De unde primim coletul?)
+    let pickupText = "⏳ Așteptare Ridicare Personală (Oradea)";
+    if (handoverInfo.type.includes("Curier")) pickupText = "🚚 Așteptare Curier (Către noi)";
+    if (handoverInfo.type.includes("FANbox")) pickupText = "📦 Așteptare Predare la FANbox (De către client)";
+
+    // Logica pentru STATUS DE RETUR (Când am terminat, ce AWB dăm?)
+    let generateAwbText = "🤝 Pregătit pentru Predare Personală";
+    let showAwbOption = false; // Nu vrem optiune AWB pentru predare personala
+    
+    if (returnInfo.type.includes("Curier")) {
+        generateAwbText = "🚚 Predat Curier (GENEREAZĂ AWB CURIER)";
+        showAwbOption = true;
+    }
+    if (returnInfo.type.includes("FANbox")) {
+        generateAwbText = "📦 Predat Curier (GENEREAZĂ AWB FANBOX)";
+        showAwbOption = true;
+    }
+
     if (isService) {
-      if (isOradea) {
         return (
           <>
             {initialOption}
-            <option value="in_asteptare_ridicare">⏳ Așteptare Preluare Personală</option>
+            <option value="in_asteptare_ridicare">{pickupText}</option>
             <option value="posesie">📥 În laboratorul Karix</option>
             <option value="diagnosticare">🔍 Diagnosticare</option>
             <option value="reparat">✅ Reparat / Gata</option>
             <option value="ireparabil">❌ Ireparabil</option>
-            <option value="gata_de_livrare">🤝 Pregătit pentru Predare</option>
-            <option value="livrat">🏁 Predat (Finalizat)</option>
+            
+            {showAwbOption ? (
+                <option value="predat_curier">{generateAwbText}</option>
+            ) : (
+                <option value="gata_de_livrare">{generateAwbText}</option>
+            )}
+            
+            <option value="livrat">🏁 Livrat Final (Închis)</option>
             <option value="anulat">❌ Anulat</option>
           </>
         );
-      } else {
-        return (
-          <>
-            {initialOption}
-            <option value="in_asteptare_ridicare">🚚 Așteptare Curier (Către noi)</option>
-            <option value="posesie">📥 În laboratorul Karix</option>
-            <option value="diagnosticare">🔍 Diagnosticare</option>
-            <option value="reparat">✅ Reparat / Gata</option>
-            <option value="ireparabil">❌ Ireparabil</option>
-            <option value="predat_curier">📦 Predat Curier (GENEREAZĂ AWB)</option>
-            <option value="livrat">🏁 Livrat Final</option>
-            <option value="anulat">❌ Anulat</option>
-          </>
-        );
-      }
     } else {
-      if (isOradea) {
+        // Pentru Hardware (Nu avem pickup de la ei, doar livrare de la noi)
         return (
           <>
             {initialOption}
             <option value="in_procesare">⚙️ În Procesare</option>
             <option value="in_pregatire">🛠️ În Asamblare</option>
-            <option value="gata_de_livrare">🤝 Gata de Livrare Personală</option>
+            
+            {showAwbOption ? (
+                <>
+                  <option value="gata_de_livrare">📦 Ambalat (Așteaptă ridicare logistică)</option>
+                  <option value="predat_curier">{generateAwbText}</option>
+                </>
+            ) : (
+                <option value="gata_de_livrare">{generateAwbText}</option>
+            )}
+            
             <option value="livrat">🏁 Livrat Final</option>
             <option value="anulat">❌ Anulat</option>
           </>
         );
-      } else {
-        return (
-          <>
-            {initialOption}
-            <option value="in_procesare">⚙️ În Procesare</option>
-            <option value="in_pregatire">🛠️ În Asamblare</option>
-            <option value="gata_de_livrare">📦 Ambalat (Așteaptă Curier)</option>
-            <option value="predat_curier">🚚 Predat Curier (GENEREAZĂ AWB)</option>
-            <option value="livrat">🏁 Livrat Final</option>
-            <option value="anulat">❌ Anulat</option>
-          </>
-        );
-      }
     }
   };
 
@@ -270,7 +273,6 @@ export default function AdminDashboard() {
                       returnInfo = { type: "📍 Predare Personală (Oradea)", address: rawAddress };
                   } else if (order.serviceDeliveryMethod === "fanbox" || rawAddress.includes("| Locker:") || rawAddress.includes("Locker FANbox:")) {
                       if (rawAddress.includes("| Locker:")) {
-                          // Clientul lasă la FANbox, dar vrea retur Acasă
                           const parts = rawAddress.split("| Locker:");
                           const homeAddress = parts[0].trim();
                           const lockerAddress = parts[1].replace("Locker FANbox:", "").trim();
@@ -278,18 +280,15 @@ export default function AdminDashboard() {
                           handoverInfo = { type: "📦 FANbox", address: lockerAddress };
                           returnInfo = { type: "🚚 Curier (Acasă)", address: homeAddress };
                       } else {
-                          // Clientul lasă la FANbox și vrea retur tot la acel FANbox
                           const cleanLockerAddr = rawAddress.replace("Locker FANbox:", "").trim();
                           handoverInfo = { type: "📦 FANbox", address: cleanLockerAddr };
-                          returnInfo = { type: "📦 FANbox (Același Locker)", address: cleanLockerAddr };
+                          returnInfo = { type: "📦 FANbox", address: cleanLockerAddr };
                       }
                   } else {
-                      // Curier clasic dus-întors
-                      handoverInfo = { type: "🚚 Curier (De la client)", address: rawAddress };
-                      returnInfo = { type: "🚚 Curier (Către client)", address: rawAddress };
+                      handoverInfo = { type: "🚚 Curier", address: rawAddress };
+                      returnInfo = { type: "🚚 Curier", address: rawAddress };
                   }
               } else {
-                  // Comandă clasică Hardware
                   if (isOradeaF2F) {
                       returnInfo = { type: "📍 Predare Personală (Oradea)", address: rawAddress };
                   } else if (rawAddress.includes("Locker FANbox:")) {
@@ -427,7 +426,8 @@ export default function AdminDashboard() {
                                     item.status === 'livrat' ? 'border-emerald-500/50 text-emerald-400' : 'border-white/10'
                                   }`}
                                 >
-                                  {renderStatusOptions(item, order)}
+                                  {/* 👉 TRANSMITEM INFORMAȚIILE DE LOGISTICĂ LA RENDER OPTION */}
+                                  {renderStatusOptions(item, order, handoverInfo, returnInfo)}
                                 </select>
                               </div>
                             </div>

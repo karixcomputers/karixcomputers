@@ -225,7 +225,7 @@ export const CartProvider = ({ children }) => {
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
                   Ai deja o <strong className="text-white">Reparație / Serviciu</strong> în coș. <br /><br />
-                  Din motive de logistică și transport, produsele hardware (PC-uri, componente) trebuie comandate separat. Golești coșul pentru a adăuga noul produs?
+                  Din motive de logistică și transport, produsele hardware (PC-uri) trebuie comandate separat. Golești coșul pentru a adăuga noul produs?
                 </p>
                 <div className="flex flex-col gap-3">
                   <button onClick={confirmReplaceCart} className="w-full py-4 rounded-xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-rose-600/20 hover:bg-rose-500 transition-all">Golește coșul și adaugă</button>
