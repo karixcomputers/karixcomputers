@@ -250,35 +250,46 @@ export default function AdminDashboard() {
               const isPendingBankTransfer = order.paymentMethod === "transfer_bancar" && order.status === "in_asteptare_plata";
 
               // ===============================================
-              // 👉 LOGICĂ PENTRU PARSAREA DETALIILOR DE LOGISTICĂ
+              // 👉 NOUA LOGICĂ CLARĂ DE SEPARARE LOGISTICĂ
               // ===============================================
               const rawAddress = order.shippingAddress || "";
               const isFanbox = order.serviceDeliveryMethod === "fanbox" || rawAddress.includes("FANbox") || rawAddress.includes("Locker:");
               const isServiceOrder = order.items?.some(item => ['service', 'mentenanta', 'curatare', 'reparatie'].some(kw => (item.productName || "").toLowerCase().includes(kw)));
               const isOradeaF2F = order.pickupType === "KarixPersonal" || rawAddress.includes("Predare Personală");
 
-              let handoverInfo = null;
-              let returnInfo = null;
+              let handoverInfo = { type: "", address: "" }; // Client -> Karix
+              let returnInfo = { type: "", address: "" };   // Karix -> Client
 
-              if (isOradeaF2F) {
-                  handoverInfo = { method: "📍 Predare Personală (F2F Oradea)", address: rawAddress };
-                  returnInfo = { method: "📍 Predare Personală (F2F Oradea)", address: rawAddress };
-              } else if (isServiceOrder) {
-                  if (isFanbox) {
+              if (isServiceOrder) {
+                  if (isOradeaF2F) {
+                      handoverInfo = { type: "Predare Personală", address: rawAddress };
+                      returnInfo = { type: "Predare Personală", address: rawAddress };
+                  } else if (isFanbox) {
                       if (rawAddress.includes("| Locker:")) {
+                          // Clientul lasă la FANbox, vrea retur Acasă
                           const parts = rawAddress.split("| Locker:");
-                          returnInfo = { method: "🚚 Retur prin Curier (Acasă)", address: parts[0].trim() };
-                          handoverInfo = { method: "📦 Predare la FANbox", address: parts[1].trim() };
+                          const homeAddress = parts[0].trim();
+                          const lockerAddress = parts[1].trim();
+                          
+                          handoverInfo = { type: "FANbox", address: lockerAddress };
+                          returnInfo = { type: "Curier (Acasă)", address: homeAddress };
                       } else {
-                          returnInfo = { method: "📦 Retur la FANbox", address: rawAddress };
-                          handoverInfo = { method: "📦 Predare la FANbox", address: rawAddress };
+                          // Clientul lasă la FANbox, vrea retur la același FANbox
+                          handoverInfo = { type: "FANbox", address: rawAddress };
+                          returnInfo = { type: "FANbox", address: rawAddress };
                       }
                   } else {
-                      handoverInfo = { method: "🚚 Preluare prin Curier de Acasă", address: rawAddress };
-                      returnInfo = { method: "🚚 Retur prin Curier Acasă", address: rawAddress };
+                      // Curier clasic dus-întors
+                      handoverInfo = { type: "Curier", address: rawAddress };
+                      returnInfo = { type: "Curier", address: rawAddress };
                   }
               } else {
-                  returnInfo = { method: isFanbox ? "📦 Livrare la FANbox" : "🚚 Livrare Standard prin Curier", address: rawAddress };
+                  // Comandă clasică (Hardware)
+                  if (isOradeaF2F) {
+                      returnInfo = { type: "Predare Personală", address: rawAddress };
+                  } else {
+                      returnInfo = { type: "Curier Standard", address: rawAddress };
+                  }
               }
               // ===============================================
 
@@ -324,7 +335,7 @@ export default function AdminDashboard() {
                           <p className="flex items-center gap-2"><span>📧</span> {order.user?.email || 'Fără Email'}</p>
                           <p className="flex items-center gap-2"><span>📞</span> {order.shippingPhone}</p>
                           
-                          {/* 👉 NOU: BLOC DETALII LOGISTICĂ */}
+                          {/* 👉 NOU: BLOC DETALII LOGISTICĂ CLAR */}
                           <div className="mt-4 flex flex-col gap-3 p-4 rounded-2xl bg-black/30 border border-white/5 not-italic font-sans">
                             <h5 className="text-[10px] text-gray-500 font-black uppercase tracking-widest border-b border-white/5 pb-2 mb-1">
                               📦 Detalii Logistică
@@ -333,27 +344,27 @@ export default function AdminDashboard() {
                             {isServiceOrder ? (
                               <>
                                 <div>
-                                  <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block mb-1">De la Client ➔ Karix:</span>
+                                  <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block mb-1">Ridicare (De la Client):</span>
                                   <div className="flex items-start gap-2">
-                                     <span className="text-white font-bold text-xs">{handoverInfo.method}</span>
+                                     <span className="text-white font-bold text-xs">Mod: {handoverInfo.type}</span>
                                   </div>
-                                  <p className="text-gray-400 text-[11px] mt-1 font-medium">{handoverInfo.address}</p>
+                                  <p className="text-gray-400 text-[11px] mt-1 font-medium break-words leading-relaxed">Adresa: {handoverInfo.address}</p>
                                 </div>
                                 <div className="pt-2 border-t border-white/5">
-                                  <span className="text-[9px] text-emerald-400 font-black uppercase tracking-wider block mb-1">Retur Karix ➔ Client:</span>
+                                  <span className="text-[9px] text-emerald-400 font-black uppercase tracking-wider block mb-1">Livrare (Retur la Client):</span>
                                   <div className="flex items-start gap-2">
-                                     <span className="text-white font-bold text-xs">{returnInfo.method}</span>
+                                     <span className="text-white font-bold text-xs">Mod: {returnInfo.type}</span>
                                   </div>
-                                  <p className="text-gray-400 text-[11px] mt-1 font-medium">{returnInfo.address}</p>
+                                  <p className="text-gray-400 text-[11px] mt-1 font-medium break-words leading-relaxed">Adresa: {returnInfo.address}</p>
                                 </div>
                               </>
                             ) : (
                               <div>
-                                <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block mb-1">Adresă Livrare:</span>
+                                <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block mb-1">Livrare (Către Client):</span>
                                 <div className="flex items-start gap-2">
-                                   <span className="text-white font-bold text-xs">{returnInfo.method}</span>
+                                   <span className="text-white font-bold text-xs">Mod: {returnInfo.type}</span>
                                 </div>
-                                <p className="text-gray-400 text-[11px] mt-1 font-medium">{returnInfo.address}</p>
+                                <p className="text-gray-400 text-[11px] mt-1 font-medium break-words leading-relaxed">Adresa: {returnInfo.address}</p>
                               </div>
                             )}
                           </div>
