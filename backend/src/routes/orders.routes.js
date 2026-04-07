@@ -18,7 +18,6 @@ import {
   sendAdminOrderCanceledEmail,
   sendAssemblyOrderPlaced,
   sendAdminAssemblyAlert,
-  // 👉 NOU: Importăm funcțiile pentru FANbox
   sendFanboxInstructionsEmail,
   sendFanboxCheckoutEmail
 } from "../services/mail.service.js";
@@ -35,8 +34,8 @@ import {
 const prisma = new PrismaClient();
 const router = express.Router();
 
-// 👉 FUNCȚIE SUPREMĂ PENTRU ELIMINARE DIACRITICE ȘI LOWERCASE
 const normalizeTxt = (txt) => (txt || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const serviceKeywordsArray = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj', 'asamblare'];
 
 async function generateUniqueOrderId() {
   let isUnique = false;
@@ -191,22 +190,49 @@ router.patch("/:id/cancel", requireAuth, async (req, res, next) => {
 router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { itemId } = req.params;
-    const { status, awb, weight, packages, insurance } = req.body; 
+    const { status, awb, weight, packages, insurance, forceFanbox } = req.body; // 👉 Adăugat forceFanbox
+
+    const currentItem = await prisma.orderItem.findUnique({
+      where: { id: parseInt(itemId) },
+      include: { order: { include: { user: true, items: true } } }
+    });
+
+    if (!currentItem) return res.status(404).json({ error: "Item negăsit." });
+
+    let generatedAwb = awb || currentItem.awb || null;
+    const order = currentItem.order;
+
+    const rawOrderAddress = order.shippingAddress || "";
+    const isOradea = normalizeTxt(rawOrderAddress).includes('oradea') && order.pickupType === "KarixPersonal";
+
+    // GENERARE AWB (Dacă e predat curier/fanbox și n-avem deja un AWB emis)
+    if (status === 'predat_curier' && !generatedAwb) {
+        if (!isOradea) {
+            try {
+                generatedAwb = await createFanAWB(
+                    order, 
+                    false, 
+                    weight || 1, 
+                    packages || 1, 
+                    insurance || false,
+                    forceFanbox || false // 👉 Transmitem intenția clară de FANbox
+                );
+                
+                await prisma.order.update({
+                    where: { id: order.id },
+                    data: { awb: generatedAwb }
+                });
+            } catch (awbError) {
+                console.error("❌ Eroare auto-generare AWB (Karix->Client):", awbError);
+                return res.status(500).json({ error: awbError.message || "Eroare generare AWB" });
+            }
+        }
+    }
 
     let updatedItem = await prisma.orderItem.update({
-      where: { id: itemId },
-      data: { 
-        status, 
-        ...(awb && { awb }) 
-      },
-      include: { 
-        order: { 
-          include: { 
-            items: true, 
-            user: { select: { email: true } } 
-          } 
-        } 
-      }
+      where: { id: parseInt(itemId) },
+      data: { status, awb: generatedAwb },
+      include: { order: { include: { items: true, user: { select: { email: true } } } } }
     });
 
     const allItems = updatedItem.order.items;
@@ -229,23 +255,17 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
 
     const userEmail = updatedItem.order.user.email;
     const itemName = updatedItem.productName || "";
+    const isService = serviceKeywordsArray.some(kw => normalizeTxt(itemName).includes(kw));
     
-    const isService = ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'].some(kw => normalizeTxt(itemName).includes(kw));
-    
-    const rawOrderAddress = updatedItem.order.shippingAddress || "";
-    const isFanbox = updatedItem.order.serviceDeliveryMethod === "fanbox" || normalizeTxt(rawOrderAddress).includes("fanbox");
-    const isOradea = !isFanbox && normalizeTxt(rawOrderAddress).includes('oradea');
-    
-    let currentAwb = awb || updatedItem.awb || "";
-
     const emailData = {
       customerName: updatedItem.order.shippingName,
       productName: updatedItem.productName,
       orderId: updatedItem.orderId,
-      awb: currentAwb,
+      awb: generatedAwb,
       phone: updatedItem.order.shippingPhone
     };
 
+    // Trimitem email-uri în funcție de status
     if (status === "posesie") {
       await sendServiceInPossessionEmail(userEmail, emailData).catch(err => console.error(err));
     } 
@@ -260,32 +280,11 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
         await sendOrderReadyEmail(userEmail, emailData).catch(err => console.error(err));
       }
     } 
-    else if (status === "predat_curier") {
-      if (!isOradea) {
-        if (!currentAwb) {
-          try {
-            const isInsured = insurance === true || insurance === "true";
-            const newAwb = await createFanAWB(updatedItem.order, false, weight, packages, isInsured); 
-            
-            updatedItem = await prisma.orderItem.update({
-              where: { id: itemId },
-              data: { awb: newAwb },
-              include: { order: { include: { items: true, user: { select: { email: true } } } } }
-            });
-
-            currentAwb = newAwb;
-            emailData.awb = newAwb;
-          } catch (awbError) {
-            console.error("❌ Eroare auto-generare AWB:", awbError);
-            return res.status(500).json({ error: awbError.message || "Eroare la generarea AWB-ului la FAN Courier" });
-          }
-        }
-        
-        if (isService) {
-          await sendServiceShippedBackEmail(userEmail, emailData).catch(err => console.error(err));
-        } else {
-          await sendOrderShippedEmail(userEmail, emailData).catch(err => console.error(err));
-        }
+    else if (status === "predat_curier" && !isOradea) {
+      if (isService) {
+        await sendServiceShippedBackEmail(userEmail, emailData).catch(err => console.error(err));
+      } else {
+        await sendOrderShippedEmail(userEmail, emailData).catch(err => console.error(err));
       }
     }
 
@@ -298,25 +297,19 @@ router.post("/", requireAuth, async (req, res, next) => {
   try {
     const { client, cartItems, total, userEmail, pickupType, couponCode, paymentMethod, shippingCents } = req.body;
     const randomOrderId = await generateUniqueOrderId();
-
-    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'drift', 'hall', 'stick'];
     
-    const hasAssembly = cartItems.some(item => {
-        return normalizeTxt(item.productName || item.name).includes("asamblare");
-    });
+    const hasAssembly = cartItems.some(item => normalizeTxt(item.productName || item.name).includes("asamblare"));
 
     const containsServices = cartItems.some(item => {
         const isSrvCategory = item.category === 'service';
-        const hasSrvKeyword = serviceKeywords.some(kw => normalizeTxt(item.productName || item.name).includes(kw));
+        const hasSrvKeyword = serviceKeywordsArray.some(kw => normalizeTxt(item.productName || item.name).includes(kw));
         return isSrvCategory || hasSrvKeyword;
     });
 
     const initialStatus = paymentMethod === 'transfer_bancar' ? 'in_asteptare_plata' : 'in_asteptare';
 
-    // 👉 AICI ESTE MAGIA: Unim adresa completă (Stradă, Oraș, Județ)
     let fullShippingAddress = [client.addressDetails, client.city, client.county].filter(Boolean).join(", ");
     
-    // 👉 LIMPIM TEXTUL LOCKERULUI LA ADRESĂ PENTRU E-MAIL-URI
     if (client.serviceDeliveryMethod === "fanbox" && client.fanboxAddressText) {
         fullShippingAddress += ` | Locker: ${client.fanboxAddressText}`;
     }
@@ -345,8 +338,7 @@ router.post("/", requireAuth, async (req, res, next) => {
           create: cartItems.map(item => {
             const nameFinal = item.productName || item.name;
             const isServiceItem = (item.category === 'service') || 
-                                  serviceKeywords.some(kw => normalizeTxt(nameFinal).includes(kw)) ||
-                                  normalizeTxt(nameFinal).includes("asamblare");
+                                  serviceKeywordsArray.some(kw => normalizeTxt(nameFinal).includes(kw));
             
             return {
               productId: String(item.id),
@@ -434,12 +426,12 @@ router.post("/", requireAuth, async (req, res, next) => {
         orderId: newOrder.id,
         total: total,
         couponCode: couponCode || null,
-        pickupType: isFanbox ? 'curier' : pickupType, // Oprim Oradea daca e fanbox
+        pickupType: isFanbox ? 'curier' : pickupType,
         isServiceOrder: containsServices, 
         paymentMethod: paymentMethod,
         cartItems: cartItems.map(item => {
           const nameFinal = item.productName || item.name;
-          const isSrv = (item.category === 'service') || serviceKeywords.some(kw => normalizeTxt(nameFinal).includes(kw));
+          const isSrv = (item.category === 'service') || serviceKeywordsArray.some(kw => normalizeTxt(nameFinal).includes(kw));
           return { ...item, name: nameFinal, isServiceItem: isSrv, priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy, qty: item.qty || 1 };
         })
       };
@@ -534,17 +526,14 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
     if (!order) return res.status(404).json({ error: "Comanda nu a fost găsită." });
     if (order.paymentMethod !== "transfer_bancar") return res.status(400).json({ error: "Doar pentru Transfer Bancar." });
 
-    // 1. Emitere Factură Finală SmartBill
     let invoiceData = await createSmartBillInvoice(order);
     let pdfBuffer = null;
     if (invoiceData && invoiceData.series && invoiceData.number) {
         pdfBuffer = await getSmartBillPdf(invoiceData.series, invoiceData.number);
     }
 
-    // 2. LOGICĂ AUTOMATĂ RIDICARE (AWB INVERS)
-    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'drift', 'hall'];
     const hasService = order.items.some(item => 
-        serviceKeywords.some(kw => normalizeTxt(item.productName).includes(kw))
+        serviceKeywordsArray.some(kw => normalizeTxt(item.productName).includes(kw))
     );
     
     const rawOrderAddress = order.shippingAddress || "";
@@ -561,7 +550,6 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
         }
     }
 
-    // 3. Actualizăm Comanda în DB
     await prisma.order.update({
       where: { id },
       data: {
@@ -578,9 +566,8 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
       }
     });
 
-    // 4. TRIMITEM EMAIL-UL DE CONFIRMARE (Diferențiat pe FANbox vs Curier Normal)
     if (hasService && isFanbox) {
-        const isReturnToLocker = !rawOrderAddress.includes("| Locker:"); // E la fel, se va duce mereu în Fanbox dacă nu are adresă de casă lipită
+        const isReturnToLocker = !rawOrderAddress.includes("| Locker:");
         await sendFanboxInstructionsEmail(order.user.email, order, isReturnToLocker, pdfBuffer);
     } else {
         await sendFinalInvoiceEmail(order.user.email, order, pdfBuffer);

@@ -85,58 +85,83 @@ const formatForFan = (str) => {
 };
 
 // ==========================================
+// MOTOR DE EXTRAGERE INTELIGENTĂ A ADRESELOR (O singură logică pt ambele funcții)
+// ==========================================
+function parseAddresses(rawAddress, providedPudoId) {
+    let homeStr = rawAddress;
+    let lockerStr = "";
+    let finalPudoId = providedPudoId;
+
+    if (rawAddress.includes("| Locker:")) {
+        const parts = rawAddress.split("| Locker:");
+        homeStr = parts[0].trim();
+        lockerStr = parts[1].trim();
+    } else if (rawAddress.includes("Locker FANbox:") || rawAddress.toLowerCase().includes("fanbox")) {
+        lockerStr = rawAddress;
+        homeStr = rawAddress; 
+    }
+
+    if (!finalPudoId && lockerStr) {
+        const match = lockerStr.match(/F\d{5,}/);
+        if (match) finalPudoId = match[0];
+    }
+
+    if (homeStr.includes("| Note:")) homeStr = homeStr.split("| Note:")[0].trim();
+    if (homeStr.includes("Locker FANbox:")) {
+        const p = homeStr.split("-");
+        if (p.length > 1) homeStr = p.slice(1).join("-").trim();
+    }
+
+    let county = "Bucuresti", locality = "Bucuresti", street = homeStr;
+    const addrParts = homeStr.split(',').map(s => s.trim()).filter(Boolean);
+    
+    if (addrParts.length >= 3) {
+         county = addrParts.pop(); 
+         locality = addrParts.pop(); 
+         street = addrParts.join(', '); 
+    } else if (addrParts.length === 2) {
+         county = addrParts[1];
+         locality = addrParts[1];
+         street = addrParts[0];
+    }
+
+    return {
+        pudoId: finalPudoId,
+        county: formatForFan(county),
+        locality: formatForFan(locality),
+        street: street || homeStr
+    };
+}
+
+
+// ==========================================
 // 2. GENERARE AWB STANDARD (Karix -> Client)
 // ==========================================
-export async function createFanAWB(order, isTestMode = false, weight = 1, packagesCount = 1, isInsured = false) { 
+export async function createFanAWB(order, isTestMode = false, weight = 1, packagesCount = 1, isInsured = false, forceFanbox = false) { 
     if (isTestMode) return `TEST_AWB_${Math.floor(Math.random() * 100000000)}`; 
 
     try {
         const token = await getFanToken();
         const clientIdNum = parseInt(String(process.env.FAN_CLIENT_ID).trim(), 10);
 
-        let rawAddress = order.shippingAddress || "";
-        if (rawAddress.includes("| Note:")) rawAddress = rawAddress.split("| Note:")[0].trim();
-
-        // Identificare FANbox
-        const isLocker = (order.serviceDeliveryMethod === "fanbox") || rawAddress.toLowerCase().includes("fanbox") || rawAddress.toLowerCase().includes("locker");
-
-        let county = "Bucuresti";
-        let locality = "Bucuresti";
-        let street = rawAddress;
-
-        if (isLocker && rawAddress.includes("-")) {
-             const parts = rawAddress.split("-");
-             if (parts.length > 1) {
-                 const addrParts = parts[1].split(",");
-                 if (addrParts.length >= 2) {
-                     county = addrParts[0].trim();
-                     locality = addrParts[1].trim();
-                 }
-             }
-        } else {
-             const addressParts = rawAddress.split(',').map(s => s.trim()).filter(Boolean);
-             if (addressParts.length >= 3) {
-                 county = addressParts.pop(); 
-                 locality = addressParts.pop(); 
-                 street = addressParts.join(', '); 
-             } else if (addressParts.length === 2) {
-                 county = addressParts[1];
-                 locality = addressParts[1];
-                 street = addressParts[0];
-             }
-        }
+        const rawAddress = order.shippingAddress || "";
+        const parsedData = parseAddresses(rawAddress, order.fanboxLocationId);
+        
+        const hasHomeAndLockerSeparately = rawAddress.includes("| Locker:");
+        
+        // Dacă forțăm Fanbox din Frontend SAU a ales doar Locker fără adresă de casă.
+        // Dacă a ales și Casă și Locker (deci e retur hibrid), NU ducem la locker returul dacă nu e forțat.
+        const isDeliveryToLocker = forceFanbox || (!hasHomeAndLockerSeparately && Boolean(parsedData.pudoId));
 
         const orderTotalRon = (order.totalCents / 100);
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : orderTotalRon;
-        
-        let serviceType = isLocker ? "FANbox" : (rambursValue > 0 ? "Cont Colector" : "Standard");
         
         const payload = {
             clientId: clientIdNum,
             shipments: [
                 {
                     info: {
-                        service: serviceType,
+                        service: isDeliveryToLocker ? "FANbox" : (rambursValue > 0 ? "Cont Colector" : "Standard"),
                         packages: { parcel: parseInt(packagesCount), envelopes: 0 },
                         weight: parseInt(weight),
                         payment: "sender", 
@@ -145,19 +170,19 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: rambursValue,
                         declaredValue: isInsured ? orderTotalRon : 0,
-                        options: isLocker ? ["X"] : []
+                        options: isDeliveryToLocker ? ["X"] : [] // Karix lasa curierul, care duce pachetul in locker (X)
                     },
                     recipient: {
                         name: order.shippingName,
                         phone: order.shippingPhone,
                         email: order.user?.email || "contact@karixcomputers.ro",
                         address: {
-                            county: formatForFan(county),
-                            locality: formatForFan(locality),
-                            street: street,
+                            county: parsedData.county,
+                            locality: parsedData.locality,
+                            street: isDeliveryToLocker ? "Livrare la locker FANbox" : parsedData.street,
                             streetNo: "-", 
                             zipCode: "",
-                            ...(isLocker && order.fanboxLocationId && { pudoLocationId: order.fanboxLocationId })
+                            ...(isDeliveryToLocker && parsedData.pudoId && { pudoLocationId: parsedData.pudoId })
                         }
                     }
                 }
@@ -191,45 +216,21 @@ export async function createReverseFanAWB(order, isTestMode = false) {
     if (isTestMode) return `TEST_REV_AWB_${Math.floor(Math.random() * 100000000)}`; 
 
     try {
-        // 👉 AICI ESTE SECRETUL: Folosim token-ul de retur!
         const token = await getFanReturnToken();
         const clientIdNum = parseInt(String(process.env.FAN_RETURN_CLIENT_ID || process.env.FAN_CLIENT_ID).trim(), 10);
 
-        let rawAddress = order.shippingAddress || "";
+        const rawAddress = order.shippingAddress || "";
         const cleanPhone = order.shippingPhone.replace(/\D/g, "");
+        const parsedData = parseAddresses(rawAddress, order.fanboxLocationId);
         
-        const isLocker = (order.serviceDeliveryMethod === "fanbox") || rawAddress.toLowerCase().includes("fanbox") || rawAddress.toLowerCase().includes("locker");
-
-        let county = "Bucuresti";
-        let locality = "Bucuresti";
-        let street = rawAddress;
-
-        if (isLocker && rawAddress.includes("-")) {
-             const parts = rawAddress.split("-");
-             if (parts.length > 1) {
-                 const addrParts = parts[1].split(",");
-                 if (addrParts.length >= 2) {
-                     county = addrParts[0].trim();
-                     locality = addrParts[1].trim();
-                 }
-             }
-        } else {
-             const addressParts = rawAddress.split(',').map(s => s.trim()).filter(Boolean);
-             if (addressParts.length >= 3) {
-                 county = addressParts.pop(); 
-                 locality = addressParts.pop(); 
-                 street = addressParts.join(', '); 
-             }
-        }
-
-        let serviceType = isLocker ? "FANbox" : "Standard";
+        const isDropOff = Boolean(parsedData.pudoId);
         
         const payload = {
             clientId: clientIdNum,
             shipments: [
                 {
                     info: {
-                        service: serviceType,
+                        service: isDropOff ? "FANbox" : "Standard",
                         packages: { parcel: 1, envelopes: 0 },
                         weight: 5,
                         payment: "recipient", 
@@ -238,19 +239,20 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: 0,
                         declaredValue: 0,
-                        options: isLocker ? ["W"] : []
+                        options: isDropOff ? ["W"] : [] // Client pune in locker, curier aduce la Karix (W)
                     },
                     sender: {
                         name: order.shippingName,
+                        contactPerson: order.shippingName, 
                         phone: cleanPhone,
                         email: order.user?.email || "contact@karixcomputers.ro",
                         address: {
-                            county: formatForFan(county),
-                            locality: formatForFan(locality),
-                            street: isLocker ? "Predare la locker FANbox" : street,
+                            county: parsedData.county,
+                            locality: parsedData.locality,
+                            street: isDropOff ? "Predare la locker FANbox" : parsedData.street,
                             streetNo: "-", 
                             zipCode: "",
-                            ...(isLocker && order.fanboxLocationId && { dropOffLocationId: order.fanboxLocationId })
+                            ...(isDropOff && parsedData.pudoId && { dropOffLocationId: parsedData.pudoId })
                         }
                     },
                     recipient: {
