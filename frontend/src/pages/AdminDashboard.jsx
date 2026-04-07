@@ -148,10 +148,9 @@ export default function AdminDashboard() {
 
   const renderStatusOptions = (item, order) => {
     const itemName = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const isService = itemName.includes('service') || 
-                      itemName.includes('mentenanta') ||
-                      itemName.includes('curatare') ||
-                      itemName.includes('reparatie');
+    // Corectie: adaugam toate cuvintele cheie pentru a prinde și drift-urile etc.
+    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj', 'asamblare'];
+    const isService = serviceKeywords.some(kw => itemName.includes(kw));
                       
     const isOradea = order.shippingAddress?.toLowerCase().includes('oradea');
     const isBankTransfer = order.paymentMethod === 'transfer_bancar';
@@ -250,45 +249,53 @@ export default function AdminDashboard() {
               const isPendingBankTransfer = order.paymentMethod === "transfer_bancar" && order.status === "in_asteptare_plata";
 
               // ===============================================
-              // 👉 NOUA LOGICĂ CLARĂ DE SEPARARE LOGISTICĂ
+              // 👉 LOGICĂ DETALIATĂ PENTRU EXTRAGERE ADRESE
               // ===============================================
               const rawAddress = order.shippingAddress || "";
-              const isFanbox = order.serviceDeliveryMethod === "fanbox" || rawAddress.includes("FANbox") || rawAddress.includes("Locker:");
-              const isServiceOrder = order.items?.some(item => ['service', 'mentenanta', 'curatare', 'reparatie'].some(kw => (item.productName || "").toLowerCase().includes(kw)));
-              const isOradeaF2F = order.pickupType === "KarixPersonal" || rawAddress.includes("Predare Personală");
+              const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj', 'asamblare'];
+              
+              const isServiceOrder = order.items?.some(item => {
+                 const name = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                 return serviceKeywords.some(kw => name.includes(kw));
+              });
+              
+              const isOradeaF2F = order.pickupType === "KarixPersonal" || rawAddress.toLowerCase().includes("predare personală");
 
               let handoverInfo = { type: "", address: "" }; // Client -> Karix
               let returnInfo = { type: "", address: "" };   // Karix -> Client
 
               if (isServiceOrder) {
                   if (isOradeaF2F) {
-                      handoverInfo = { type: "Predare Personală", address: rawAddress };
-                      returnInfo = { type: "Predare Personală", address: rawAddress };
-                  } else if (isFanbox) {
+                      handoverInfo = { type: "📍 Predare Personală (Oradea)", address: rawAddress };
+                      returnInfo = { type: "📍 Predare Personală (Oradea)", address: rawAddress };
+                  } else if (order.serviceDeliveryMethod === "fanbox" || rawAddress.includes("| Locker:") || rawAddress.includes("Locker FANbox:")) {
                       if (rawAddress.includes("| Locker:")) {
-                          // Clientul lasă la FANbox, vrea retur Acasă
+                          // Clientul lasă la FANbox, dar vrea retur Acasă
                           const parts = rawAddress.split("| Locker:");
                           const homeAddress = parts[0].trim();
-                          const lockerAddress = parts[1].trim();
+                          const lockerAddress = parts[1].replace("Locker FANbox:", "").trim();
                           
-                          handoverInfo = { type: "FANbox", address: lockerAddress };
-                          returnInfo = { type: "Curier (Acasă)", address: homeAddress };
+                          handoverInfo = { type: "📦 FANbox", address: lockerAddress };
+                          returnInfo = { type: "🚚 Curier (Acasă)", address: homeAddress };
                       } else {
-                          // Clientul lasă la FANbox, vrea retur la același FANbox
-                          handoverInfo = { type: "FANbox", address: rawAddress };
-                          returnInfo = { type: "FANbox", address: rawAddress };
+                          // Clientul lasă la FANbox și vrea retur tot la acel FANbox
+                          const cleanLockerAddr = rawAddress.replace("Locker FANbox:", "").trim();
+                          handoverInfo = { type: "📦 FANbox", address: cleanLockerAddr };
+                          returnInfo = { type: "📦 FANbox (Același Locker)", address: cleanLockerAddr };
                       }
                   } else {
                       // Curier clasic dus-întors
-                      handoverInfo = { type: "Curier", address: rawAddress };
-                      returnInfo = { type: "Curier", address: rawAddress };
+                      handoverInfo = { type: "🚚 Curier (De la client)", address: rawAddress };
+                      returnInfo = { type: "🚚 Curier (Către client)", address: rawAddress };
                   }
               } else {
-                  // Comandă clasică (Hardware)
+                  // Comandă clasică Hardware
                   if (isOradeaF2F) {
-                      returnInfo = { type: "Predare Personală", address: rawAddress };
+                      returnInfo = { type: "📍 Predare Personală (Oradea)", address: rawAddress };
+                  } else if (rawAddress.includes("Locker FANbox:")) {
+                      returnInfo = { type: "📦 FANbox", address: rawAddress.replace("Locker FANbox:", "").trim() };
                   } else {
-                      returnInfo = { type: "Curier Standard", address: rawAddress };
+                      returnInfo = { type: "🚚 Curier Standard", address: rawAddress };
                   }
               }
               // ===============================================
@@ -335,7 +342,7 @@ export default function AdminDashboard() {
                           <p className="flex items-center gap-2"><span>📧</span> {order.user?.email || 'Fără Email'}</p>
                           <p className="flex items-center gap-2"><span>📞</span> {order.shippingPhone}</p>
                           
-                          {/* 👉 NOU: BLOC DETALII LOGISTICĂ CLAR */}
+                          {/* 👉 BLOC DETALII LOGISTICĂ AFISAT CLAR */}
                           <div className="mt-4 flex flex-col gap-3 p-4 rounded-2xl bg-black/30 border border-white/5 not-italic font-sans">
                             <h5 className="text-[10px] text-gray-500 font-black uppercase tracking-widest border-b border-white/5 pb-2 mb-1">
                               📦 Detalii Logistică
@@ -344,27 +351,27 @@ export default function AdminDashboard() {
                             {isServiceOrder ? (
                               <>
                                 <div>
-                                  <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block mb-1">Ridicare (De la Client):</span>
+                                  <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block mb-1">Preluare (Client ➔ Karix):</span>
                                   <div className="flex items-start gap-2">
-                                     <span className="text-white font-bold text-xs">Mod: {handoverInfo.type}</span>
+                                     <span className="text-white font-bold text-xs">{handoverInfo.type}</span>
                                   </div>
-                                  <p className="text-gray-400 text-[11px] mt-1 font-medium break-words leading-relaxed">Adresa: {handoverInfo.address}</p>
+                                  <p className="text-gray-400 text-[11px] mt-1 font-medium break-words leading-relaxed">{handoverInfo.address}</p>
                                 </div>
                                 <div className="pt-2 border-t border-white/5">
-                                  <span className="text-[9px] text-emerald-400 font-black uppercase tracking-wider block mb-1">Livrare (Retur la Client):</span>
+                                  <span className="text-[9px] text-emerald-400 font-black uppercase tracking-wider block mb-1">Retur (Karix ➔ Client):</span>
                                   <div className="flex items-start gap-2">
-                                     <span className="text-white font-bold text-xs">Mod: {returnInfo.type}</span>
+                                     <span className="text-white font-bold text-xs">{returnInfo.type}</span>
                                   </div>
-                                  <p className="text-gray-400 text-[11px] mt-1 font-medium break-words leading-relaxed">Adresa: {returnInfo.address}</p>
+                                  <p className="text-gray-400 text-[11px] mt-1 font-medium break-words leading-relaxed">{returnInfo.address}</p>
                                 </div>
                               </>
                             ) : (
                               <div>
-                                <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block mb-1">Livrare (Către Client):</span>
+                                <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block mb-1">Livrare (Karix ➔ Client):</span>
                                 <div className="flex items-start gap-2">
-                                   <span className="text-white font-bold text-xs">Mod: {returnInfo.type}</span>
+                                   <span className="text-white font-bold text-xs">{returnInfo.type}</span>
                                 </div>
-                                <p className="text-gray-400 text-[11px] mt-1 font-medium break-words leading-relaxed">Adresa: {returnInfo.address}</p>
+                                <p className="text-gray-400 text-[11px] mt-1 font-medium break-words leading-relaxed">{returnInfo.address}</p>
                               </div>
                             )}
                           </div>
@@ -397,10 +404,7 @@ export default function AdminDashboard() {
                       <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 text-center lg:text-left">Status Produse</h4>
                       {order.items?.map((item) => {
                          const itemName = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                         const isService = itemName.includes('service') || 
-                                           itemName.includes('mentenanta') ||
-                                           itemName.includes('curatare') ||
-                                           itemName.includes('reparatie');
+                         const isService = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj', 'asamblare'].some(kw => itemName.includes(kw));
                          return (
                             <div key={item.id} className={`p-6 rounded-[25px] border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 transition-all group backdrop-blur-md ${
                               item.status === 'livrat' ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/5 hover:border-white/10'
