@@ -12,9 +12,7 @@ let returnTokenExpiration = null;
 // 1. AUTENTIFICARE ȘI OBȚINERE TOKEN PRINCIPAL
 // ==========================================
 export async function getFanToken() {
-    if (currentToken && tokenExpiration && new Date() < tokenExpiration) {
-        return currentToken;
-    }
+    if (currentToken && tokenExpiration && new Date() < tokenExpiration) return currentToken;
 
     const username = process.env.FAN_USERNAME;
     const password = process.env.FAN_PASSWORD;
@@ -31,9 +29,7 @@ export async function getFanToken() {
             currentToken = extractedToken;
             tokenExpiration = new Date(new Date().getTime() + 23 * 60 * 60 * 1000);
             return currentToken;
-        } else {
-            throw new Error(data.message || "Eroare token");
-        }
+        } else throw new Error(data.message || "Eroare token");
     } catch (error) {
         console.error("❌ Eroare FAN Courier Auth:", error.message);
         throw error;
@@ -44,9 +40,7 @@ export async function getFanToken() {
 // 1.5. AUTENTIFICARE PENTRU CONT OCAZIONAL (RETUR)
 // ==========================================
 export async function getFanReturnToken() {
-    if (currentReturnToken && returnTokenExpiration && new Date() < returnTokenExpiration) {
-        return currentReturnToken;
-    }
+    if (currentReturnToken && returnTokenExpiration && new Date() < returnTokenExpiration) return currentReturnToken;
 
     const username = process.env.FAN_RETURN_USERNAME || process.env.FAN_USERNAME;
     const password = process.env.FAN_RETURN_PASSWORD || process.env.FAN_PASSWORD;
@@ -61,16 +55,13 @@ export async function getFanReturnToken() {
             currentReturnToken = extractedToken;
             returnTokenExpiration = new Date(new Date().getTime() + 23 * 60 * 60 * 1000);
             return currentReturnToken;
-        } else {
-            throw new Error(data.message || "Eroare token retur");
-        }
+        } else throw new Error(data.message || "Eroare token retur");
     } catch (error) {
         console.error("❌ Eroare FAN Courier Auth Retur:", error.message);
         throw error;
     }
 }
 
-// Helper formatare text pentru FAN
 const formatForFan = (str) => {
     if (!str) return "";
     let cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -84,8 +75,68 @@ const formatForFan = (str) => {
 };
 
 // ==========================================
-// MOTOR DE EXTRAGERE INTELIGENTĂ A ADRESELOR
+// MOTOR INTELIGENT DE EXTRAGERE A ADRESELOR (GĂSEȘTE JUDEȚUL ORIUNDE AR FI)
 // ==========================================
+const roCounties = ["alba", "arad", "arges", "bacau", "bihor", "bistrita-nasaud", "botosani", "braila", "brasov", "bucuresti", "buzau", "calarasi", "caras-severin", "cluj", "constanta", "covasna", "dambovita", "dolj", "galati", "giurgiu", "gorj", "harghita", "hunedoara", "ialomita", "iasi", "ilfov", "maramures", "mehedinti", "mures", "neamt", "olt", "prahova", "salaj", "satu mare", "sibiu", "suceava", "teleorman", "timis", "tulcea", "valcea", "vaslui", "vrancea"];
+
+function extractIntelligently(str) {
+    if (!str) return null;
+    let clean = str.replace(/,\s*rom[aâ]nia$/i, '').trim();
+    if (clean.includes("| Note:")) clean = clean.split("| Note:")[0].trim();
+    clean = clean.replace(/Locker FANbox:/i, '').replace(/FANbox.*?-/i, '').trim();
+
+    const parts = clean.split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length === 0) return null;
+
+    let c = "", l = "", s = [];
+    let cIndex = -1;
+    
+    // Căutăm județul în segmentele de text
+    for (let i = 0; i < parts.length; i++) {
+        let normalizedPart = parts[i].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, '');
+        if (normalizedPart === 'bistritanasaud') normalizedPart = 'bistrita-nasaud';
+        if (normalizedPart === 'carasseverin') normalizedPart = 'caras-severin';
+        if (normalizedPart === 'satumare') normalizedPart = 'satu mare';
+        
+        if (roCounties.includes(normalizedPart) || normalizedPart.includes('bucuresti') || normalizedPart.includes('sector')) {
+            cIndex = i;
+            c = normalizedPart.includes('bucuresti') || normalizedPart.includes('sector') ? "Bucuresti" : parts[i];
+            break;
+        }
+    }
+
+    if (cIndex !== -1) {
+        // Dacă a găsit județul la final (Stradă, Oraș, Județ)
+        if (cIndex > 0 && cIndex === parts.length - 1) {
+            l = parts[cIndex - 1];
+            s = parts.slice(0, cIndex - 1);
+        } 
+        // Dacă a găsit județul la început (Județ, Oraș, Stradă - format Widget FANbox)
+        else if (cIndex < parts.length - 1) {
+            l = parts[cIndex + 1];
+            s = parts.filter((_, idx) => idx !== cIndex && idx !== (cIndex + 1));
+        } else {
+            l = parts[0];
+            s = parts;
+        }
+    } else {
+        // Fallback dacă scrie ceva total necunoscut
+        if (parts.length >= 3) {
+            c = parts[parts.length - 1];
+            l = parts[parts.length - 2];
+            s = parts.slice(0, parts.length - 2);
+        } else if (parts.length === 2) {
+            c = parts[1];
+            l = parts[0];
+            s = [parts[0]];
+        } else {
+            c = "Bucuresti"; l = "Bucuresti"; s = parts;
+        }
+    }
+
+    return { c, l, s: s.join(', ') };
+}
+
 function parseAddresses(rawAddress, providedPudoId) {
     let homeStr = rawAddress;
     let lockerStr = "";
@@ -95,7 +146,7 @@ function parseAddresses(rawAddress, providedPudoId) {
         const parts = rawAddress.split("| Locker:");
         homeStr = parts[0].trim();
         lockerStr = parts[1].trim();
-    } else if (rawAddress.includes("Locker FANbox:") || rawAddress.toLowerCase().includes("fanbox")) {
+    } else if (rawAddress.toLowerCase().includes("fanbox") || rawAddress.includes("Locker FANbox:")) {
         lockerStr = rawAddress;
         homeStr = rawAddress; 
     }
@@ -105,55 +156,28 @@ function parseAddresses(rawAddress, providedPudoId) {
         if (match) finalPudoId = match[0];
     }
 
-    const extract = (str) => {
-        if (!str) return null;
-        let clean = str.replace(/,\s*rom[aâ]nia$/i, '').trim(); 
-        if (clean.includes("| Note:")) clean = clean.split("| Note:")[0].trim();
-        if (clean.includes("Locker FANbox:")) {
-            const p = clean.split("-");
-            if (p.length > 1) clean = p.slice(1).join("-").trim();
-        }
+    let extHome = extractIntelligently(homeStr);
+    let extLocker = extractIntelligently(lockerStr);
 
-        const parts = clean.split(',').map(s => s.trim()).filter(Boolean);
-        if (parts.length >= 3) {
-            return { c: parts.pop(), l: parts.pop(), s: parts.join(', ') };
-        } else if (parts.length === 2) {
-            return { c: parts[1], l: parts[0], s: parts[0] };
-        }
-        return { c: "", l: "", s: clean };
-    };
+    let county = extHome?.c || "Bucuresti";
+    let locality = extHome?.l || "Bucuresti";
+    let street = extHome?.s || homeStr;
 
     const isInvalid = (val) => !val || val.toLowerCase().includes("fanbox") || val.toLowerCase().includes("locker");
 
-    let extHome = extract(homeStr);
-    let extLocker = extract(lockerStr);
-
-    let county = "Bucuresti";
-    let locality = "Bucuresti";
-    let street = homeStr;
-
-    if (extHome && extHome.c && !isInvalid(extHome.c)) {
-        county = extHome.c;
-        locality = extHome.l;
-        street = extHome.s;
-    } 
-    else if (extLocker && extLocker.c && !isInvalid(extLocker.c)) {
+    if (isInvalid(county) && extLocker && extLocker.c && !isInvalid(extLocker.c)) {
         county = extLocker.c;
         locality = extLocker.l;
         street = extLocker.s;
-    } 
-    else {
-        if (extHome && extHome.s && !isInvalid(extHome.s)) street = extHome.s;
     }
 
     return {
         pudoId: finalPudoId,
         county: formatForFan(county),
         locality: formatForFan(locality),
-        street: street || homeStr
+        street: street || "Livrare FANbox"
     };
 }
-
 
 // ==========================================
 // 2. GENERARE AWB STANDARD (Karix -> Client)
@@ -173,8 +197,6 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
 
         const orderTotalRon = (order.totalCents / 100);
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : orderTotalRon;
-        
-        // 👉 SOLUȚIA: Serviciul este "Standard" / "Cont Colector" pentru că pleacă de la ușa Karix!
         const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
 
         const payload = {
@@ -191,7 +213,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: rambursValue,
                         declaredValue: isInsured ? orderTotalRon : 0,
-                        options: [] // 👉 Fără "V", "X" sau "W". Door-to-locker funcționează nativ.
+                        options: [] 
                     },
                     recipient: {
                         name: order.shippingName,
@@ -203,18 +225,12 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                             street: isDeliveryToLocker ? "Livrare la locker FANbox" : parsedData.street,
                             streetNo: "-", 
                             zipCode: "",
-                            // 👉 ID-ul FANbox-ului la Destinatar rămâne `pudoLocationId`
                             ...(isDeliveryToLocker && parsedData.pudoId && { pudoLocationId: parsedData.pudoId })
                         }
                     }
                 }
             ]
         };
-
-        console.log("\n==========================================");
-        console.log(`📦 PAYLOAD TRIMIS SPRE FAN COURIER (STANDARD - COMANDA #${order.id}):`);
-        console.log(JSON.stringify(payload, null, 2));
-        console.log("==========================================\n");
 
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
@@ -224,7 +240,6 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
 
         const data = await response.json();
         if (data.response && Array.isArray(data.response) && data.response[0].awbNumber) {
-             console.log(`✅ AWB STANDARD GENERAT: ${data.response[0].awbNumber}`);
              return String(data.response[0].awbNumber); 
         }
         
@@ -299,11 +314,6 @@ export async function createReverseFanAWB(order, isTestMode = false) {
             ]
         };
 
-        console.log("\n==========================================");
-        console.log(`📦 PAYLOAD TRIMIS SPRE FAN COURIER (INVERS - COMANDA #${order.id}):`);
-        console.log(JSON.stringify(payload, null, 2));
-        console.log("==========================================\n");
-
         const response = await fetch("https://api.fancourier.ro/intern-awb", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -313,7 +323,6 @@ export async function createReverseFanAWB(order, isTestMode = false) {
         const data = await response.json();
         
         if (data.response && Array.isArray(data.response) && data.response[0].awbNumber) {
-             console.log(`✅ AWB INVERS GENERAT: ${data.response[0].awbNumber}`);
              return String(data.response[0].awbNumber); 
         }
         
