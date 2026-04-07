@@ -118,7 +118,8 @@ function parseAddresses(rawAddress, providedPudoId) {
         if (parts.length >= 3) {
             return { c: parts.pop(), l: parts.pop(), s: parts.join(', ') };
         } else if (parts.length === 2) {
-            return { c: parts[1], l: parts[1], s: parts[0] };
+            // Dacă adresa are doar "Oraș, Județ"
+            return { c: parts[1], l: parts[0], s: parts[0] };
         }
         return { c: "", l: "", s: clean };
     };
@@ -200,8 +201,8 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                             street: isDeliveryToLocker ? "Livrare la locker FANbox" : parsedData.street,
                             streetNo: "-", 
                             zipCode: "",
-                            // 👉 MODIFICARE AICI: FAN Courier cere "pickupLocationId" când livrezi la FANbox!
-                            ...(isDeliveryToLocker && parsedData.pudoId && { pickupLocationId: parsedData.pudoId })
+                            // 👉 REZOLVAREA: Cheia trebuie să fie "pickupLocation" EXACT cum ne-a certat eroarea
+                            ...(isDeliveryToLocker && parsedData.pudoId && { pickupLocation: parsedData.pudoId })
                         }
                     }
                 }
@@ -277,8 +278,8 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                             street: isDropOff ? "Predare la locker FANbox" : parsedData.street,
                             streetNo: "-", 
                             zipCode: "",
-                            // 👉 Pentru expeditor (când clientul lasă la locker) rămâne "dropOffLocationId" 
-                            ...(isDropOff && parsedData.pudoId && { dropOffLocationId: parsedData.pudoId })
+                            // 👉 REZOLVAREA: Și aici la retur, lăsăm doar "dropOffLocation" (fără Id)
+                            ...(isDropOff && parsedData.pudoId && { dropOffLocation: parsedData.pudoId })
                         }
                     },
                     recipient: {
