@@ -204,9 +204,9 @@ export default function Checkout() {
   }, [items]);
 
   const pickupLabel = useMemo(() => {
-    if (cartAnalysis.hasPC && cartAnalysis.hasService) return "Livrare & Ridicare Personală Karix";
-    if (cartAnalysis.hasPC) return "Livrare Personală Karix (Doar Oradea)";
-    return "Ridicare Personală Karix (Doar Oradea)";
+    if (cartAnalysis.hasPC && cartAnalysis.hasService) return "Livrare & Ridicare Personală (Doar Oradea)";
+    if (cartAnalysis.hasPC) return "Livrare Personală (Doar Oradea)";
+    return "Ridicare Personală (Doar Oradea)";
   }, [cartAnalysis]);
 
   const pickupDescription = useMemo(() => {

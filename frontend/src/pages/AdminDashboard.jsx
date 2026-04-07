@@ -7,11 +7,10 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // MODIFICARE: Fereastra acum cere detalii despre pachet și opțiunea de asigurare colet
   const [awbModal, setAwbModal] = useState({ open: false, itemId: null, orderId: null });
   const [packageWeight, setPackageWeight] = useState(1);
   const [packageCount, setPackageCount] = useState(1);
-  const [insurance, setInsurance] = useState(false); // 👉 NOU: Starea pentru asigurarea FAN Courier
+  const [insurance, setInsurance] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [confirmingOpId, setConfirmingOpId] = useState(null);
@@ -49,7 +48,6 @@ export default function AdminDashboard() {
     await executeItemUpdate(orderId, itemId, newStatus);
   };
 
-  // 👉 NOU: Am adăugat parametrul `insurance` în trimiterea spre backend
   const executeItemUpdate = async (orderId, itemId, status, weight = 1, packages = 1, isInsured = false) => {
     if (status === "predat_curier") setIsGenerating(true);
     
@@ -91,7 +89,7 @@ export default function AdminDashboard() {
       setAwbModal({ open: false, itemId: null, orderId: null });
       setPackageWeight(1);
       setPackageCount(1);
-      setInsurance(false); // Resetăm checkbox-ul
+      setInsurance(false); 
       showToast("Status actualizat cu succes!");
     } catch (err) {
       showToast(err.message, "error");
@@ -251,6 +249,39 @@ export default function AdminDashboard() {
               const isOrderOradea = order.shippingAddress?.toLowerCase().includes('oradea');
               const isPendingBankTransfer = order.paymentMethod === "transfer_bancar" && order.status === "in_asteptare_plata";
 
+              // ===============================================
+              // 👉 LOGICĂ PENTRU PARSAREA DETALIILOR DE LOGISTICĂ
+              // ===============================================
+              const rawAddress = order.shippingAddress || "";
+              const isFanbox = order.serviceDeliveryMethod === "fanbox" || rawAddress.includes("FANbox") || rawAddress.includes("Locker:");
+              const isServiceOrder = order.items?.some(item => ['service', 'mentenanta', 'curatare', 'reparatie'].some(kw => (item.productName || "").toLowerCase().includes(kw)));
+              const isOradeaF2F = order.pickupType === "KarixPersonal" || rawAddress.includes("Predare Personală");
+
+              let handoverInfo = null;
+              let returnInfo = null;
+
+              if (isOradeaF2F) {
+                  handoverInfo = { method: "📍 Predare Personală (F2F Oradea)", address: rawAddress };
+                  returnInfo = { method: "📍 Predare Personală (F2F Oradea)", address: rawAddress };
+              } else if (isServiceOrder) {
+                  if (isFanbox) {
+                      if (rawAddress.includes("| Locker:")) {
+                          const parts = rawAddress.split("| Locker:");
+                          returnInfo = { method: "🚚 Retur prin Curier (Acasă)", address: parts[0].trim() };
+                          handoverInfo = { method: "📦 Predare la FANbox", address: parts[1].trim() };
+                      } else {
+                          returnInfo = { method: "📦 Retur la FANbox", address: rawAddress };
+                          handoverInfo = { method: "📦 Predare la FANbox", address: rawAddress };
+                      }
+                  } else {
+                      handoverInfo = { method: "🚚 Preluare prin Curier de Acasă", address: rawAddress };
+                      returnInfo = { method: "🚚 Retur prin Curier Acasă", address: rawAddress };
+                  }
+              } else {
+                  returnInfo = { method: isFanbox ? "📦 Livrare la FANbox" : "🚚 Livrare Standard prin Curier", address: rawAddress };
+              }
+              // ===============================================
+
               return (
                 <div key={order.id} className="p-8 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl transition-all hover:bg-white/[0.08]">
                   <div className="flex flex-col lg:flex-row gap-10">
@@ -289,10 +320,45 @@ export default function AdminDashboard() {
                           </div>
                         )}
 
-                        <div className="mt-6 space-y-4 text-gray-300 text-xs font-bold italic">
+                        <div className="mt-6 space-y-3 text-gray-300 text-xs font-bold italic">
                           <p className="flex items-center gap-2"><span>📧</span> {order.user?.email || 'Fără Email'}</p>
                           <p className="flex items-center gap-2"><span>📞</span> {order.shippingPhone}</p>
-                          <p className="leading-relaxed flex items-start gap-2"><span>📍</span> {order.shippingAddress}</p>
+                          
+                          {/* 👉 NOU: BLOC DETALII LOGISTICĂ */}
+                          <div className="mt-4 flex flex-col gap-3 p-4 rounded-2xl bg-black/30 border border-white/5 not-italic font-sans">
+                            <h5 className="text-[10px] text-gray-500 font-black uppercase tracking-widest border-b border-white/5 pb-2 mb-1">
+                              📦 Detalii Logistică
+                            </h5>
+                            
+                            {isServiceOrder ? (
+                              <>
+                                <div>
+                                  <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block mb-1">De la Client ➔ Karix:</span>
+                                  <div className="flex items-start gap-2">
+                                     <span className="text-white font-bold text-xs">{handoverInfo.method}</span>
+                                  </div>
+                                  <p className="text-gray-400 text-[11px] mt-1 font-medium">{handoverInfo.address}</p>
+                                </div>
+                                <div className="pt-2 border-t border-white/5">
+                                  <span className="text-[9px] text-emerald-400 font-black uppercase tracking-wider block mb-1">Retur Karix ➔ Client:</span>
+                                  <div className="flex items-start gap-2">
+                                     <span className="text-white font-bold text-xs">{returnInfo.method}</span>
+                                  </div>
+                                  <p className="text-gray-400 text-[11px] mt-1 font-medium">{returnInfo.address}</p>
+                                </div>
+                              </>
+                            ) : (
+                              <div>
+                                <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block mb-1">Adresă Livrare:</span>
+                                <div className="flex items-start gap-2">
+                                   <span className="text-white font-bold text-xs">{returnInfo.method}</span>
+                                </div>
+                                <p className="text-gray-400 text-[11px] mt-1 font-medium">{returnInfo.address}</p>
+                              </div>
+                            )}
+                          </div>
+                          {/* SFÂRȘIT BLOC LOGISTICĂ */}
+
                         </div>
                       </div>
 
@@ -399,7 +465,6 @@ export default function AdminDashboard() {
                 </div>
             </div>
 
-            {/* 👉 NOU: Bifa pentru Asigurare Colet */}
             <div className="mb-8">
               <label className="flex items-center cursor-pointer group">
                 <div className="relative flex items-center justify-center">
@@ -431,7 +496,6 @@ export default function AdminDashboard() {
                 }} className="flex-1 py-4 text-gray-500 font-black uppercase text-[10px] hover:text-white transition-colors">Anulare</button>
                 <button 
                   disabled={isGenerating}
-                  // 👉 NOU: Trimitem și parametrul insurance!
                   onClick={() => executeItemUpdate(awbModal.orderId, awbModal.itemId, "predat_curier", packageWeight, packageCount, insurance)} 
                   className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black uppercase text-[10px] shadow-xl hover:bg-indigo-500 transition-colors disabled:opacity-50"
                 >
