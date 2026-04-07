@@ -174,12 +174,15 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const orderTotalRon = (order.totalCents / 100);
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : orderTotalRon;
         
+        // 👉 SOLUȚIA: Serviciul este "Standard" / "Cont Colector" pentru că pleacă de la ușa Karix!
+        const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
+
         const payload = {
             clientId: clientIdNum,
             shipments: [
                 {
                     info: {
-                        service: isDeliveryToLocker ? "FANbox" : (rambursValue > 0 ? "Cont Colector" : "Standard"),
+                        service: serviceType, 
                         packages: { parcel: parseInt(packagesCount), envelopes: 0 },
                         weight: parseInt(weight),
                         payment: "sender", 
@@ -188,8 +191,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: rambursValue,
                         declaredValue: isInsured ? orderTotalRon : 0,
-                        // Am pus înapoi "X", este corect pentru trimiterile standard Karix -> Locker
-                        options: isDeliveryToLocker ? ["X"] : [] 
+                        options: [] // 👉 Fără "V", "X" sau "W". Door-to-locker funcționează nativ.
                     },
                     recipient: {
                         name: order.shippingName,
@@ -201,7 +203,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                             street: isDeliveryToLocker ? "Livrare la locker FANbox" : parsedData.street,
                             streetNo: "-", 
                             zipCode: "",
-                            // REZOLVARE AICI: Folosim din nou pudoLocationId, API-ul așteaptă asta pentru "X"
+                            // 👉 ID-ul FANbox-ului la Destinatar rămâne `pudoLocationId`
                             ...(isDeliveryToLocker && parsedData.pudoId && { pudoLocationId: parsedData.pudoId })
                         }
                     }
