@@ -7,6 +7,51 @@ const getAuthHeaders = () => {
     return Buffer.from(`${USER}:${TOKEN}`).toString("base64");
 };
 
+// 👉 HELPER PENTRU CURĂȚAREA ADRESEI PE FACTURĂ
+const getCleanAddress = (rawAddress) => {
+    if (!rawAddress) return "România";
+    let clean = rawAddress.split("| Note:")[0].trim();
+    if (clean.includes("| Locker:")) {
+        clean = clean.split("| Locker:")[0].trim();
+    }
+    // Mai putem adăuga curățare pentru prefixul de locker manual dacă există
+    clean = clean.replace(/Locker FANbox:.*?($|-)/i, '').trim();
+    // Dacă după curățare rămân virgule inutile la final
+    clean = clean.replace(/,\s*$/, "");
+    return clean || "România";
+};
+
+// 👉 HELPER PENTRU ADAUGAREA TRANSPORTULUI CA PRODUS
+const buildProductsList = (items, shippingCents) => {
+    const products = (items || []).map(item => ({
+        name: item.productName || item.name || "Produs Karix",
+        code: String(item.productId || item.id || "00"),
+        measuringUnitName: "buc",
+        currency: "RON",
+        quantity: Number(item.qty || 1),
+        price: Number(((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2)), 
+        isTaxIncluded: false
+    }));
+
+    // Dacă avem un cost de transport, adăugăm o linie separată pe factură
+    if (shippingCents && Number(shippingCents) > 0) {
+        products.push({
+            name: "Servicii de curierat",
+            code: "TRANSPORT",
+            measuringUnitName: "buc",
+            currency: "RON",
+            quantity: 1,
+            price: Number((Number(shippingCents) / 100).toFixed(2)),
+            isTaxIncluded: false
+        });
+    }
+
+    return products;
+};
+
+// ==========================================
+// 1. CREARE FACTURĂ FISCALĂ FINALĂ
+// ==========================================
 export const createSmartBillInvoice = async (order) => {
     try {
         console.log("=== 1. START SMARTBILL INVOICE ===");
@@ -15,9 +60,7 @@ export const createSmartBillInvoice = async (order) => {
         const SERIA = (process.env.SMARTBILL_SERIA || "").trim();
         const auth = getAuthHeaders();
         
-        // 👉 TĂIEM NOTIȚA CA SĂ NU APARĂ PE FACTURĂ
-        const rawAddress = order.shippingAddress || "România";
-        const cleanAddress = rawAddress.split("| Note:")[0].trim();
+        const cleanAddress = getCleanAddress(order.shippingAddress);
 
         const clientObj = {
             name: order.isCompany ? order.companyName : (order.shippingName || "Client Karix"),
@@ -30,16 +73,11 @@ export const createSmartBillInvoice = async (order) => {
         if (order.isCompany && order.cui) {
             clientObj.vatCode = order.cui;
         }
+        if (order.isCompany && order.regCom) {
+            clientObj.regCom = order.regCom;
+        }
 
-        const products = (order.items || []).map(item => ({
-            name: item.productName || "Produs Karix",
-            code: String(item.productId || "00"),
-            measuringUnitName: "buc",
-            currency: "RON",
-            quantity: Number(item.qty || 1),
-            price: Number(((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2)), 
-            isTaxIncluded: false
-        }));
+        const products = buildProductsList(order.items, order.shippingCents);
 
         const payload = {
             companyVatCode: CUI,
@@ -70,11 +108,14 @@ export const createSmartBillInvoice = async (order) => {
         return data;
 
     } catch (error) {
-        console.log("=== CRASH ===", error.message);
+        console.log("=== CRASH INVOICE ===", error.message);
         return null;
     }
 };
 
+// ==========================================
+// 2. DESCĂRCARE PDF FACTURĂ FINALĂ
+// ==========================================
 export const getSmartBillPdf = async (seriesName, number) => {
     try {
         const CUI = (process.env.SMARTBILL_CUI || "").trim();
@@ -100,25 +141,28 @@ export const getSmartBillPdf = async (seriesName, number) => {
 };
 
 // ==========================================
-// 🚀 FUNCȚII NOI PENTRU PROFORME (ESTIMATE)
+// 3. CREARE PROFORMĂ (ESTIMATE)
 // ==========================================
-
 export const createSmartBillProforma = async (order, clientData, cartItems) => {
     try {
         console.log("=== 1. START SMARTBILL PROFORMA ===");
         
         const CUI = (process.env.SMARTBILL_CUI || "").trim();
-        // IDEAL: Să ai o serie separată pentru proforme în .env (ex: SMARTBILL_PROFORMA_SERIA=PROF)
         const SERIA_PROFORMA = (process.env.SMARTBILL_PROFORMA_SERIA || process.env.SMARTBILL_SERIA || "").trim();
         const auth = getAuthHeaders();
         
-        // 👉 TĂIEM NOTIȚA CA SĂ NU APARĂ PE PROFORMĂ
+        // Formăm adresa inițială combinând componentele din checkout, apoi o curățăm
         const rawAddress = `${clientData.addressDetails}, ${clientData.city}, ${clientData.county}`;
-        const cleanAddress = rawAddress.split("| Note:")[0].trim();
+        let cleanAddress = getCleanAddress(rawAddress);
+        
+        // Extra fallback dacă formatarea a rezultat într-un string gol sau doar virgule
+        if (!cleanAddress || cleanAddress.trim() === "," || cleanAddress.trim() === ", ,") {
+            cleanAddress = "România";
+        }
 
         const clientObj = {
             name: clientData.isCompany ? clientData.companyName : (clientData.name || "Client Karix"),
-            address: cleanAddress || "România",
+            address: cleanAddress,
             country: "Romania",
             isTaxPayer: !!clientData.isCompany,
             saveToDb: false
@@ -127,18 +171,13 @@ export const createSmartBillProforma = async (order, clientData, cartItems) => {
         if (clientData.isCompany && clientData.cui) {
             clientObj.vatCode = clientData.cui;
         }
+        if (clientData.isCompany && clientData.regCom) {
+            clientObj.regCom = clientData.regCom;
+        }
 
-        const products = (cartItems || []).map(item => ({
-            name: item.productName || item.name || "Produs Karix",
-            code: String(item.id || item.productId || "00"),
-            measuringUnitName: "buc",
-            currency: "RON",
-            quantity: Number(item.qty || 1),
-            price: Number(((item.priceCentsAtBuy || item.priceCents || 0) / 100).toFixed(2)), 
-            isTaxIncluded: false
-        }));
+        // Construim produsele folosind funcția helper și shippingCents
+        const products = buildProductsList(cartItems, order.shippingCents);
 
-        // Setăm data scadentă (7 zile de la emitere)
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 7);
 
@@ -152,7 +191,6 @@ export const createSmartBillProforma = async (order, clientData, cartItems) => {
             products: products
         };
 
-        // SmartBill folosește /estimate pentru proforme
         const response = await fetch("https://ws.smartbill.ro/SBORO/api/estimate", {
             method: "POST",
             headers: {
@@ -178,12 +216,14 @@ export const createSmartBillProforma = async (order, clientData, cartItems) => {
     }
 };
 
+// ==========================================
+// 4. DESCĂRCARE PDF PROFORMĂ
+// ==========================================
 export const getSmartBillProformaPdf = async (seriesName, number) => {
     try {
         const CUI = (process.env.SMARTBILL_CUI || "").trim();
         const auth = getAuthHeaders();
         
-        // Endpoint diferit pentru PDF-ul de proformă
         const url = `https://ws.smartbill.ro/SBORO/api/estimate/pdf?cif=${CUI}&seriesname=${seriesName}&number=${number}`;
         
         const response = await fetch(url, {
