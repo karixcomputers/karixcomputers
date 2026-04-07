@@ -190,10 +190,10 @@ router.patch("/:id/cancel", requireAuth, async (req, res, next) => {
 router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { itemId } = req.params;
-    const { status, awb, weight, packages, insurance, forceFanbox } = req.body; // 👉 Adăugat forceFanbox
+    const { status, awb, weight, packages, insurance, forceFanbox } = req.body; 
 
     const currentItem = await prisma.orderItem.findUnique({
-      where: { id: parseInt(itemId) },
+      where: { id: itemId }, // 👉 REZOLVAT: Am scos parseInt(), lăsăm String-ul nativ
       include: { order: { include: { user: true, items: true } } }
     });
 
@@ -215,7 +215,7 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
                     weight || 1, 
                     packages || 1, 
                     insurance || false,
-                    forceFanbox || false // 👉 Transmitem intenția clară de FANbox
+                    forceFanbox || false
                 );
                 
                 await prisma.order.update({
@@ -230,7 +230,7 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
     }
 
     let updatedItem = await prisma.orderItem.update({
-      where: { id: parseInt(itemId) },
+      where: { id: itemId }, // 👉 REZOLVAT: Am scos parseInt()
       data: { status, awb: generatedAwb },
       include: { order: { include: { items: true, user: { select: { email: true } } } } }
     });
