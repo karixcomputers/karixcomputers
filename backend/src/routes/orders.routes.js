@@ -193,7 +193,7 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
     const { status, awb, weight, packages, insurance, forceFanbox } = req.body; 
 
     const currentItem = await prisma.orderItem.findUnique({
-      where: { id: itemId }, // 👉 REZOLVAT: Am scos parseInt(), lăsăm String-ul nativ
+      where: { id: itemId }, 
       include: { order: { include: { user: true, items: true } } }
     });
 
@@ -215,13 +215,11 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
                     weight || 1, 
                     packages || 1, 
                     insurance || false,
-                    forceFanbox || false
+                    forceFanbox || false 
                 );
                 
-                await prisma.order.update({
-                    where: { id: order.id },
-                    data: { awb: generatedAwb }
-                });
+                // Am șters prisma.order.update({ data: { awb: generatedAwb } }) de aici!
+                
             } catch (awbError) {
                 console.error("❌ Eroare auto-generare AWB (Karix->Client):", awbError);
                 return res.status(500).json({ error: awbError.message || "Eroare generare AWB" });
@@ -229,8 +227,9 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
         }
     }
 
+    // AWB-ul se salvează AICI la nivel de OrderItem, unde coloana "awb" chiar există
     let updatedItem = await prisma.orderItem.update({
-      where: { id: itemId }, // 👉 REZOLVAT: Am scos parseInt()
+      where: { id: itemId },
       data: { status, awb: generatedAwb },
       include: { order: { include: { items: true, user: { select: { email: true } } } } }
     });
