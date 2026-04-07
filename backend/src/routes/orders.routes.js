@@ -19,7 +19,8 @@ import {
   sendAssemblyOrderPlaced,
   sendAdminAssemblyAlert,
   sendFanboxInstructionsEmail,
-  sendFanboxCheckoutEmail
+  sendFanboxCheckoutEmail,
+  sendServiceOpConfirmedEmail
 } from "../services/mail.service.js";
 
 import { createFanAWB, createReverseFanAWB } from "../services/fancourier.service.js";
@@ -565,11 +566,20 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
       }
     });
 
-    if (hasService && isFanbox) {
-        const isReturnToLocker = !rawOrderAddress.includes("| Locker:");
-        await sendFanboxInstructionsEmail(order.user.email, order, isReturnToLocker, pdfBuffer);
+    // 👉 AICI E LOGICA NOUĂ PENTRU EMAIL
+    if (hasService) {
+        // SCENARIU SERVICE: Trimitem template-ul specific pentru OP Service
+        const mailData = {
+            customerName: order.shippingName,
+            orderId: order.id,
+            isFanbox: isFanbox,
+            isOradea: isOradea,
+            reverseAwb: reverseAwb
+        };
+        await sendServiceOpConfirmedEmail(order.user.email, mailData, pdfBuffer).catch(err => console.error(err));
     } else {
-        await sendFinalInvoiceEmail(order.user.email, order, pdfBuffer);
+        // SCENARIU PC NOU (Hardware Standard): Trimitem template-ul original (Final Invoice Email)
+        await sendFinalInvoiceEmail(order.user.email, order, pdfBuffer).catch(err => console.error(err));
     }
 
     res.json({ success: true, reverseAwb: reverseAwb });

@@ -1171,3 +1171,49 @@ export async function sendFanboxCheckoutEmail(to, orderData) {
     console.error("❌ Eroare sendFanboxCheckoutEmail:", err);
   }
 }
+
+// ============================================================
+// 🚀 NOU: FUNCȚIE CONFIRMARE OP PENTRU SERVICE
+// ============================================================
+export async function sendServiceOpConfirmedEmail(to, data, pdfBuffer) {
+  try {
+    const tpl = loadTemplate("service_op_confirmed.html");
+    
+    // Înlocuim variabilele simple
+    let html = render(tpl, {
+        customerName: data.customerName,
+        orderId: data.orderId,
+        reverseAwb: data.reverseAwb || "În procesare"
+    });
+
+    // Simulăm logica de {{#if isFanbox}} din Handlebars prin regex
+    // Păstrăm doar blocul HTML aferent opțiunii selectate
+    if (data.isFanbox) {
+        html = html.replace(/{{#if isFanbox}}([\s\S]*?){{else if isOradea}}[\s\S]*?{{else}}[\s\S]*?{{\/if}}/g, "$1");
+    } else if (data.isOradea) {
+        html = html.replace(/{{#if isFanbox}}[\s\S]*?{{else if isOradea}}([\s\S]*?){{else}}[\s\S]*?{{\/if}}/g, "$1");
+    } else {
+        html = html.replace(/{{#if isFanbox}}[\s\S]*?{{else if isOradea}}[\s\S]*?{{else}}([\s\S]*?){{\/if}}/g, "$1");
+    }
+
+    const mailOptions = {
+        to,
+        subject: `✅ Plată confirmată - Pregătire Service #${data.orderId}`,
+        html,
+        attachments: []
+    };
+
+    if (pdfBuffer) {
+        mailOptions.attachments.push({
+            filename: `Factura_Karix_${data.orderId}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf'
+        });
+    }
+
+    await sendHtmlMail(mailOptions);
+    console.log(`✅ MAIL OP SERVICE TRIMIS LA: ${to}`);
+  } catch (err) {
+    console.error("❌ Eroare sendServiceOpConfirmedEmail:", err);
+  }
+}
