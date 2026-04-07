@@ -107,7 +107,7 @@ function parseAddresses(rawAddress, providedPudoId) {
 
     const extract = (str) => {
         if (!str) return null;
-        let clean = str.replace(/,\s*rom[aâ]nia$/i, '').trim(); // Ștergem cuvântul România
+        let clean = str.replace(/,\s*rom[aâ]nia$/i, '').trim(); 
         if (clean.includes("| Note:")) clean = clean.split("| Note:")[0].trim();
         if (clean.includes("Locker FANbox:")) {
             const p = clean.split("-");
@@ -132,19 +132,16 @@ function parseAddresses(rawAddress, providedPudoId) {
     let locality = "Bucuresti";
     let street = homeStr;
 
-    // 1. Încercăm să luăm județul din adresa de casă
     if (extHome && extHome.c && !isInvalid(extHome.c)) {
         county = extHome.c;
         locality = extHome.l;
         street = extHome.s;
     } 
-    // 2. Dacă e "Fanbox", încercăm să luăm județul din adresa lockerului!
     else if (extLocker && extLocker.c && !isInvalid(extLocker.c)) {
         county = extLocker.c;
         locality = extLocker.l;
         street = extLocker.s;
     } 
-    // 3. Fallback extrem
     else {
         if (extHome && extHome.s && !isInvalid(extHome.s)) street = extHome.s;
     }
@@ -191,7 +188,6 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: rambursValue,
                         declaredValue: isInsured ? orderTotalRon : 0,
-                        // 👉 SOLUȚIA AICI: "V" înseamnă PickUp (curierul ridică de la sediul tău)
                         options: isDeliveryToLocker ? ["V"] : [] 
                     },
                     recipient: {
@@ -204,7 +200,8 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                             street: isDeliveryToLocker ? "Livrare la locker FANbox" : parsedData.street,
                             streetNo: "-", 
                             zipCode: "",
-                            ...(isDeliveryToLocker && parsedData.pudoId && { pudoLocationId: parsedData.pudoId })
+                            // 👉 MODIFICARE AICI: FAN Courier cere "pickupLocationId" când livrezi la FANbox!
+                            ...(isDeliveryToLocker && parsedData.pudoId && { pickupLocationId: parsedData.pudoId })
                         }
                     }
                 }
@@ -267,7 +264,6 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: 0,
                         declaredValue: 0,
-                        // 👉 Pentru retur clientul folosește DropOff, deci rămâne corect "W"
                         options: isDropOff ? ["W"] : []
                     },
                     sender: {
@@ -281,6 +277,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                             street: isDropOff ? "Predare la locker FANbox" : parsedData.street,
                             streetNo: "-", 
                             zipCode: "",
+                            // 👉 Pentru expeditor (când clientul lasă la locker) rămâne "dropOffLocationId" 
                             ...(isDropOff && parsedData.pudoId && { dropOffLocationId: parsedData.pudoId })
                         }
                     },
