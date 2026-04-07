@@ -123,7 +123,6 @@ function parseAddresses(rawAddress, providedPudoId) {
         return { c: "", l: "", s: clean };
     };
 
-    // Funcție să vedem dacă am extras "Fanbox" în loc de județ valid
     const isInvalid = (val) => !val || val.toLowerCase().includes("fanbox") || val.toLowerCase().includes("locker");
 
     let extHome = extract(homeStr);
@@ -145,7 +144,7 @@ function parseAddresses(rawAddress, providedPudoId) {
         locality = extLocker.l;
         street = extLocker.s;
     } 
-    // 3. Fallback extrem (județ rămâne Bucuresti ca să nu crape API-ul)
+    // 3. Fallback extrem
     else {
         if (extHome && extHome.s && !isInvalid(extHome.s)) street = extHome.s;
     }
@@ -192,7 +191,8 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: rambursValue,
                         declaredValue: isInsured ? orderTotalRon : 0,
-                        options: isDeliveryToLocker ? ["X"] : []
+                        // 👉 SOLUȚIA AICI: "V" înseamnă PickUp (curierul ridică de la sediul tău)
+                        options: isDeliveryToLocker ? ["V"] : [] 
                     },
                     recipient: {
                         name: order.shippingName,
@@ -267,6 +267,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: 0,
                         declaredValue: 0,
+                        // 👉 Pentru retur clientul folosește DropOff, deci rămâne corect "W"
                         options: isDropOff ? ["W"] : []
                     },
                     sender: {
