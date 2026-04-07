@@ -105,26 +105,49 @@ function parseAddresses(rawAddress, providedPudoId) {
         if (match) finalPudoId = match[0];
     }
 
-    if (homeStr.includes("| Note:")) homeStr = homeStr.split("| Note:")[0].trim();
-    if (homeStr.includes("Locker FANbox:")) {
-        const p = homeStr.split("-");
-        if (p.length > 1) homeStr = p.slice(1).join("-").trim();
-    }
+    const extract = (str) => {
+        if (!str) return null;
+        let clean = str.replace(/,\s*rom[aâ]nia$/i, '').trim(); // Ștergem cuvântul România
+        if (clean.includes("| Note:")) clean = clean.split("| Note:")[0].trim();
+        if (clean.includes("Locker FANbox:")) {
+            const p = clean.split("-");
+            if (p.length > 1) clean = p.slice(1).join("-").trim();
+        }
 
-    // 👉 ELIMINĂM "Romania" pentru a nu strica județul
-    homeStr = homeStr.replace(/,\s*rom[aâ]nia$/i, '').trim();
+        const parts = clean.split(',').map(s => s.trim()).filter(Boolean);
+        if (parts.length >= 3) {
+            return { c: parts.pop(), l: parts.pop(), s: parts.join(', ') };
+        } else if (parts.length === 2) {
+            return { c: parts[1], l: parts[1], s: parts[0] };
+        }
+        return { c: "", l: "", s: clean };
+    };
 
-    let county = "Bucuresti", locality = "Bucuresti", street = homeStr;
-    const addrParts = homeStr.split(',').map(s => s.trim()).filter(Boolean);
-    
-    if (addrParts.length >= 3) {
-         county = addrParts.pop(); 
-         locality = addrParts.pop(); 
-         street = addrParts.join(', '); 
-    } else if (addrParts.length === 2) {
-         county = addrParts[1];
-         locality = addrParts[1];
-         street = addrParts[0];
+    // Funcție să vedem dacă am extras "Fanbox" în loc de județ valid
+    const isInvalid = (val) => !val || val.toLowerCase().includes("fanbox") || val.toLowerCase().includes("locker");
+
+    let extHome = extract(homeStr);
+    let extLocker = extract(lockerStr);
+
+    let county = "Bucuresti";
+    let locality = "Bucuresti";
+    let street = homeStr;
+
+    // 1. Încercăm să luăm județul din adresa de casă
+    if (extHome && extHome.c && !isInvalid(extHome.c)) {
+        county = extHome.c;
+        locality = extHome.l;
+        street = extHome.s;
+    } 
+    // 2. Dacă e "Fanbox", încercăm să luăm județul din adresa lockerului!
+    else if (extLocker && extLocker.c && !isInvalid(extLocker.c)) {
+        county = extLocker.c;
+        locality = extLocker.l;
+        street = extLocker.s;
+    } 
+    // 3. Fallback extrem (județ rămâne Bucuresti ca să nu crape API-ul)
+    else {
+        if (extHome && extHome.s && !isInvalid(extHome.s)) street = extHome.s;
     }
 
     return {
