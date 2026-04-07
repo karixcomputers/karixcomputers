@@ -118,7 +118,6 @@ function parseAddresses(rawAddress, providedPudoId) {
         if (parts.length >= 3) {
             return { c: parts.pop(), l: parts.pop(), s: parts.join(', ') };
         } else if (parts.length === 2) {
-            // Dacă adresa are doar "Oraș, Județ"
             return { c: parts[1], l: parts[0], s: parts[0] };
         }
         return { c: "", l: "", s: clean };
@@ -189,7 +188,8 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: rambursValue,
                         declaredValue: isInsured ? orderTotalRon : 0,
-                        options: isDeliveryToLocker ? ["V"] : [] 
+                        // Am pus înapoi "X", este corect pentru trimiterile standard Karix -> Locker
+                        options: isDeliveryToLocker ? ["X"] : [] 
                     },
                     recipient: {
                         name: order.shippingName,
@@ -201,8 +201,8 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                             street: isDeliveryToLocker ? "Livrare la locker FANbox" : parsedData.street,
                             streetNo: "-", 
                             zipCode: "",
-                            // 👉 REZOLVAREA: Cheia trebuie să fie "pickupLocation" EXACT cum ne-a certat eroarea
-                            ...(isDeliveryToLocker && parsedData.pudoId && { pickupLocation: parsedData.pudoId })
+                            // REZOLVARE AICI: Folosim din nou pudoLocationId, API-ul așteaptă asta pentru "X"
+                            ...(isDeliveryToLocker && parsedData.pudoId && { pudoLocationId: parsedData.pudoId })
                         }
                     }
                 }
@@ -278,8 +278,7 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                             street: isDropOff ? "Predare la locker FANbox" : parsedData.street,
                             streetNo: "-", 
                             zipCode: "",
-                            // 👉 REZOLVAREA: Și aici la retur, lăsăm doar "dropOffLocation" (fără Id)
-                            ...(isDropOff && parsedData.pudoId && { dropOffLocation: parsedData.pudoId })
+                            ...(isDropOff && parsedData.pudoId && { dropOffLocationId: parsedData.pudoId })
                         }
                     },
                     recipient: {
