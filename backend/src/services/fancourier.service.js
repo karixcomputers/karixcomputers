@@ -182,7 +182,8 @@ function parseAddresses(rawAddress, providedPudoId) {
 // ==========================================
 // 2. GENERARE AWB STANDARD (Karix -> Client)
 // ==========================================
-export async function createFanAWB(order, isTestMode = false, weight = 1, packagesCount = 1, isInsured = false, forceFanbox = false) { 
+// 👉 NOU: Am adăugat customDeclaredValue ca ultim parametru
+export async function createFanAWB(order, isTestMode = false, weight = 1, packagesCount = 1, isInsured = false, forceFanbox = false, customDeclaredValue = null) { 
     if (isTestMode) return `TEST_AWB_${Math.floor(Math.random() * 100000000)}`; 
 
     try {
@@ -199,6 +200,18 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : orderTotalRon;
         const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
 
+        // 👉 NOU: Logica de stabilire a valorii declarate (pentru asigurare)
+        let finalDeclaredValue = 0;
+        if (isInsured) {
+            // Dacă din Admin ți-a venit o valoare specifică (ex: 20000 lei pentru piesele de Asamblare)
+            if (customDeclaredValue !== null && !isNaN(customDeclaredValue)) {
+                finalDeclaredValue = Number(customDeclaredValue);
+            } else {
+                // Dacă nu, folosește valoarea coșului (cum era înainte)
+                finalDeclaredValue = orderTotalRon;
+            }
+        }
+
         const payload = {
             clientId: clientIdNum,
             shipments: [
@@ -212,7 +225,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         content: "Sistem PC / Componente Hardware",
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: rambursValue,
-                        declaredValue: isInsured ? orderTotalRon : 0,
+                        declaredValue: finalDeclaredValue, // Acum folosește valoarea calculată inteligent mai sus
                         options: [] 
                     },
                     recipient: {

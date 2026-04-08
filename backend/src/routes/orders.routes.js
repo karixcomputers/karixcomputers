@@ -23,7 +23,7 @@ import {
   sendServiceOpConfirmedEmail,
   sendAssemblyOpPlacedEmail,
   sendAssemblyOpConfirmedEmail,
-  sendAssemblyInPossessionEmail // 👉 NOU
+  sendAssemblyInPossessionEmail
 } from "../services/mail.service.js";
 
 import { createFanAWB, createReverseFanAWB } from "../services/fancourier.service.js";
@@ -194,7 +194,8 @@ router.patch("/:id/cancel", requireAuth, async (req, res, next) => {
 router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { itemId } = req.params;
-    const { status, awb, weight, packages, insurance, forceFanbox } = req.body; 
+    // 👉 Preluăm declaredValue din body (poate fi null dacă nu e completat)
+    const { status, awb, weight, packages, insurance, forceFanbox, declaredValue } = req.body; 
 
     const currentItem = await prisma.orderItem.findUnique({
       where: { id: itemId }, 
@@ -212,8 +213,9 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
     if (status === 'predat_curier' && !generatedAwb) {
         if (!isOradea) {
             try {
+                // 👉 Trimitem și declaredValue mai departe
                 generatedAwb = await createFanAWB(
-                    order, false, weight || 1, packages || 1, insurance || false, forceFanbox || false 
+                    order, false, weight || 1, packages || 1, insurance || false, forceFanbox || false, declaredValue
                 );
             } catch (awbError) {
                 console.error("❌ Eroare auto-generare AWB:", awbError);
@@ -259,7 +261,6 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
       phone: updatedItem.order.shippingPhone
     };
 
-// 👉 LOGICĂ DE EMAIL ACTUALIZATĂ PENTRU STATUSURI (INCLUSIV ASAMBLARE)
     if (status === "posesie") {
       if (isAssembly) {
           await sendAssemblyInPossessionEmail(userEmail, emailData).catch(err => console.error(err));
@@ -278,7 +279,6 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
       }
     } 
     else if (status === "gata_de_livrare") {
-      // ✅ REPARAT: Acum include PC-urile Noi și Asamblarea (indiferent dacă e Oradea sau Curier)
       if (!isService || isOradea) {
         await sendOrderReadyEmail(userEmail, emailData).catch(err => console.error(err));
       }
@@ -287,7 +287,6 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
       if (isService) {
         await sendServiceShippedBackEmail(userEmail, emailData).catch(err => console.error(err));
       } else {
-        // Aceasta trimite mail cu AWB și pentru PC-uri și pentru Asamblare Finalizată care pleacă prin Curier
         await sendOrderShippedEmail(userEmail, emailData).catch(err => console.error(err));
       }
     }
