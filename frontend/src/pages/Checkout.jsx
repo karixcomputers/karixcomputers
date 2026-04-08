@@ -109,7 +109,7 @@ const notifyDiscord = async (orderData, coupon) => {
 };
 
 export default function Checkout() {
-  const { items, clearCart } = useCart();
+  const { items, clearCart, totalCents } = useCart();
   const { user, accessToken } = useAuth();
   const nav = useNavigate();
   const location = useLocation(); 
@@ -181,7 +181,6 @@ export default function Checkout() {
     });
   }, [items]);
 
-  // 👉 NOU: Logica inteligentă pentru numărarea dispozitivelor de bază
   const cartAnalysis = useMemo(() => {
     const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick', 'upgrade', 'instalare', 'reinstalare', 'windows', 'software', 'bios', 'recuperare'];
     
@@ -192,7 +191,13 @@ export default function Checkout() {
       const nameStr = (item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const isSrv = item.category === 'service' || isServiceKeywords.some(kw => nameStr.includes(kw));
       if (!isSrv) {
-        hardwareSubtotal += ((item.priceCentsAtBuy || item.priceCents || 0) * (item.qty || 1));
+        // 👉 Aici calculăm hardwareSubtotal cu prețul final (care include deja garanția)
+        const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
+        let extraWarrantyPrice = 0;
+        if (item.extendedWarranty === 1) extraWarrantyPrice = Math.round(basePrice * 0.09);
+        if (item.extendedWarranty === 2) extraWarrantyPrice = Math.round(basePrice * 0.16);
+        
+        hardwareSubtotal += ((basePrice + extraWarrantyPrice) * (item.qty || 1));
         return true;
       }
       return false;
@@ -203,7 +208,6 @@ export default function Checkout() {
       
       const isSrv = item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => nameStr.includes(kw)));
       
-      // Dacă e serviciu, verificăm dacă e un DEVICE de bază sau doar un upgrade
       if (isSrv) {
         const addonKeywords = ['upgrade', 'asamblare', 'instalare', 'reinstalare', 'windows', 'software', 'recuperare', 'devirusare', 'bios'];
         const isAddon = addonKeywords.some(kw => nameStr.includes(kw));
@@ -276,17 +280,13 @@ export default function Checkout() {
     return JUDETE.filter(j => j.toLowerCase().startsWith(input));
   }, [shipping.county]);
 
-  const currentSubtotal = useMemo(() => {
-    return items.reduce((acc, item) => acc + ((item.priceCentsAtBuy || item.priceCents || 0) * (item.qty || 1)), 0);
-  }, [items]);
-
   const discountCents = useMemo(() => {
     if (!appliedCoupon) return 0;
     if (appliedCoupon.discountType === "percentage") {
-      return Math.round(currentSubtotal * (appliedCoupon.discountValue / 100));
+      return Math.round(totalCents * (appliedCoupon.discountValue / 100));
     }
     return appliedCoupon.discountValue; 
-  }, [appliedCoupon, currentSubtotal]);
+  }, [appliedCoupon, totalCents]);
 
   const shippingCents = useMemo(() => {
     if (pickupByKarix) return 0; 
@@ -305,7 +305,7 @@ export default function Checkout() {
     return cost;
   }, [pickupByKarix, cartAnalysis, isAssemblyOrder, serviceDeliveryMethod]);
 
-  const totalCents = Math.max(0, currentSubtotal - discountCents + shippingCents);
+  const finalTotalCents = Math.max(0, totalCents - discountCents + shippingCents);
 
   const handleSwitchToCompany = () => {
     setShipping(s => ({ ...s, isCompany: true, phone: "" }));
@@ -417,19 +417,29 @@ export default function Checkout() {
       const isService = item.category === 'service' || 
                         ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => nameStr.includes(kw));
       
-      let finalWarranty = 0;
-      if (!isService) {
-          let baseWarranty = (item.warrantyMonths !== undefined && item.warrantyMonths !== null) 
-                             ? parseInt(item.warrantyMonths) : 24;
-          finalWarranty = shipping.isCompany ? Math.min(baseWarranty, 12) : baseWarranty;
+      const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
+      let extraWarrantyPrice = 0;
+      if (item.extendedWarranty === 1) extraWarrantyPrice = Math.round(basePrice * 0.09);
+      if (item.extendedWarranty === 2) extraWarrantyPrice = Math.round(basePrice * 0.16);
+
+      let baseWarrantyMonths = item.warrantyMonths || 24;
+      let addedMonths = item.extendedWarranty === 1 ? 12 : (item.extendedWarranty === 2 ? 24 : 0);
+      let finalWarranty = isService ? 0 : (baseWarrantyMonths + addedMonths);
+
+      if (shipping.isCompany && !isService) {
+          finalWarranty = Math.min(baseWarrantyMonths, 12) + addedMonths;
       }
+
+      let extraText = "";
+      if (item.extendedWarranty === 1) extraText = " (+ Garanție Extinsă 1 An)";
+      if (item.extendedWarranty === 2) extraText = " (+ Garanție Extinsă 2 Ani)";
 
       return {
         ...item,
         id: item.id,
-        productName: item.name || item.productName, 
+        productName: (item.name || item.productName) + extraText, 
         qty: parseInt(item.qty || item.quantity || 1),
-        priceCentsAtBuy: parseInt(item.priceCents || item.priceCentsAtBuy || 0),
+        priceCentsAtBuy: basePrice + extraWarrantyPrice,
         warrantyMonths: finalWarranty
       };
     });
@@ -463,7 +473,7 @@ export default function Checkout() {
         ...serviceOpts 
       }, 
       cartItems: enrichedItems,
-      total: totalCents, 
+      total: finalTotalCents, 
       shippingCents: shippingCents,
       userEmail: user?.email, 
       pickupType: pickupByKarix ? "KarixPersonal" : "Courier",
@@ -876,7 +886,6 @@ export default function Checkout() {
 
                           <div className="md:col-span-2 space-y-2">
                             <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
-                            {/* 👉 Am scos limitările pentru a putea scrie mereu adresa exactă, chiar și pe Oradea */}
                             <textarea className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600`} value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc, Apartament unde venim noi sau livrăm..." />
                           </div>
                         </>
@@ -960,7 +969,7 @@ export default function Checkout() {
                   <div className="flex justify-between items-baseline">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total de Plată</span>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">{formatRON(totalCents).split(' ')[0]}</span>
+                      <span className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">{formatRON(finalTotalCents).split(' ')[0]}</span>
                       <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">RON</span>
                     </div>
                   </div>

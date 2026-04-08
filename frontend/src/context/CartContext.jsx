@@ -29,10 +29,17 @@ export const CartProvider = ({ children }) => {
     setItems([]); 
   };
 
+  // 👉 AICI: Recalculăm Totalul coșului incluzând și valoarea garanției extinse
   const totalCents = useMemo(() => {
     return items.reduce((acc, item) => {
-      const price = item.priceCentsAtBuy || item.priceCents || 0;
-      return acc + (price * item.qty);
+      const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
+      
+      let extraWarrantyPrice = 0;
+      if (item.extendedWarranty === 1) extraWarrantyPrice = Math.round(basePrice * 0.09);
+      if (item.extendedWarranty === 2) extraWarrantyPrice = Math.round(basePrice * 0.16);
+
+      const finalPrice = basePrice + extraWarrantyPrice;
+      return acc + (finalPrice * item.qty);
     }, 0);
   }, [items]);
 
@@ -44,7 +51,6 @@ export const CartProvider = ({ children }) => {
     }, 5000); 
   };
 
-  // Verifică dacă produsul face parte din spectrul mare de "Servicii"
   const isProductService = (product) => {
     if (product.category === 'service') return true;
     const nameStr = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -52,24 +58,19 @@ export const CartProvider = ({ children }) => {
     return serviceKeywords.some(kw => nameStr.includes(kw));
   };
 
-  // Verifică dacă produsul este o "Asamblare"
   const isProductAssembly = (product) => {
     const nameStr = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return nameStr.includes("asamblare");
   };
 
-  // 👉 NOU: Verifică dacă produsul reprezintă un "Dispozitiv de bază" pentru service (Nu e un upgrade adiacent)
   const isBaseDeviceService = (product) => {
     const nameStr = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    // Un upgrade NU reprezintă un dispozitiv fizic extra
     if (nameStr.includes("upgrade")) return false; 
     
-    // Lista de cuvinte cheie care indică faptul că se aduce un dispozitiv ÎNTREG la service
     const baseKeywords = ['mentenanta', 'reparatie', 'curatare', 'diagnosticare', 'service', 'instalare', 'reinstalare', 'recuperare', 'windows'];
     return baseKeywords.some(kw => nameStr.includes(kw));
   };
 
-  // Numărăm EXACT câte "Dispozitive de bază" avem în coș (Nu și upgrade-urile lipite de ele)
   const countTotalDevicesInCart = (cartArray) => {
     return cartArray.reduce((total, i) => {
       if (isBaseDeviceService(i) && !isProductAssembly(i)) {
@@ -82,6 +83,8 @@ export const CartProvider = ({ children }) => {
   const performAdd = (product, clearPrevious = false) => {
     setItems((prev) => {
       const currentCart = clearPrevious ? [] : prev;
+      // La căutarea dublurilor, acum luăm în calcul și ID-ul (pentru a putea adăuga același PC de 2 ori cu garanții diferite dacă e nevoie)
+      // Dar pentru simplitate și comportamentul actual de coș, doar îi creștem cantitatea
       const exists = currentCart.find((i) => i.id === product.id);
       
       const actualPrice = product.priceCents || product.price || product.totalCents || 0;
@@ -107,12 +110,14 @@ export const CartProvider = ({ children }) => {
           productName: product.name || product.productName, 
           name: product.name || product.productName,
           category: product.category || (isSrv ? "service" : "pc"),
-          priceCents: actualPrice,
+          basePriceCents: actualPrice, // 👉 Salvăm prețul de bază separat
+          priceCents: actualPrice, // Păstrăm fallback pentru restul aplicației
           priceCentsAtBuy: actualPrice,
           images: finalImages, 
           imageUrl: finalImageUrl, 
           specs: product.specs || {},
-          warrantyMonths: product.warrantyMonths, 
+          warrantyMonths: product.warrantyMonths || (isSrv ? 0 : 24), 
+          extendedWarranty: 0, // 👉 Setăm valoarea implicită pentru Garanția Extinsă
           qty: qtyToAdd 
         }];
       }
@@ -180,6 +185,15 @@ export const CartProvider = ({ children }) => {
     });
   };
 
+  // 👉 NOU: Funcția care actualizează garanția pe un anume item din coș
+  const updateItemWarranty = (id, warrantyLevel) => {
+    setItems((prev) => 
+      prev.map((i) => 
+        i.id === id ? { ...i, extendedWarranty: warrantyLevel } : i
+      )
+    );
+  };
+
   const confirmReplaceCart = () => {
     if (conflictModal.pendingProduct) {
       performAdd(conflictModal.pendingProduct, true); 
@@ -197,7 +211,16 @@ export const CartProvider = ({ children }) => {
   };
 
   return (
-    <CartContext.Provider value={{ items, addItem, addToCart: addItem, removeFromCart, updateQty, totalCents, clearCart }}>
+    <CartContext.Provider value={{ 
+      items, 
+      addItem, 
+      addToCart: addItem, 
+      removeFromCart, 
+      updateQty, 
+      updateItemWarranty, // Oferim acces la funcția nouă
+      totalCents, 
+      clearCart 
+    }}>
       {children}
 
       {/* MODAL CONFLICT */}
