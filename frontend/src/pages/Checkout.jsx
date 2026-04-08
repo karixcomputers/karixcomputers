@@ -417,9 +417,6 @@ export default function Checkout() {
                         ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => nameStr.includes(kw));
       
       const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
-      let extraWarrantyPrice = 0;
-      if (item.extendedWarranty === 1) extraWarrantyPrice = Math.round(basePrice * 0.09);
-      if (item.extendedWarranty === 2) extraWarrantyPrice = Math.round(basePrice * 0.16);
 
       let baseWarrantyMonths = item.warrantyMonths || 24;
       let addedMonths = item.extendedWarranty === 1 ? 12 : (item.extendedWarranty === 2 ? 24 : 0);
@@ -438,7 +435,9 @@ export default function Checkout() {
         id: item.id,
         productName: (item.name || item.productName) + extraText, 
         qty: parseInt(item.qty || item.quantity || 1),
-        priceCentsAtBuy: basePrice + extraWarrantyPrice,
+        // 👉 AICI: Acum trimitem prețul de bază (fără garanție inclusă) către DB și Proformă!
+        priceCents: basePrice,
+        priceCentsAtBuy: basePrice,
         warrantyMonths: finalWarranty
       };
     });
@@ -472,6 +471,7 @@ export default function Checkout() {
         ...serviceOpts 
       }, 
       cartItems: enrichedItems,
+      // 👉 Iar totalul este suma cu tot cu garanție (Așa Proforma va adăuga rândul lipsă!)
       total: finalTotalCents, 
       shippingCents: shippingCents,
       userEmail: user?.email, 
