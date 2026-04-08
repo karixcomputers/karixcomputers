@@ -259,7 +259,7 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
       phone: updatedItem.order.shippingPhone
     };
 
-    // 👉 LOGICĂ DE EMAIL PENTRU STATUSURI (INCLUSIV ASAMBLARE POSESIE)
+// 👉 LOGICĂ DE EMAIL ACTUALIZATĂ PENTRU STATUSURI (INCLUSIV ASAMBLARE)
     if (status === "posesie") {
       if (isAssembly) {
           await sendAssemblyInPossessionEmail(userEmail, emailData).catch(err => console.error(err));
@@ -278,9 +278,8 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
       }
     } 
     else if (status === "gata_de_livrare") {
-      if (!isOradea && !isService && !isAssembly) {
-        await sendOrderReadyEmail(userEmail, emailData).catch(err => console.error(err));
-      } else if (isOradea) {
+      // ✅ REPARAT: Acum include PC-urile Noi și Asamblarea (indiferent dacă e Oradea sau Curier)
+      if (!isService || isOradea) {
         await sendOrderReadyEmail(userEmail, emailData).catch(err => console.error(err));
       }
     } 
@@ -288,6 +287,7 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
       if (isService) {
         await sendServiceShippedBackEmail(userEmail, emailData).catch(err => console.error(err));
       } else {
+        // Aceasta trimite mail cu AWB și pentru PC-uri și pentru Asamblare Finalizată care pleacă prin Curier
         await sendOrderShippedEmail(userEmail, emailData).catch(err => console.error(err));
       }
     }

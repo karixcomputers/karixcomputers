@@ -1,17 +1,48 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchMyOrders } from "../api/orders";
-import { apiFetch } from "../api/client"; 
+import React, { useState, useMemo, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useCart } from "../context/CartContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import { formatRON } from "../utils/money";
+import { apiFetch } from "../api/client";
+import axios from "axios";
 import SEO from "../components/SEO";
 
 // Helper Status Badge Inteligent
-function StatusBadge({ status, isService, isOradea }) {
+function StatusBadge({ status, isService, isAssembly, isOradea }) {
   let label = status;
   let color = "text-gray-400 border-white/5 bg-white/5";
 
-  if (isService) {
+  // 👉 1. LOGICĂ PENTRU ASAMBLARE (NOUĂ)
+  if (isAssembly) {
+    if (isOradea) {
+      const map = {
+        in_asteptare: { label: "În așteptare", color: "text-amber-400 border-amber-500/20 bg-amber-500/5" },
+        in_asteptare_plata: { label: "Așteaptă Plata OP", color: "text-yellow-400 border-yellow-500/20 bg-yellow-500/5" },
+        in_asteptare_ridicare: { label: "Așteaptă Ridicare", color: "text-pink-400 border-pink-500/20 bg-pink-500/5" },
+        posesie: { label: "Piese în laborator", color: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5" },
+        in_pregatire: { label: "În asamblare", color: "text-purple-400 border-purple-500/20 bg-purple-500/5" },
+        gata_de_livrare: { label: "Pregătit pt Predare", color: "text-indigo-400 border-indigo-500/20 bg-indigo-500/5" },
+        livrat: { label: "Predat", color: "text-emerald-500 border-emerald-500/20 bg-emerald-500/5" },
+        anulat: { label: "Anulată", color: "text-gray-500 border-white/10 bg-white/5" },
+      };
+      if (map[status]) { label = map[status].label; color = map[status].color; }
+    } else {
+      const map = {
+        in_asteptare: { label: "În așteptare", color: "text-amber-400 border-amber-500/20 bg-amber-500/5" },
+        in_asteptare_plata: { label: "Așteaptă Plata OP", color: "text-yellow-400 border-yellow-500/20 bg-yellow-500/5" },
+        in_asteptare_ridicare: { label: "Așteaptă Curierul", color: "text-pink-400 border-pink-500/20 bg-pink-500/5" },
+        posesie: { label: "Piese în laborator", color: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5" },
+        in_pregatire: { label: "În asamblare", color: "text-purple-400 border-purple-500/20 bg-purple-500/5" },
+        gata_de_livrare: { label: "Asamblat & Ambalat", color: "text-indigo-400 border-indigo-500/20 bg-indigo-500/5" },
+        predat_curier: { label: "Expediat (Retur PC)", color: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5" },
+        livrat: { label: "Livrat", color: "text-emerald-500 border-emerald-500/20 bg-emerald-500/5" },
+        anulat: { label: "Anulată", color: "text-gray-500 border-white/10 bg-white/5" },
+      };
+      if (map[status]) { label = map[status].label; color = map[status].color; }
+    }
+  } 
+  // 👉 2. LOGICĂ PENTRU SERVICE STANDARD
+  else if (isService) {
     if (isOradea) {
       const map = {
         in_asteptare: { label: "În așteptare", color: "text-amber-400 border-amber-500/20 bg-amber-500/5" },
@@ -41,8 +72,9 @@ function StatusBadge({ status, isService, isOradea }) {
       };
       if (map[status]) { label = map[status].label; color = map[status].color; }
     }
-  } else {
-    // Hardware PC
+  } 
+  // 👉 3. LOGICĂ PENTRU HARDWARE PC
+  else {
     if (isOradea) {
        const map = {
         in_asteptare: { label: "În așteptare", color: "text-amber-400 border-amber-500/20 bg-amber-500/5" },
@@ -76,7 +108,7 @@ function StatusBadge({ status, isService, isOradea }) {
   );
 }
 
-// Payment Status Badge - Actualizat fără Ramburs și cu "Comandă Anulată"
+// Payment Status Badge
 function PaymentBadge({ paymentMethod, status }) {
   let label = "Detalii Plată";
   let color = "text-gray-400 border-gray-500/20 bg-gray-500/5";
@@ -341,7 +373,10 @@ export default function Orders() {
                       <div className="space-y-4">
                         {o.items.map(it => {
                           const itemName = (it.productName || "").toLowerCase();
-                          const isService = serviceKeywords.some(kw => itemName.includes(kw));
+                          // 👉 Verificăm dacă e asamblare
+                          const isAssembly = itemName.includes("asamblare");
+                          // Dacă nu e asamblare, vedem dacă e service
+                          const isService = !isAssembly && serviceKeywords.some(kw => itemName.includes(kw));
 
                           return (
                             <div key={it.id} className="group relative p-6 rounded-3xl bg-white/5 border border-white/5 hover:border-indigo-500/20 transition-all backdrop-blur-md">
@@ -355,7 +390,8 @@ export default function Orders() {
                                       )}
                                    </div>
                                  </div>
-                                 <StatusBadge status={it.status} isService={isService} isOradea={isOradea} />
+                                 {/* 👉 Apelăm StatusBadge cu prop-urile necesare */}
+                                 <StatusBadge status={it.status} isService={isService} isAssembly={isAssembly} isOradea={isOradea} />
                               </div>
                             </div>
                           );
