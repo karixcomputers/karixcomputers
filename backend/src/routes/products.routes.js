@@ -93,13 +93,46 @@ const requireAdmin = (req, res, next) => {
 };
 
 /**
+ * 0. PUT: Salvare Reordonare (DRAG & DROP)
+ * O punem sus ca să nu facă conflict cu /:id
+ */
+router.put("/reorder", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { items } = req.body; // Așteaptă un array de tip [{ id: "12345", sortOrder: 0 }, { id: "67890", sortOrder: 1 }]
+
+    if (!items || !Array.isArray(items)) {
+      return res.status(400).json({ error: "Format invalid." });
+    }
+
+    // Folosim o tranzacție pentru a updata toate produsele o singură dată
+    const updatePromises = items.map((item) =>
+      prisma.product.update({
+        where: { id: item.id },
+        data: { sortOrder: item.sortOrder },
+      })
+    );
+
+    await prisma.$transaction(updatePromises);
+
+    res.json({ success: true, message: "Ordinea a fost actualizată!" });
+  } catch (e) {
+    console.error("REORDER ERROR:", e);
+    res.status(500).json({ error: "Eroare la salvarea ordinii." });
+  }
+});
+
+/**
  * 1. GET: Toate produsele (Vizibile în Shop)
  */
 router.get("/", async (req, res, next) => {
   try {
     const products = await prisma.product.findMany({
       where: { isVisible: true },
-      orderBy: { createdAt: "desc" },
+      // 👉 AICI: Sortare principală după sortOrder, fallback după data creării
+      orderBy: [
+        { sortOrder: "asc" },
+        { createdAt: "desc" }
+      ],
     });
     res.json(products);
   } catch (e) { next(e); }
@@ -111,7 +144,11 @@ router.get("/", async (req, res, next) => {
 router.get("/admin-all", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const products = await prisma.product.findMany({
-      orderBy: { createdAt: "desc" },
+      // 👉 AICI: Aceeași sortare pentru Admin
+      orderBy: [
+        { sortOrder: "asc" },
+        { createdAt: "desc" }
+      ],
     });
     res.json(products);
   } catch (e) { next(e); }
@@ -150,7 +187,7 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
       cpuBrand, gpuBrand, ramGb, storageGb, motherboard, 
       case: caseBrand, cooler, psu, stock, category, 
       warrantyMonths, benchmarks, isVisible,
-      pcgarageWishlistId 
+      pcgarageWishlistId, sortOrder // Aducem și sortOrder
     } = req.body;
 
     const randomId = await generateUniqueProductId();
@@ -176,7 +213,8 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
         warrantyMonths: warrantyMonths ? parseInt(warrantyMonths) : 24,
         benchmarks: benchmarks || [],
         isVisible: isVisible !== undefined ? isVisible : true,
-        pcgarageWishlistId: pcgarageWishlistId || null 
+        pcgarageWishlistId: pcgarageWishlistId || null,
+        sortOrder: sortOrder ? parseInt(sortOrder) : 0 // NOU
       },
     });
 
@@ -201,7 +239,7 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
       cpuBrand, gpuBrand, ramGb, storageGb, motherboard, 
       case: caseBrand, cooler, psu, stock, category, 
       warrantyMonths, benchmarks, isVisible,
-      pcgarageWishlistId 
+      pcgarageWishlistId, sortOrder // Aducem și sortOrder
     } = req.body;
 
     const existing = await prisma.product.findUnique({ where: { id } });
@@ -228,7 +266,8 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
         warrantyMonths: warrantyMonths !== undefined ? parseInt(warrantyMonths) : undefined,
         benchmarks: benchmarks ?? undefined,
         isVisible: isVisible !== undefined ? isVisible : undefined,
-        pcgarageWishlistId: pcgarageWishlistId === "" ? null : pcgarageWishlistId 
+        pcgarageWishlistId: pcgarageWishlistId === "" ? null : pcgarageWishlistId,
+        sortOrder: sortOrder !== undefined ? parseInt(sortOrder) : undefined // NOU
       },
     });
 

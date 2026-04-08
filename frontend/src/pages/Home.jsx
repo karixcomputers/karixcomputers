@@ -89,7 +89,7 @@ export default function Home() {
             <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8">
               {[
                 { icon: "🛡️", text: "24 luni garanție" },
-                { icon: "🔁", text: "retur 14 zile" },
+                { icon: "✅", text: "transport asigurat" },
                 { icon: "🚚", text: "livrare rapidă" },
                 { icon: "💳", text: "plăți securizate" }
               ].map((item, index) => (

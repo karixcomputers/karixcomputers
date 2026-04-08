@@ -42,29 +42,30 @@ model User {
 }
 
 model Product {
-  id              String         @id // Generat manual în backend (5 cifre, salvat ca String)
-  name            String
-  priceCents      Int
-  images          String[]
-  description     String         @db.Text 
-  longDescription String?        @db.Text 
-  cpuBrand        String?
-  gpuBrand        String?
-  ramGb           String?
-  storageGb       String?
-  motherboard     String?        // NOU: Placa de bază
-  case            String?        // NOU: Carcasa
-  cooler          String?        
-  psu             String?        
-  stock           Int            @default(1)
-  tags            String[]
-  category        String         @default("pc")
-  warrantyMonths  Int            @default(24) 
-  createdAt       DateTime       @default(now())
-  favoritedBy     WishlistItem[]
-  reviews         Review[]      
-  benchmarks      Json? // Stochează: [{ "game": "CS2", "fps": "500", "color": "blue" }, ...] 
-  isVisible       Boolean  @default(true)
+  id                String         @id // Generat manual în backend (5 cifre, salvat ca String)
+  name              String
+  priceCents        Int
+  images            String[]
+  description       String         @db.Text 
+  longDescription   String?        @db.Text 
+  cpuBrand          String?
+  gpuBrand          String?
+  ramGb             String?
+  storageGb         String?
+  motherboard       String?        
+  case              String?        
+  cooler            String?        
+  psu               String?        
+  stock             Int            @default(1)
+  tags              String[]
+  category          String         @default("pc")
+  warrantyMonths    Int            @default(24) 
+  sortOrder         Int            @default(0)
+  createdAt         DateTime       @default(now())
+  favoritedBy       WishlistItem[]
+  reviews           Review[]       
+  benchmarks        Json? 
+  isVisible         Boolean  @default(true)
   pcgarageWishlistId  String?  @unique
 }
 
