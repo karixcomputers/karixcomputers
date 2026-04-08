@@ -1217,3 +1217,74 @@ export async function sendServiceOpConfirmedEmail(to, data, pdfBuffer) {
     console.error("❌ Eroare sendServiceOpConfirmedEmail:", err);
   }
 }
+
+// ============================================================
+// 🚀 ASAMBLARE: PLASARE COMANDĂ OP (Așteptăm plata proformei)
+// ============================================================
+export async function sendAssemblyOpPlacedEmail(to, data, proformaBuffer) {
+  try {
+    const templateName = data.isOradea ? "assemblyPlacedOpOradea.html" : "assemblyPlacedOpClient.html";
+    const tpl = loadTemplate(templateName);
+    
+    const html = render(tpl, {
+        customerName: data.customerName,
+        orderId: data.orderId,
+        accountUrl: `https://karixcomputers.ro/orders`
+    });
+
+    const mailOptions = {
+        to,
+        subject: `[Așteptăm Plata OP] Comandă Asamblare #${data.orderId}`,
+        html,
+        attachments: []
+    };
+
+    if (proformaBuffer) {
+        mailOptions.attachments.push({
+            filename: `Proforma_Karix_${data.orderId}.pdf`,
+            content: proformaBuffer,
+            contentType: 'application/pdf'
+        });
+    }
+
+    await sendHtmlMail(mailOptions);
+    console.log(`✅ MAIL ASAMBLARE (PLACED OP) TRIMIS LA: ${to}`);
+  } catch (err) {
+    console.error("❌ Eroare sendAssemblyOpPlacedEmail:", err);
+  }
+}
+
+// ============================================================
+// 🚀 ASAMBLARE: CONFIRMARE PLATĂ OP DIN ADMIN (Acum adu/trimite piesele)
+// ============================================================
+export async function sendAssemblyOpConfirmedEmail(to, data, invoiceBuffer) {
+  try {
+    const templateName = data.isOradea ? "assemblyConfirmedOpOradea.html" : "assemblyConfirmedOpClient.html";
+    const tpl = loadTemplate(templateName);
+    
+    const html = render(tpl, {
+        customerName: data.customerName,
+        orderId: data.orderId
+    });
+
+    const mailOptions = {
+        to,
+        subject: `✅ Plată Confirmată - Asamblare #${data.orderId}`,
+        html,
+        attachments: []
+    };
+
+    if (invoiceBuffer) {
+        mailOptions.attachments.push({
+            filename: `Factura_Karix_${data.orderId}.pdf`,
+            content: invoiceBuffer,
+            contentType: 'application/pdf'
+        });
+    }
+
+    await sendHtmlMail(mailOptions);
+    console.log(`✅ MAIL ASAMBLARE (CONFIRMAT OP) TRIMIS LA: ${to}`);
+  } catch (err) {
+    console.error("❌ Eroare sendAssemblyOpConfirmedEmail:", err);
+  }
+}
