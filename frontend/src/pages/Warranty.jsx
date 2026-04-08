@@ -30,13 +30,11 @@ export default function Warranty() {
       {/* SEO: CONFIGURARE PENTRU PAGINA DE GARANȚIE */}
       <SEO 
         title="Politică de Garanție & Service" 
-        description="Află totul despre garanția Karix Computers: 24 luni pentru persoane fizice, 12 luni B2B și service exclusiv cu ridicare gratuită în Oradea. Fără sigilii restrictive pe carcasă."
+        description="Află totul despre garanția Karix Computers: 24 luni legal, garanții extinse, reguli privind sigiliile interne și politica de înlocuire a componentelor."
       />
 
       <div className="relative isolate min-h-screen pt-32 pb-24 px-4 sm:px-6 overflow-hidden bg-transparent">
         
-
-
         <div className="max-w-4xl mx-auto relative z-10">
           
           <header className="mb-20 text-center">
@@ -70,7 +68,7 @@ export default function Warranty() {
               </div>
 
               <p className="text-xs italic opacity-70 mt-4 text-left">
-                * Excepție fac produsele unde este specificată o altă perioadă (ex: promoții, componente cu garanție extinsă de producător de 36-60 luni).
+                * Excepție fac produsele unde este specificată o altă perioadă (ex: promoții, componente cu garanție extinsă sau pachetele de garanție comercială extra).
               </p>
             </WarrantySection>
 
@@ -96,7 +94,7 @@ export default function Warranty() {
                 ))}
               </div>
               <p className="pt-4 font-bold text-white italic text-left">
-                Karix Computers asigură gratuit diagnosticarea, repararea sau înlocuirea componentelor defecte.
+                Karix Computers asigură gratuit diagnosticarea, repararea sau înlocuirea componentelor defecte aflate în termenul de garanție.
               </p>
             </WarrantySection>
 
@@ -104,12 +102,11 @@ export default function Warranty() {
               <p>Garanția se anulează sau nu se aplică în următoarele situații:</p>
               <ul className="space-y-3 text-left">
                 {[
-                  "Probleme cauzate de software piratat, viruși sau setări incorecte de BIOS/Overclocking",
-                  "Modificări hardware, upgrade-uri sau intervenții realizate de personal neautorizat Karix",
-                  "Contactul cu lichide, depuneri masive de praf sau utilizarea în medii umede/corozive",
-                  "Defecțiuni cauzate de rețeaua electrică (șocuri, prize fără împământare, fulgere)",
-                  "Deteriorări fizice vizibile (componente ciobite, pini îndoiți, mufe forțate)",
-                  "Ruperea sau modificarea sigiliilor de garanție aplicate pe carcasă sau componente"
+                  "Probleme cauzate de software piratat, viruși, setări incorecte de BIOS sau Overclocking extrem.",
+                  "Contactul cu lichide, depuneri masive de praf, utilizarea în medii umede, corozive sau expunerea la șocuri termice.",
+                  "Defecțiuni cauzate de rețeaua electrică (șocuri de tensiune, prize fără împământare, fulgere).",
+                  "Deteriorări fizice vizibile (componente ciobite, pini îndoiți, mufe forțate, trasee întrerupte).",
+                  "Intervenții hardware, reparații sau operațiuni de mentenanță efectuate de alte unități de service sau persoane neautorizate de Karix Computers."
                 ].map((text) => (
                   <li key={text} className="flex items-start gap-3 text-sm">
                      <div className="h-1.5 w-1.5 rounded-full bg-pink-500 mt-2 shrink-0" />
@@ -119,18 +116,59 @@ export default function Warranty() {
               </ul>
             </WarrantySection>
 
-            <WarrantySection number="04" title="Procedura de Service">
+            <WarrantySection number="04" title="Sigilii și Intervenții Neautorizate">
               <p>
-                Pentru a beneficia de garanție, trebuie să deschideți un tichet de suport din Panoul de Control.
+                Sistemele asamblate de Karix Computers permit deschiderea panoului lateral exclusiv pentru o curățare de suprafață (ex: suflarea prafului cu aer comprimat).
+              </p>
+              <p className="text-white font-bold border-l-2 border-pink-500 pl-4 bg-white/5 py-3 pr-3 rounded-r-xl">
+                Garanția se anulează automat în cazul în care se constată ruperea, zgârierea sau alterarea sigiliilor de securitate Karix aplicate în interiorul sistemului, pe șuruburile de montaj ale componentelor cheie (Cooler Procesor, Placă Video, SSD, Sursă de alimentare, etc.).
+              </p>
+              <p>
+                Acest lucru indică o intervenție neautorizată asupra hardware-ului (ex: schimbarea pastei termoconductoare în regie proprie, demontarea plăcii video). Orice nevoie de mentenanță profundă sau upgrade în perioada de garanție trebuie realizată exclusiv prin intermediul laboratorului Karix.
+              </p>
+            </WarrantySection>
+
+            <WarrantySection number="05" title="Politica Garanției Extinse (Karix Extra)">
+              <p>
+                Garanția Extinsă reprezintă un contract comercial facultativ, aplicabil după expirarea garanției legale de 24 de luni. În această perioadă, se aplică următoarele reguli specifice privind înlocuirea componentelor defecte:
+              </p>
+              <ul className="space-y-4 text-left mt-4">
+                <li className="flex items-start gap-3 text-sm bg-indigo-500/5 p-4 rounded-xl border border-indigo-500/10">
+                   <div className="text-xl">🔄</div>
+                   <div>
+                     <strong className="text-white block mb-1">Echivalența Performanței</strong>
+                     Înlocuirea unei componente defecte se va face cu un produs care oferă performanțe tehnice echivalente sau superioare în momentul înlocuirii. <span className="text-pink-400 font-bold">Nu se va lua în calcul prețul de achiziție inițial al piesei defecte.</span> (Ex: O placă video de generație mai veche poate fi înlocuită cu o placă dintr-o generație mai nouă, cu specificații egale sau superioare).
+                   </div>
+                </li>
+                <li className="flex items-start gap-3 text-sm bg-indigo-500/5 p-4 rounded-xl border border-indigo-500/10">
+                   <div className="text-xl">♻️</div>
+                   <div>
+                     <strong className="text-white block mb-1">Componente Recondiționate</strong>
+                     Karix Computers își rezervă dreptul de a folosi componente recondiționate (refurbished) certificate și perfect funcționale pentru a soluționa cazurile de garanție extinsă.
+                   </div>
+                </li>
+                <li className="flex items-start gap-3 text-sm bg-indigo-500/5 p-4 rounded-xl border border-indigo-500/10">
+                   <div className="text-xl">📉</div>
+                   <div>
+                     <strong className="text-white block mb-1">Stornare cu Amortizare</strong>
+                     În cazul excepțional în care componenta defectă nu mai poate fi reparată sau înlocuită (din motive de compatibilitate tehnologică), clientul va fi despăgubit prin storno parțial. Valoarea storno va fi calculată scăzând o uzură/amortizare tehnologică aplicată prețului de la momentul achiziției inițiale a sistemului.
+                   </div>
+                </li>
+              </ul>
+            </WarrantySection>
+
+            <WarrantySection number="06" title="Procedura de Service">
+              <p>
+                Pentru a beneficia de garanție, trebuie să deschideți un tichet de suport din Panoul de Control al contului dvs.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mt-4">
                  <div className="flex-1 p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-center leading-relaxed">
-                    <span className="block font-black text-white mb-2 uppercase tracking-tighter text-[10px]">Expediere</span>
-                    Utilizăm curieratul rapid pentru colectare națională. Pentru <strong>persoanele fizice</strong>, costul transportului în garanție (tur-retur) este suportat integral de Karix Computers. Pentru <strong>firme (PJ)</strong>, costul este suportat de client.
+                    <span className="block font-black text-white mb-2 uppercase tracking-tighter text-[10px]">Expediere Națională</span>
+                    Utilizăm curieratul rapid pentru colectare din țară. Pentru <strong>persoanele fizice</strong>, costul transportului în garanție (tur-retur) este suportat integral de Karix. Pentru <strong>firme (PJ)</strong>, costul este suportat de client.
                  </div>
                  <div className="flex-1 p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-center leading-relaxed">
                     <span className="block font-black text-indigo-400 mb-2 uppercase tracking-tighter text-[10px]">Service Oradea</span>
-                    Clienții din Oradea beneficiază de ridicare și livrare personală <strong>gratuită</strong>, serviciu exclusiv oferit de Karix Computers.
+                    Clienții din Oradea beneficiază de ridicare și livrare personală <strong>gratuită</strong> (F2F), serviciu exclusiv oferit de Karix Computers.
                  </div>
               </div>
             </WarrantySection>
