@@ -217,14 +217,6 @@ export default function Shop() {
         psu: pc.psu
       }
     });
-
-    if (success === false) return;
-
-    const toastId = Date.now();
-    setToasts((prev) => [...prev, { id: toastId, message: `Sistemul "${pc.name}" a fost adăugat!` }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== toastId));
-    }, 3000);
   };
 
   const selectSort = (value) => {

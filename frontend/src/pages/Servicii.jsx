@@ -59,13 +59,6 @@ export default function Servicii() {
       category: 'service'
     });
 
-    if (success === false) return;
-
-    const id = Date.now(); 
-    setToasts((prev) => [...prev, { id, message: `Ai adăugat "${service.name}" în coș!` }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 3000);
   };
 
   // 👉 NOU: Logica de Drag & Drop
