@@ -65,7 +65,7 @@ export const CartProvider = ({ children }) => {
     if (nameStr.includes("upgrade")) return false; 
     
     // Lista de cuvinte cheie care indică faptul că se aduce un dispozitiv ÎNTREG la service
-    const baseKeywords = ['mentenanta', 'reparatie', 'curatare', 'diagnosticare'];
+    const baseKeywords = ['mentenanta', 'reparatie', 'curatare', 'diagnosticare', 'service', 'instalare', 'reinstalare', 'recuperare', 'windows'];
     return baseKeywords.some(kw => nameStr.includes(kw));
   };
 

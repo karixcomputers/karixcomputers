@@ -181,14 +181,16 @@ export default function Checkout() {
     });
   }, [items]);
 
+  // 👉 NOU: Logica inteligentă pentru numărarea dispozitivelor de bază
   const cartAnalysis = useMemo(() => {
-    const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick'];
+    const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick', 'upgrade', 'instalare', 'reinstalare', 'windows', 'software', 'bios', 'recuperare'];
     
     let hardwareSubtotal = 0;
     let totalServicesInCart = 0;
     
     const hasPC = items.some(item => {
-      const isSrv = item.category === 'service' || isServiceKeywords.some(kw => (item.name || "").toLowerCase().includes(kw));
+      const nameStr = (item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const isSrv = item.category === 'service' || isServiceKeywords.some(kw => nameStr.includes(kw));
       if (!isSrv) {
         hardwareSubtotal += ((item.priceCentsAtBuy || item.priceCents || 0) * (item.qty || 1));
         return true;
@@ -197,10 +199,18 @@ export default function Checkout() {
     });
 
     const hasService = items.some(item => {
-      const name = (item.productName || item.name || "").toLowerCase();
-      const isSrv = item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => name.includes(kw)));
-      if (isSrv && !name.includes("asamblare")) {
-          totalServicesInCart += (item.qty || 1);
+      const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      
+      const isSrv = item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => nameStr.includes(kw)));
+      
+      // Dacă e serviciu, verificăm dacă e un DEVICE de bază sau doar un upgrade
+      if (isSrv) {
+        const addonKeywords = ['upgrade', 'asamblare', 'instalare', 'reinstalare', 'windows', 'software', 'recuperare', 'devirusare', 'bios'];
+        const isAddon = addonKeywords.some(kw => nameStr.includes(kw));
+        
+        if (!isAddon) {
+            totalServicesInCart += (item.qty || 1);
+        }
       }
       return isSrv;
     });
@@ -208,7 +218,6 @@ export default function Checkout() {
     return { hasPC, hasService, hardwareSubtotal, totalServicesInCart };
   }, [items]);
 
-  // 👉 DACĂ SUNT > 1 SERVICII, BLOCĂM PE ORADEA
   useEffect(() => {
       if (cartAnalysis.totalServicesInCart > 1) {
           setPickupByKarix(true);
@@ -751,7 +760,6 @@ export default function Checkout() {
                       <div className="md:col-span-2 mb-4">
                         <button 
                           type="button" 
-                          // DACĂ ARE MULTIPLE SERVICII, E DISABLED
                           onClick={() => { if (cartAnalysis.totalServicesInCart <= 1) setPickupByKarix(!pickupByKarix); }} 
                           className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md 
                             ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5"}
@@ -868,7 +876,8 @@ export default function Checkout() {
 
                           <div className="md:col-span-2 space-y-2">
                             <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
-                            <textarea className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600 ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} value={shipping.addressDetails} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder={pickupByKarix ? "Nu este necesar pentru preluare în Oradea" : "Strada, Număr, Bloc, Apartament..."} readOnly={pickupByKarix} />
+                            {/* 👉 Am scos limitările pentru a putea scrie mereu adresa exactă, chiar și pe Oradea */}
+                            <textarea className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600`} value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc, Apartament unde venim noi sau livrăm..." />
                           </div>
                         </>
                       )}

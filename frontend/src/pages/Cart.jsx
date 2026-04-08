@@ -37,16 +37,27 @@ export default function Cart() {
   const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  const SERVICE_KEYWORDS = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'upgrade'];
+  // 👉 NOU: Helper-ul inteligent pentru numărarea dispozitivelor fizice (la fel ca în CartContext)
+  const isBaseDeviceService = (item) => {
+    const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (nameStr.includes("upgrade") || nameStr.includes("asamblare")) return false; // Upgrade-ul nu e un device în sine
+    
+    const baseKeywords = ['mentenanta', 'reparatie', 'curatare', 'diagnosticare', 'service', 'instalare', 'reinstalare', 'recuperare', 'windows'];
+    return item.category === 'service' || baseKeywords.some(kw => nameStr.includes(kw));
+  };
 
-  const serviceItems = useMemo(() => {
-    return items.filter(item => {
-      const name = (item.productName || item.name || "").toLowerCase();
-      return item.category === 'service' || SERVICE_KEYWORDS.some(kw => name.includes(kw));
-    });
-  }, [items]);
+  const countTotalDevicesInCart = (cartArray) => {
+    return cartArray.reduce((total, i) => {
+      if (isBaseDeviceService(i)) {
+        return total + (i.qty || 1);
+      }
+      return total;
+    }, 0);
+  };
 
-  const hasMultipleServices = serviceItems.length >= 2;
+  // Verificăm strict numărul de DISPOZITIVE de bază, nu de servicii totale
+  const totalBaseDevices = countTotalDevicesInCart(items);
+  const hasMultipleDevices = totalBaseDevices > 1;
 
   const finalTotal = useMemo(() => {
     if (!appliedCoupon) return totalCents;
@@ -155,7 +166,8 @@ export default function Cart() {
   };
 
   const handleCheckoutClick = () => {
-    if (hasMultipleServices && !singleDevice) {
+    // Înainte blocam dacă avea mai multe "servicii", acum blocăm doar dacă are mai multe "DISPOZITIVE" fizice și nu a bifat.
+    if (hasMultipleDevices && !singleDevice) {
       setShowErrorModal(true);
       return;
     }
@@ -232,7 +244,6 @@ export default function Cart() {
 
   return (
     <>
-      {/* SEO: PENTRU COȘUL DE CUMPĂRĂTURI */}
       <SEO 
         title="Coșul tău de cumpărături"
         description="Verifică produsele tale, aplică vouchere de reducere și finalizează comanda la Karix Computers. Siguranță și viteză în build-uri PC."
@@ -240,8 +251,6 @@ export default function Cart() {
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent text-left">
         
-
-
         <div className="max-w-5xl mx-auto relative z-10">
           <header className="mb-12 flex justify-between items-end">
             <div>
@@ -274,8 +283,8 @@ export default function Cart() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               <div className="lg:col-span-8 space-y-4">
                 
-                {/* Mesaj Logistică Servicii */}
-                {hasMultipleServices && (
+                {/* 👉 Mesaj Logistică: Apare doar dacă ai 2 sau mai multe DISPOZITIVE */}
+                {hasMultipleDevices && (
                   <div className={`p-8 rounded-[35px] border backdrop-blur-md transition-all duration-500 ${singleDevice ? 'bg-indigo-500/10 border-indigo-500/40 shadow-indigo-500/10 shadow-2xl' : 'bg-pink-500/5 border-pink-500/20 shadow-2xl'}`}>
                     <div className="flex items-start gap-5">
                       <div className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-500 ${singleDevice ? "bg-indigo-500 text-white border-indigo-400" : "bg-pink-500/20 text-pink-400 border-pink-500/20"}`}>
@@ -284,7 +293,7 @@ export default function Cart() {
                       <div>
                         <h4 className="text-white font-black text-lg mb-1 italic uppercase tracking-tight">Logistica Karix Service</h4>
                         <p className="text-gray-300 text-xs leading-relaxed mb-6">
-                          Ai <span className="text-pink-400 font-black">{serviceItems.length} servicii</span> în coș. Ridicăm un singur colet per comandă.
+                          Ai <span className="text-pink-400 font-black">{totalBaseDevices} dispozitive</span> în coș pentru service. Ridicăm un singur colet per comandă (sau preluare multiplă Oradea).
                         </p>
                         <label className="flex items-center gap-4 cursor-pointer group w-fit">
                           <input type="checkbox" checked={singleDevice} onChange={(e) => setSingleDevice(e.target.checked)} className="hidden" />
@@ -292,7 +301,7 @@ export default function Cart() {
                             <div className={`h-4 w-4 rounded-full bg-white absolute top-1 transition-all duration-500 ${singleDevice ? 'left-7' : 'left-1'}`} />
                           </div>
                           <span className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${singleDevice ? 'text-indigo-400' : 'text-gray-500 group-hover:text-gray-400'}`}>
-                            CONFIRM: UN SINGUR DEVICE
+                            CONFIRM: PRELUARE DIN ORADEA
                           </span>
                         </label>
                       </div>
@@ -303,7 +312,8 @@ export default function Cart() {
                 {/* Listă Produse */}
                 {items.map((item) => {
                   const nameStr = (item.productName || item.name || "").toLowerCase();
-                  const isService = item.category === 'service' || SERVICE_KEYWORDS.some(kw => nameStr.includes(kw));
+                  // Aici afișarea generică "Service" rămâne inclusiv pentru Upgrade-uri
+                  const isService = item.category === 'service' || ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'upgrade'].some(kw => nameStr.includes(kw));
                   const isPC = !isService;
                   const itemPrice = item.priceCentsAtBuy || item.priceCents || item.price || 0;
                   const quantity = item.qty || 1;
@@ -447,7 +457,7 @@ export default function Cart() {
                   </div>
                   <button
                     onClick={handleCheckoutClick}
-                    className={`group relative w-full py-6 rounded-[25px] font-black text-white overflow-hidden transition-all active:scale-[0.98] shadow-2xl ${hasMultipleServices && !singleDevice ? 'opacity-40 grayscale pointer-events-none' : ''}`}
+                    className={`group relative w-full py-6 rounded-[25px] font-black text-white overflow-hidden transition-all active:scale-[0.98] shadow-2xl ${hasMultipleDevices && !singleDevice ? 'opacity-40 grayscale pointer-events-none' : ''}`}
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 group-hover:scale-110 transition-transform duration-500" />
                     <span className="relative z-10 text-lg uppercase tracking-widest italic">Finalizează →</span>
@@ -459,7 +469,6 @@ export default function Cart() {
         </div>
 
         {/* MODALE (Ștergere, Eroare, Login) */}
-        {/* Păstrează codul pentru modale exact cum era, doar asigură-te că sunt în interiorul fragmentului */}
         {deleteConfirm.show && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 backdrop-blur-md bg-black/60">
             <div className="relative w-full max-w-sm bg-[#161e31]/90 backdrop-blur-2xl border border-pink-500/20 p-10 rounded-[40px] text-center shadow-2xl animate-in zoom-in">
@@ -478,7 +487,7 @@ export default function Cart() {
             <div className="relative w-full max-w-md bg-[#161e31]/90 backdrop-blur-2xl border border-pink-500/20 p-10 rounded-[40px] text-center shadow-2xl">
               <div className="text-5xl mb-6 text-pink-500 drop-shadow-[0_0_15px_rgba(236,72,153,0.3)]">⚠️</div>
               <h2 className="text-2xl font-black text-white mb-4 italic uppercase">Conflict Logistic</h2>
-              <p className="text-gray-400 text-sm mb-10 leading-relaxed font-medium">Karix poate procesa un singur colet per comandă. Bifează confirmarea pentru un singur device în coș.</p>
+              <p className="text-gray-400 text-sm mb-10 leading-relaxed font-medium">Karix poate procesa un singur colet per comandă externă. Dacă ai mai multe dispozitive, trebuie să confirmi preluarea din Oradea.</p>
               <button onClick={() => setShowErrorModal(false)} className="w-full py-5 rounded-2xl font-black text-white bg-pink-600 hover:bg-pink-500 uppercase tracking-widest text-xs shadow-lg shadow-pink-600/20 transition-all">Am înțeles</button>
             </div>
           </div>
@@ -557,7 +566,6 @@ export default function Cart() {
                     <div className="relative flex justify-center text-[9px] uppercase tracking-widest font-black"><span className="bg-[#161e31] px-4 text-gray-500">SAU</span></div>
                   </div>
                   <button type="button" onClick={handleGoogleLoginInit} disabled={loading} className="w-full py-4 rounded-[20px] font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-all uppercase tracking-widest text-[11px] flex items-center justify-center gap-3">
-                    {/* SVG Google ICON */}
                     <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                     Logare cu Google
                   </button>
@@ -567,6 +575,13 @@ export default function Cart() {
           </div>
         )}
       </div>
+      
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+      `}</style>
     </>
   );
 }
