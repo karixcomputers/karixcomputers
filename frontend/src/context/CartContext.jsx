@@ -36,54 +36,12 @@ export const CartProvider = ({ children }) => {
     }, 0);
   }, [items]);
 
-  const triggerToast = (message) => {
+  const triggerToast = (message, isWarning = false) => {
     const id = Date.now() + Math.random(); 
-    setToasts((prev) => [...prev, { id, message }]);
+    setToasts((prev) => [...prev, { id, message, isWarning }]);
     setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 3000);
-  };
-
-  const performAdd = (product, clearPrevious = false) => {
-    setItems((prev) => {
-      const currentCart = clearPrevious ? [] : prev;
-      const exists = currentCart.find((i) => i.id === product.id);
-      
-      const actualPrice = product.priceCents || product.price || product.totalCents || 0;
-      const qtyToAdd = product.qty || 1;
-
-      if (exists) {
-        return currentCart.map((i) =>
-          i.id === product.id ? { ...i, qty: i.qty + qtyToAdd } : i
-        );
-      }
-
-      let finalImages = product.images || [];
-      if (finalImages.length === 0) {
-         if (product.imageUrl) finalImages = [product.imageUrl];
-         else if (product.image) finalImages = [product.image];
-      }
-      const finalImageUrl = product.imageUrl || finalImages[0] || null;
-
-      // Determinăm dacă produsul adăugat este un serviciu (inclusiv asamblarea)
-      const isSrv = isProductService(product);
-
-      return [...currentCart, { 
-        id: product.id, 
-        productName: product.name || product.productName, 
-        name: product.name || product.productName,
-        category: product.category || (isSrv ? "service" : "pc"),
-        priceCents: actualPrice,
-        priceCentsAtBuy: actualPrice,
-        images: finalImages, 
-        imageUrl: finalImageUrl, 
-        specs: product.specs || {},
-        warrantyMonths: product.warrantyMonths, 
-        qty: qtyToAdd 
-      }];
-    });
-
-    triggerToast(`Ai adăugat "${product.name || product.productName}" în coș!`);
+    }, 5000); // Lăsăm 5 secunde să aibă timp să citească
   };
 
   // Funcție de helper pentru a stabili exact ce este considerat un Serviciu
@@ -100,13 +58,74 @@ export const CartProvider = ({ children }) => {
     return nameStr.includes("asamblare");
   };
 
+  // 👉 Funcție helper ca să numărăm exact câte dispozitive de tip service sunt în coș (inclusiv cantitatea fiecăruia)
+  const countTotalServicesInCart = (cartArray) => {
+    return cartArray.reduce((total, i) => {
+      if (isProductService(i) && !isProductAssembly(i)) {
+        return total + (i.qty || 1);
+      }
+      return total;
+    }, 0);
+  };
+
+  const performAdd = (product, clearPrevious = false) => {
+    setItems((prev) => {
+      const currentCart = clearPrevious ? [] : prev;
+      const exists = currentCart.find((i) => i.id === product.id);
+      
+      const actualPrice = product.priceCents || product.price || product.totalCents || 0;
+      const qtyToAdd = product.qty || 1;
+      const isSrv = isProductService(product);
+
+      let newCart;
+
+      if (exists) {
+        newCart = currentCart.map((i) =>
+          i.id === product.id ? { ...i, qty: i.qty + qtyToAdd } : i
+        );
+      } else {
+        let finalImages = product.images || [];
+        if (finalImages.length === 0) {
+           if (product.imageUrl) finalImages = [product.imageUrl];
+           else if (product.image) finalImages = [product.image];
+        }
+        const finalImageUrl = product.imageUrl || finalImages[0] || null;
+
+        newCart = [...currentCart, { 
+          id: product.id, 
+          productName: product.name || product.productName, 
+          name: product.name || product.productName,
+          category: product.category || (isSrv ? "service" : "pc"),
+          priceCents: actualPrice,
+          priceCentsAtBuy: actualPrice,
+          images: finalImages, 
+          imageUrl: finalImageUrl, 
+          specs: product.specs || {},
+          warrantyMonths: product.warrantyMonths, 
+          qty: qtyToAdd 
+        }];
+      }
+
+      // Verificăm dacă după adăugare avem >1 servicii în coș
+      const totalServicesNow = countTotalServicesInCart(newCart);
+      
+      if (totalServicesNow > 1) {
+        triggerToast("ℹ️ Ai mai multe dispozitive în coș. Atenție: preluarea multiplă pe aceeași comandă este posibilă DOAR în Oradea.", true);
+      } else {
+        triggerToast(`Ai adăugat "${product.name || product.productName}" în coș!`, false);
+      }
+
+      return newCart;
+    });
+  };
+
   const addItem = (product) => {
     const incomingIsService = isProductService(product);
     const incomingIsAssembly = isProductAssembly(product);
 
-    const hasServiceInCart = items.some(i => isProductService(i));
     const hasHardwareInCart = items.some(i => !isProductService(i));
     const hasAssemblyInCart = items.some(i => isProductAssembly(i));
+    const hasServiceInCart = items.some(i => isProductService(i) && !isProductAssembly(i));
 
     // Regula 1: Daca ai Asamblare in cos, nu mai poti pune nimic (nici hardware, nici alt serviciu)
     if (hasAssemblyInCart && !incomingIsAssembly) {
@@ -120,8 +139,8 @@ export const CartProvider = ({ children }) => {
       return false;
     }
 
-    // Regula 3: (NOUA REGULĂ LOGISTICĂ) Nu lăsăm amestecarea între Hardware și Servicii (altele decât Asamblarea pe care o tratăm separat sus)
-    if (hasHardwareInCart && incomingIsService) {
+    // Regula 3: (REGULĂ LOGISTICĂ MAJORA) Nu lăsăm amestecarea între Hardware și Servicii (altele decât Asamblarea)
+    if (hasHardwareInCart && incomingIsService && !incomingIsAssembly) {
       setConflictModal({ isOpen: true, type: 'WANTS_SERVICE_OVER_HARDWARE', pendingProduct: product });
       return false;
     }
@@ -140,11 +159,19 @@ export const CartProvider = ({ children }) => {
   };
 
   const updateQty = (id, delta) => {
-    setItems((prev) =>
-      prev.map((i) =>
+    setItems((prev) => {
+      const newCart = prev.map((i) =>
         i.id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i
-      )
-    );
+      );
+
+      // Verificăm și aici, dacă a apăsat pe "+" din coș
+      const totalServicesNow = countTotalServicesInCart(newCart);
+      if (delta > 0 && totalServicesNow > 1) {
+         triggerToast("ℹ️ Ai selectat mai multe dispozitive. Preluarea comună este disponibilă DOAR în Oradea.", true);
+      }
+
+      return newCart;
+    });
   };
 
   const confirmReplaceCart = () => {
@@ -205,7 +232,7 @@ export const CartProvider = ({ children }) => {
               </>
             )}
 
-            {/* 👉 NOU: Modal vrea să adauge SERVICIU peste HARDWARE */}
+            {/* Modal vrea să adauge SERVICIU peste HARDWARE */}
             {conflictModal.type === 'WANTS_SERVICE_OVER_HARDWARE' && (
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
@@ -220,7 +247,7 @@ export const CartProvider = ({ children }) => {
               </>
             )}
 
-            {/* 👉 NOU: Modal vrea să adauge HARDWARE peste SERVICIU */}
+            {/* Modal vrea să adauge HARDWARE peste SERVICIU */}
             {conflictModal.type === 'WANTS_HARDWARE_OVER_SERVICE' && (
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
@@ -244,12 +271,16 @@ export const CartProvider = ({ children }) => {
         {toasts.map((t) => (
           <div 
             key={t.id} 
-            className="animate-in slide-in-from-right-full pointer-events-auto flex items-center gap-4 bg-[#0f172a]/95 backdrop-blur-xl border border-indigo-500/20 p-4 rounded-2xl shadow-2xl min-w-[280px] md:min-w-[320px] transition-all"
+            className={`animate-in slide-in-from-right-full pointer-events-auto flex items-center gap-4 backdrop-blur-xl border p-4 rounded-2xl shadow-2xl min-w-[280px] md:min-w-[320px] transition-all
+              ${t.isWarning ? 'bg-amber-950/95 border-amber-500/30' : 'bg-[#0f172a]/95 border-indigo-500/20'}
+            `}
           >
-            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.5)] shrink-0">
-              <span className="text-white text-xs font-bold">✓</span>
+            <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 shadow-lg
+              ${t.isWarning ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-gradient-to-r from-indigo-500 to-pink-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)]'}
+            `}>
+              <span className="text-xs font-bold">{t.isWarning ? '!' : '✓'}</span>
             </div>
-            <p className="text-white font-black text-[10px] uppercase tracking-widest text-left leading-tight">{t.message}</p>
+            <p className="text-white font-black text-[10px] uppercase tracking-widest text-left leading-tight pr-2">{t.message}</p>
           </div>
         ))}
       </div>

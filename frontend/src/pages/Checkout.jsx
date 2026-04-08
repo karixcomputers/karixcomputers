@@ -185,6 +185,7 @@ export default function Checkout() {
     const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick'];
     
     let hardwareSubtotal = 0;
+    let totalServicesInCart = 0;
     
     const hasPC = items.some(item => {
       const isSrv = item.category === 'service' || isServiceKeywords.some(kw => (item.name || "").toLowerCase().includes(kw));
@@ -197,21 +198,34 @@ export default function Checkout() {
 
     const hasService = items.some(item => {
       const name = (item.productName || item.name || "").toLowerCase();
-      return item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => name.includes(kw)));
+      const isSrv = item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => name.includes(kw)));
+      if (isSrv && !name.includes("asamblare")) {
+          totalServicesInCart += (item.qty || 1);
+      }
+      return isSrv;
     });
 
-    return { hasPC, hasService, hardwareSubtotal };
+    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart };
   }, [items]);
+
+  // 👉 DACĂ SUNT > 1 SERVICII, BLOCĂM PE ORADEA
+  useEffect(() => {
+      if (cartAnalysis.totalServicesInCart > 1) {
+          setPickupByKarix(true);
+      }
+  }, [cartAnalysis.totalServicesInCart]);
 
   const pickupLabel = useMemo(() => {
     if (cartAnalysis.hasPC && cartAnalysis.hasService) return "Livrare & Ridicare Personală (Doar Oradea)";
     if (cartAnalysis.hasPC) return "Livrare Personală (Doar Oradea)";
+    if (cartAnalysis.totalServicesInCart > 1) return "Preluare Multiplă (Doar Oradea)";
     return "Ridicare Personală (Doar Oradea)";
   }, [cartAnalysis]);
 
   const pickupDescription = useMemo(() => {
     if (cartAnalysis.hasPC && cartAnalysis.hasService) return "Voi veni personal să ridic echipamentul pentru service și să livrez PC-ul nou.";
     if (cartAnalysis.hasPC) return "Vom livra personal noul PC în Oradea pentru siguranță maximă.";
+    if (cartAnalysis.totalServicesInCart > 1) return "Ai mai multe dispozitive. Venim noi la tine să le ridicăm.";
     return "Vom veni noi să ridicăm pachetul de la adresa ta din Oradea.";
   }, [cartAnalysis]);
 
@@ -423,11 +437,9 @@ export default function Checkout() {
        finalAddressDetails = `${shipping.addressDetails || "Fără adresă de livrare prestabilită"} | Note client: ${shipping.assemblyNotes}`;
     }
 
-    // 👉 AICI ESTE SECREUTUL NOSTRU PENTRU LOCKER:
     const serviceOpts = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix ? {
         serviceDeliveryMethod,
         fanboxLocationId: serviceDeliveryMethod === "fanbox" && selectedFanbox ? selectedFanbox.id : null,
-        // 👉 ADAUGĂM TEXTUL CU NUMELE LOCKERULUI ÎN PAYLOAD DOAR CÂND VREA LIVRARE ACASĂ
         fanboxAddressText: serviceDeliveryMethod === "fanbox" && selectedFanbox && !returnToSameFanbox
             ? `Locker FANbox: ${selectedFanbox.name} - ${selectedFanbox.address}` 
             : null
@@ -629,12 +641,27 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* 2. Detalii Livrare / ASAMBLARE */}
+              {/* 2. Detalii Livrare / ASAMBLARE / PRELUARE */}
               <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
                 <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
                   {isAssemblyOrder ? "2. Detalii Predare Componente" : "2. Detalii Livrare / Ridicare"}
                 </h2>
                 
+                {/* BANNER AVERTIZARE MAI MULTE DISPOZITIVE */}
+                {cartAnalysis.totalServicesInCart > 1 && (
+                  <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+                    <span className="text-amber-400 mt-0.5">⚠️</span>
+                    <div>
+                      <p className="text-xs text-amber-400 font-medium leading-relaxed">
+                        Ai în coș <strong>{cartAnalysis.totalServicesInCart} dispozitive</strong> pentru service.
+                      </p>
+                      <p className="text-[11px] text-amber-500/80 mt-1 leading-snug">
+                        Din motive logistice (generare AWB per colet), preluarea comună este disponibilă <strong>exclusiv în Oradea</strong> (ne deplasăm noi sau ni le aduci tu). Dacă dorești trimitere prin Curier/FANbox din alt județ, te rugăm să plasezi comenzi separate pentru fiecare dispozitiv.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   
                   {isAssemblyOrder ? (
@@ -722,9 +749,17 @@ export default function Checkout() {
                   ) : (
                     <>
                       <div className="md:col-span-2 mb-4">
-                        <button type="button" onClick={() => setPickupByKarix(!pickupByKarix)} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
+                        <button 
+                          type="button" 
+                          // DACĂ ARE MULTIPLE SERVICII, E DISABLED
+                          onClick={() => { if (cartAnalysis.totalServicesInCart <= 1) setPickupByKarix(!pickupByKarix); }} 
+                          className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md 
+                            ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5"}
+                            ${cartAnalysis.totalServicesInCart > 1 ? "cursor-not-allowed opacity-80 border-indigo-500/50 bg-indigo-500/10" : "hover:border-white/10"}
+                          `}
+                        >
                           <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${pickupByKarix ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
-                            {cartAnalysis.hasPC ? "🚀" : "🏠"}
+                            {cartAnalysis.hasPC ? "🚀" : "📍"}
                           </div>
                           <div className="flex-1">
                             <h4 className="text-white font-black text-xs uppercase tracking-wider">{pickupLabel}</h4>
@@ -736,7 +771,8 @@ export default function Checkout() {
                         </button>
                       </div>
 
-                      {cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && (
+                      {/* DACĂ E SERVICE ȘI NU A ALES ORADEA (ȘI E PERMIS) */}
+                      {cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && cartAnalysis.totalServicesInCart <= 1 && (
                         <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4 transition-all">
                            <h4 className="text-white font-black text-xs uppercase tracking-wider mb-4 flex items-center gap-2">
                               <span>📦</span> Cum ne trimiți dispozitivul defect?
@@ -832,7 +868,7 @@ export default function Checkout() {
 
                           <div className="md:col-span-2 space-y-2">
                             <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
-                            <textarea className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc, Apartament..." />
+                            <textarea className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600 ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} value={shipping.addressDetails} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder={pickupByKarix ? "Nu este necesar pentru preluare în Oradea" : "Strada, Număr, Bloc, Apartament..."} readOnly={pickupByKarix} />
                           </div>
                         </>
                       )}
@@ -941,7 +977,7 @@ export default function Checkout() {
 
                 <button 
                   onClick={handlePlaceOrder} 
-                  disabled={loading || items.length === 0} 
+                  disabled={loading || items.length === 0 || (cartAnalysis.totalServicesInCart > 1 && !pickupByKarix)} 
                   className="group relative w-full py-6 rounded-[25px] font-black text-white overflow-hidden transition-all active:scale-[0.98] shadow-2xl disabled:opacity-50"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 group-hover:scale-105 transition-transform duration-500" />
