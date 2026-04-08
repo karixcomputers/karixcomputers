@@ -191,7 +191,6 @@ export default function Checkout() {
       const nameStr = (item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const isSrv = item.category === 'service' || isServiceKeywords.some(kw => nameStr.includes(kw));
       if (!isSrv) {
-        // 👉 Aici calculăm hardwareSubtotal cu prețul final (care include deja garanția)
         const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
         let extraWarrantyPrice = 0;
         if (item.extendedWarranty === 1) extraWarrantyPrice = Math.round(basePrice * 0.09);
