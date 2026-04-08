@@ -1,15 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx"; 
+import { useAuth } from "../context/AuthContext.jsx"; // 👉 NOU: Pentru verificarea adminului
 import { formatRON } from "../utils/money"; 
 import { apiFetch } from "../api/client"; 
 import SEO from "../components/SEO";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"; // 👉 NOU
 
 export default function Servicii() {
   const { addItem } = useCart(); 
+  const { user, accessToken } = useAuth(); // 👉 NOU
+  
   const [services, setServices] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
+
+  // --- STATE-URI PENTRU REORDONARE DRAG & DROP (ADMIN) ---
+  const [isReordering, setIsReordering] = useState(false);
+  const [reorderList, setReorderList] = useState([]);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   const getImageUrl = (img) => {
     if (!img) return null;
@@ -17,26 +26,27 @@ export default function Servicii() {
     return `https://karixcomputers.ro/api/uploads/${img}`;
   };
 
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const res = await apiFetch("/products");
-        if (res.ok) {
-          const data = await res.json();
-          const onlyServices = data.filter(p => 
-            p.category === "service" || 
-            p.name.toLowerCase().includes("mentenanta") || 
-            p.name.toLowerCase().includes("diagnosticare") ||
-            p.name.toLowerCase().includes("service")
-          );
-          setServices(onlyServices);
-        }
-      } catch (err) {
-        console.error("Eroare la încărcarea serviciilor:", err);
-      } finally {
-        setLoading(false);
+  const fetchServices = async () => {
+    try {
+      const res = await apiFetch("/products");
+      if (res.ok) {
+        const data = await res.json();
+        const onlyServices = data.filter(p => 
+          p.category === "service" || 
+          p.name.toLowerCase().includes("mentenanta") || 
+          p.name.toLowerCase().includes("diagnosticare") ||
+          p.name.toLowerCase().includes("service")
+        );
+        setServices(onlyServices);
       }
-    };
+    } catch (err) {
+      console.error("Eroare la încărcarea serviciilor:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchServices();
   }, []);
 
@@ -58,6 +68,57 @@ export default function Servicii() {
     }, 3000);
   };
 
+  // 👉 NOU: Logica de Drag & Drop
+  const handleDragEnd = (result) => {
+    if (!result.destination) return;
+    const items = Array.from(reorderList);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    setReorderList(items);
+  };
+
+  const toggleReorderMode = () => {
+    if (!isReordering) {
+      setReorderList([...services]); 
+    }
+    setIsReordering(!isReordering);
+  };
+
+  const saveNewOrder = async () => {
+    setIsSavingOrder(true);
+    // Pregătim payload-ul: [{ id: "123", sortOrder: 0 }, { id: "456", sortOrder: 1 }]
+    const updatedItems = reorderList.map((item, index) => ({
+      id: item.id,
+      sortOrder: index
+    }));
+
+    try {
+      const res = await fetch("https://api.karixcomputers.ro/api/products/reorder", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ items: updatedItems })
+      });
+
+      if (res.ok) {
+        const toastId = Date.now();
+        setToasts((prev) => [...prev, { id: toastId, message: "Ordinea a fost salvată cu succes!" }]);
+        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toastId)), 3000);
+        setIsReordering(false);
+        fetchServices(); // Reîncărcăm lista de pe server cu noua ordine
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || "Eroare la salvare.");
+      }
+    } catch (err) {
+      alert("A apărut o eroare: " + err.message);
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-transparent">
       <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
@@ -71,11 +132,11 @@ export default function Servicii() {
         description="Reparații profesionale în Oradea: Curățare praf și schimbare pastă termică PC/Laptop, asamblare calculatoare, reparații console și stick drift controllere. Ridicare și livrare la domiciliu!"
       />
 
-      {/* Am eliminat div-ul decorativ care genera pata de lumină în fundal */}
       <div className="min-h-screen text-gray-200 relative pt-32 pb-24 px-4 overflow-hidden bg-transparent">
         
         <div className="max-w-6xl mx-auto relative z-10">
-          <div className="text-center mb-16 md:mb-20">
+          
+          <div className="text-center mb-10 md:mb-16">
             <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-4 drop-shadow-2xl uppercase italic text-center">
               Karix <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Services</span>
             </h1>
@@ -84,50 +145,120 @@ export default function Servicii() {
             </p>
           </div>
 
-          {services.length === 0 ? (
-            <div className="text-center py-20 opacity-50 bg-white/5 backdrop-blur-md rounded-[40px] border border-white/5">
-              <p className="italic">Momentan nu sunt servicii disponibile în catalog.</p>
+          {/* 👉 NOU: Buton Reordonare (Doar Admin) */}
+          {user?.role === "admin" && (
+            <div className="flex justify-center mb-12">
+              <button 
+                onClick={toggleReorderMode}
+                className={`px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-lg flex items-center gap-3 ${isReordering ? 'bg-amber-500 text-black shadow-amber-500/20' : 'bg-indigo-600 text-white shadow-indigo-600/20 hover:scale-105'}`}
+              >
+                <span>{isReordering ? "✕ Anulează Editarea" : "✏️ Editează Ordinea Serviciilor"}</span>
+              </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-              {services.map((service) => (
-                <div 
-                  key={service.id}
-                  className="flex flex-col p-8 rounded-[32px] bg-white/5 border border-white/10 hover:border-indigo-500/40 transition-all duration-500 group backdrop-blur-md relative overflow-hidden text-center shadow-2xl"
+          )}
+
+          {/* --- CONȚINUT: LISTĂ DRAG&DROP SAU GRILĂ NORMALĂ --- */}
+          {isReordering ? (
+            
+            <div className="animate-in fade-in duration-300 bg-white/5 border border-white/10 p-8 rounded-[40px] backdrop-blur-md max-w-4xl mx-auto">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h2 className="text-2xl font-black text-amber-400 italic uppercase">Reordonare Servicii</h2>
+                  <p className="text-xs text-gray-400 font-medium">Trage serviciile în sus sau în jos pentru a le schimba poziția pe site.</p>
+                </div>
+                <button 
+                  onClick={saveNewOrder} 
+                  disabled={isSavingOrder}
+                  className="px-8 py-4 rounded-2xl bg-amber-500 text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-amber-500/20 hover:bg-amber-400 disabled:opacity-50 transition-all"
                 >
-                  <div className="h-32 w-32 rounded-2xl flex items-center justify-center mb-6 border bg-white/5 border-white/10 overflow-hidden transition-transform duration-300 group-hover:scale-110 mx-auto shadow-inner">
-                    {service.images && service.images[0] ? (
-                      <img 
-                        src={getImageUrl(service.images[0])} 
-                        alt={service.name} 
-                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                      />
-                    ) : (
-                      <span className="text-5xl">🛠️</span>
-                    )}
-                  </div>
-                  
-                  <h3 className="text-2xl font-black text-white mb-3 tracking-tight italic uppercase drop-shadow-md">{service.name}</h3>
-                  <p className="text-gray-300 text-[14px] leading-relaxed mb-6 font-medium">
-                    {service.description || "Echipamentul tău va fi preluat de curier și adus în laboratorul Karix pentru intervenție profesională."}
-                  </p>
-                  
-                  <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between">
-                    <div className="flex flex-col text-left">
-                       <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Preț Serviciu</span>
-                       <span className="text-2xl font-black text-white italic">{formatRON(service.priceCents)}</span>
+                  {isSavingOrder ? "Se salvează..." : "✓ Salvează Ordinea"}
+                </button>
+              </div>
+
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable droppableId="services-list">
+                  {(provided) => (
+                    <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-col gap-4">
+                      {reorderList.map((service, index) => (
+                        <Draggable key={service.id} draggableId={service.id} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className={`flex items-center gap-6 p-4 rounded-2xl border transition-all ${snapshot.isDragging ? 'bg-amber-500/20 border-amber-500 shadow-2xl scale-[1.02]' : 'bg-[#0b1020] border-white/10 hover:border-white/30'}`}
+                            >
+                              <div className="text-gray-500 text-2xl cursor-grab active:cursor-grabbing px-2">≡</div>
+                              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center font-black text-white/50">{index + 1}</div>
+                              <div className="w-16 h-16 rounded-xl flex items-center justify-center border bg-white/5 border-white/10 overflow-hidden">
+                                {service.images && service.images[0] ? (
+                                  <img src={getImageUrl(service.images[0])} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <span className="text-2xl">🛠️</span>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="font-bold text-white uppercase italic tracking-tight">{service.name}</h3>
+                                <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">{formatRON(service.priceCents)}</p>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+            </div>
+
+          ) : (
+            
+            services.length === 0 ? (
+              <div className="text-center py-20 opacity-50 bg-white/5 backdrop-blur-md rounded-[40px] border border-white/5">
+                <p className="italic">Momentan nu sunt servicii disponibile în catalog.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                {services.map((service) => (
+                  <div 
+                    key={service.id}
+                    className="flex flex-col p-8 rounded-[32px] bg-white/5 border border-white/10 hover:border-indigo-500/40 transition-all duration-500 group backdrop-blur-md relative overflow-hidden text-center shadow-2xl"
+                  >
+                    <div className="h-32 w-32 rounded-2xl flex items-center justify-center mb-6 border bg-white/5 border-white/10 overflow-hidden transition-transform duration-300 group-hover:scale-110 mx-auto shadow-inner">
+                      {service.images && service.images[0] ? (
+                        <img 
+                          src={getImageUrl(service.images[0])} 
+                          alt={service.name} 
+                          className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                        />
+                      ) : (
+                        <span className="text-5xl">🛠️</span>
+                      )}
                     </div>
                     
-                    <button 
-                      onClick={() => handleAddToCart(service)}
-                      className="px-6 py-3 rounded-2xl bg-indigo-500 text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:scale-105 transition-all active:scale-95"
-                    >
-                      Adaugă
-                    </button>
+                    <h3 className="text-2xl font-black text-white mb-3 tracking-tight italic uppercase drop-shadow-md">{service.name}</h3>
+                    <p className="text-gray-300 text-[14px] leading-relaxed mb-6 font-medium">
+                      {service.description || "Echipamentul tău va fi preluat de curier și adus în laboratorul Karix pentru intervenție profesională."}
+                    </p>
+                    
+                    <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between">
+                      <div className="flex flex-col text-left">
+                         <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Preț Serviciu</span>
+                         <span className="text-2xl font-black text-white italic">{formatRON(service.priceCents)}</span>
+                      </div>
+                      
+                      <button 
+                        onClick={() => handleAddToCart(service)}
+                        className="px-6 py-3 rounded-2xl bg-indigo-500 text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:scale-105 transition-all active:scale-95"
+                      >
+                        Adaugă
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
           )}
 
           <div className="mt-20 flex flex-col gap-6 max-w-4xl mx-auto">
@@ -162,6 +293,16 @@ export default function Servicii() {
             </div>
 
           </div>
+        </div>
+
+        {/* TOAST NOTIFICATION */}
+        <div className="fixed bottom-10 right-4 md:right-10 flex flex-col gap-3 z-[100] pointer-events-none">
+          {toasts.map((toast) => (
+            <div key={toast.id} className="toast-card flex items-center gap-4 bg-[#1a2236]/90 border border-emerald-500/30 p-4 sm:p-5 rounded-3xl shadow-2xl backdrop-blur-2xl pointer-events-auto animate-in slide-in-from-right duration-300">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-xl font-bold text-emerald-400 shadow-lg">✓</div>
+              <p className="text-white font-bold text-xs sm:text-sm drop-shadow-md pr-4">{toast.message}</p>
+            </div>
+          ))}
         </div>
 
       </div>
