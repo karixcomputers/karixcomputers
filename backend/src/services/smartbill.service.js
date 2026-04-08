@@ -21,8 +21,8 @@ const getCleanAddress = (rawAddress) => {
     return clean || "România";
 };
 
-// 👉 HELPER PENTRU ADAUGAREA TRANSPORTULUI CA PRODUS
-const buildProductsList = (items, shippingCents) => {
+// 👉 HELPER INTELIGENT PENTRU CONSTRUIREA PRODUSELOR (Inclusiv Garanții și Reduceri)
+const buildProductsList = (items, shippingCents, totalOrderCents) => {
     const products = (items || []).map(item => ({
         name: item.productName || item.name || "Produs Karix",
         code: String(item.productId || item.id || "00"),
@@ -33,17 +33,56 @@ const buildProductsList = (items, shippingCents) => {
         isTaxIncluded: false
     }));
 
+    let calculatedTotal = products.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+
     // Dacă avem un cost de transport, adăugăm o linie separată pe factură
     if (shippingCents && Number(shippingCents) > 0) {
+        const shippingPrice = Number((Number(shippingCents) / 100).toFixed(2));
         products.push({
             name: "Servicii de curierat",
             code: "TRANSPORT",
             measuringUnitName: "buc",
             currency: "RON",
             quantity: 1,
-            price: Number((Number(shippingCents) / 100).toFixed(2)),
+            price: shippingPrice,
             isTaxIncluded: false
         });
+        calculatedTotal += shippingPrice;
+    }
+
+    // 👉 Auto-Corecție: Adăugăm Garanția lipsă sau Reducerea aplicată
+    if (totalOrderCents !== undefined && totalOrderCents !== null) {
+        const targetTotal = Number((Number(totalOrderCents) / 100).toFixed(2));
+        const diff = Number((targetTotal - calculatedTotal).toFixed(2));
+
+        // Dacă diferența e mai mare de 5 bani (ignorăm erorile de rotunjire)
+        if (Math.abs(diff) > 0.05) {
+            if (diff > 0) {
+                // Clientul a plătit MAI MULT decât suma produselor (A cumpărat Garanție Extinsă)
+                products.push({
+                    name: "Garanție Extinsă Karix / Servicii Suplimentare",
+                    code: "GARANTIE_EXTRA",
+                    measuringUnitName: "buc",
+                    currency: "RON",
+                    quantity: 1,
+                    price: diff,
+                    isTaxIncluded: false
+                });
+            } else if (diff < 0) {
+                // Clientul a plătit MAI PUȚIN (Avem un Voucher / Cod de reducere aplicat)
+                let remainingDiscount = Math.abs(diff);
+                // Distribuim discountul pe produse (fără a ajunge cu ele sub 0 lei)
+                for (let p of products) {
+                    if (remainingDiscount <= 0) break;
+                    const lineTotal = p.price * p.quantity;
+                    if (lineTotal > 0.01) {
+                        const applicableDiscount = Math.min(lineTotal - 0.01, remainingDiscount);
+                        p.discountValue = Number(applicableDiscount.toFixed(2));
+                        remainingDiscount -= applicableDiscount;
+                    }
+                }
+            }
+        }
     }
 
     return products;
@@ -77,7 +116,8 @@ export const createSmartBillInvoice = async (order) => {
             clientObj.regCom = order.regCom;
         }
 
-        const products = buildProductsList(order.items, order.shippingCents);
+        // Acum trimitem și totalCents plătit real de client pentru auto-corecție
+        const products = buildProductsList(order.items, order.shippingCents, order.totalCents);
 
         const payload = {
             companyVatCode: CUI,
@@ -175,8 +215,8 @@ export const createSmartBillProforma = async (order, clientData, cartItems) => {
             clientObj.regCom = clientData.regCom;
         }
 
-        // Construim produsele folosind funcția helper și shippingCents
-        const products = buildProductsList(cartItems, order.shippingCents);
+        // Construim produsele folosind funcția helper, shippingCents și totalul plătit!
+        const products = buildProductsList(cartItems, order.shippingCents, order.totalCents);
 
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 7);

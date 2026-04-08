@@ -8,7 +8,6 @@ import axios from "axios";
 import SEO from "../components/SEO";
 
 export default function Cart() {
-  // 👉 NOU: Am adăugat updateItemWarranty din context (pe care îl vom implementa în pasul următor)
   const { items, removeFromCart, updateQty, clearCart, totalCents, updateItemWarranty } = useCart();
   const { user, login, loginWithGoogle } = useAuth();
   const nav = useNavigate();
@@ -289,7 +288,7 @@ export default function Cart() {
                       <div>
                         <h4 className="text-white font-black text-lg mb-1 italic uppercase tracking-tight">Logistica Karix Service</h4>
                         <p className="text-gray-300 text-xs leading-relaxed mb-6">
-                          Ai <span className="text-pink-400 font-black">{totalBaseDevices} dispozitive</span> în coș pentru service. Ridicăm un singur colet per comandă (sau preluare multiplă Oradea).
+                          Ai <span className="text-pink-400 font-black">{totalBaseDevices} dispozitive</span> în coș pentru service. Ridicăm un single colet per comandă (sau preluare multiplă Oradea).
                         </p>
                         <label className="flex items-center gap-4 cursor-pointer group w-fit">
                           <input type="checkbox" checked={singleDevice} onChange={(e) => setSingleDevice(e.target.checked)} className="hidden" />
@@ -311,17 +310,21 @@ export default function Cart() {
                   const isService = item.category === 'service' || ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'upgrade'].some(kw => nameStr.includes(kw));
                   const isPC = !isService;
                   
-                  // 👉 LOGICĂ PREȚ: Extragem prețul de bază și calculăm garanția extinsă
                   const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || item.price || 0;
-                  const extraWarrantyPrice = item.extendedWarranty === 1 ? Math.round(basePrice * 0.09) : (item.extendedWarranty === 2 ? Math.round(basePrice * 0.16) : 0);
+                  
+                  let extraWarrantyPrice = 0;
+                  if (isPC) {
+                    if (item.extendedWarranty === 1) extraWarrantyPrice = Math.round(basePrice * 0.09);
+                    if (item.extendedWarranty === 2) extraWarrantyPrice = Math.round(basePrice * 0.16);
+                  }
+                  
                   const itemPrice = basePrice + extraWarrantyPrice;
                   
                   const quantity = item.qty || 1;
                   const imgUrl = item.images?.[0] || item.imageUrl || null;
                   
-                  // Calculăm lunile afișate
                   const baseWarrantyMonths = item.warrantyMonths || 24;
-                  const displayWarranty = baseWarrantyMonths + (item.extendedWarranty === 1 ? 12 : (item.extendedWarranty === 2 ? 24 : 0));
+                  const displayWarranty = isPC ? (baseWarrantyMonths + (item.extendedWarranty === 1 ? 12 : (item.extendedWarranty === 2 ? 24 : 0))) : 0;
 
                   return (
                     <div key={item.id} className="group p-5 sm:p-6 rounded-[25px] sm:rounded-[35px] bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 hover:bg-white/[0.08] hover:border-indigo-500/30 transition-all duration-300 shadow-xl relative">
@@ -378,7 +381,6 @@ export default function Cart() {
                           </div>
                         )}
 
-                        {/* 👉 NOU: Selector Garanție Extinsă pentru PC-uri */}
                         {isPC && (
                            <div className="mt-4 pt-4 border-t border-white/5 w-full">
                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Garanție Extinsă Karix (Opțional)</span>
@@ -407,7 +409,7 @@ export default function Cart() {
 
                         <div className="hidden sm:flex items-center gap-4 mt-6">
                           <p className="text-white font-black text-lg drop-shadow-lg">{formatRON(itemPrice * quantity)}</p>
-                          {displayWarranty > 0 && (
+                          {isPC && displayWarranty > 0 && (
                             <span className="text-[9px] text-indigo-300 font-bold uppercase italic flex items-center gap-1">
                               🛡️ {displayWarranty} Luni Garanție
                             </span>
@@ -418,7 +420,7 @@ export default function Cart() {
                       <div className="flex items-center justify-between sm:justify-center w-full sm:w-auto mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-white/5 sm:border-0 shrink-0">
                         <div className="sm:hidden flex flex-col">
                           <p className="text-white font-black text-base drop-shadow-lg">{formatRON(itemPrice * quantity)}</p>
-                          {displayWarranty > 0 && (
+                          {isPC && displayWarranty > 0 && (
                             <span className="text-[8px] text-indigo-300 font-bold uppercase italic flex items-center gap-1">
                               🛡️ {displayWarranty} Luni
                             </span>
