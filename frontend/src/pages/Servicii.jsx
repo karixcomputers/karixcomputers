@@ -158,9 +158,9 @@ export default function Servicii() {
           )}
 
           {/* --- CONȚINUT: LISTĂ DRAG&DROP SAU GRILĂ NORMALĂ --- */}
-          {isReordering ? (
+{isReordering ? (
             
-            <div className="animate-in fade-in duration-300 bg-white/5 border border-white/10 p-8 rounded-[40px] backdrop-blur-md max-w-4xl mx-auto">
+            <div className="bg-[#12192b] border border-white/10 p-8 rounded-[40px] shadow-2xl max-w-4xl mx-auto">
               <div className="flex justify-between items-center mb-8">
                 <div>
                   <h2 className="text-2xl font-black text-amber-400 italic uppercase">Reordonare Servicii</h2>
@@ -180,14 +180,14 @@ export default function Servicii() {
                   {(provided) => (
                     <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-col gap-4">
                       {reorderList.map((service, index) => (
-<Draggable key={service.id} draggableId={service.id} index={index}>
+                        <Draggable key={service.id} draggableId={service.id} index={index}>
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              style={provided.draggableProps.style} /* 👉 AICI ESTE FIX-UL */
-                              className={`flex items-center gap-6 p-4 rounded-2xl border transition-all ${snapshot.isDragging ? 'bg-amber-500/20 border-amber-500 shadow-2xl scale-[1.02]' : 'bg-[#0b1020] border-white/10 hover:border-white/30'}`}
+                              style={provided.draggableProps.style}
+                              className={`flex items-center gap-6 p-4 rounded-2xl border transition-all ${snapshot.isDragging ? 'bg-amber-500/20 border-amber-500 shadow-2xl' : 'bg-[#0b1020] border-white/10 hover:border-white/30'}`}
                             >
                               <div className="text-gray-500 text-2xl cursor-grab active:cursor-grabbing px-2">≡</div>
                               <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center font-black text-white/50">{index + 1}</div>
