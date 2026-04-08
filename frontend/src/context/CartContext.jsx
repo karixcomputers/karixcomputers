@@ -41,27 +41,38 @@ export const CartProvider = ({ children }) => {
     setToasts((prev) => [...prev, { id, message, isWarning }]);
     setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 5000); // Lăsăm 5 secunde să aibă timp să citească
+    }, 5000); 
   };
 
-  // Funcție de helper pentru a stabili exact ce este considerat un Serviciu
+  // Verifică dacă produsul face parte din spectrul mare de "Servicii"
   const isProductService = (product) => {
     if (product.category === 'service') return true;
     const nameStr = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj', 'asamblare'];
+    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj', 'asamblare', 'upgrade'];
     return serviceKeywords.some(kw => nameStr.includes(kw));
   };
 
-  // Funcție de helper specifică pentru Asamblare
+  // Verifică dacă produsul este o "Asamblare"
   const isProductAssembly = (product) => {
     const nameStr = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return nameStr.includes("asamblare");
   };
 
-  // 👉 Funcție helper ca să numărăm exact câte dispozitive de tip service sunt în coș (inclusiv cantitatea fiecăruia)
-  const countTotalServicesInCart = (cartArray) => {
+  // 👉 NOU: Verifică dacă produsul reprezintă un "Dispozitiv de bază" pentru service (Nu e un upgrade adiacent)
+  const isBaseDeviceService = (product) => {
+    const nameStr = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    // Un upgrade NU reprezintă un dispozitiv fizic extra
+    if (nameStr.includes("upgrade")) return false; 
+    
+    // Lista de cuvinte cheie care indică faptul că se aduce un dispozitiv ÎNTREG la service
+    const baseKeywords = ['mentenanta', 'reparatie', 'curatare', 'diagnosticare'];
+    return baseKeywords.some(kw => nameStr.includes(kw));
+  };
+
+  // Numărăm EXACT câte "Dispozitive de bază" avem în coș (Nu și upgrade-urile lipite de ele)
+  const countTotalDevicesInCart = (cartArray) => {
     return cartArray.reduce((total, i) => {
-      if (isProductService(i) && !isProductAssembly(i)) {
+      if (isBaseDeviceService(i) && !isProductAssembly(i)) {
         return total + (i.qty || 1);
       }
       return total;
@@ -106,10 +117,9 @@ export const CartProvider = ({ children }) => {
         }];
       }
 
-      // Verificăm dacă după adăugare avem >1 servicii în coș
-      const totalServicesNow = countTotalServicesInCart(newCart);
+      const totalDevicesNow = countTotalDevicesInCart(newCart);
       
-      if (totalServicesNow > 1) {
+      if (totalDevicesNow > 1) {
         triggerToast("ℹ️ Ai mai multe dispozitive în coș. Atenție: preluarea multiplă pe aceeași comandă este posibilă DOAR în Oradea.", true);
       } else {
         triggerToast(`Ai adăugat "${product.name || product.productName}" în coș!`, false);
@@ -127,19 +137,16 @@ export const CartProvider = ({ children }) => {
     const hasAssemblyInCart = items.some(i => isProductAssembly(i));
     const hasServiceInCart = items.some(i => isProductService(i) && !isProductAssembly(i));
 
-    // Regula 1: Daca ai Asamblare in cos, nu mai poti pune nimic (nici hardware, nici alt serviciu)
     if (hasAssemblyInCart && !incomingIsAssembly) {
       setConflictModal({ isOpen: true, type: 'WANTS_NORMAL', pendingProduct: product });
       return false;
     }
 
-    // Regula 2: Daca ai Orice in cos (Hardware sau alt Serviciu), nu poti pune Asamblare peste ele
     if (!hasAssemblyInCart && incomingIsAssembly && items.length > 0) {
       setConflictModal({ isOpen: true, type: 'WANTS_ASSEMBLY', pendingProduct: product });
       return false;
     }
 
-    // Regula 3: (REGULĂ LOGISTICĂ MAJORA) Nu lăsăm amestecarea între Hardware și Servicii (altele decât Asamblarea)
     if (hasHardwareInCart && incomingIsService && !incomingIsAssembly) {
       setConflictModal({ isOpen: true, type: 'WANTS_SERVICE_OVER_HARDWARE', pendingProduct: product });
       return false;
@@ -164,9 +171,8 @@ export const CartProvider = ({ children }) => {
         i.id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i
       );
 
-      // Verificăm și aici, dacă a apăsat pe "+" din coș
-      const totalServicesNow = countTotalServicesInCart(newCart);
-      if (delta > 0 && totalServicesNow > 1) {
+      const totalDevicesNow = countTotalDevicesInCart(newCart);
+      if (delta > 0 && totalDevicesNow > 1) {
          triggerToast("ℹ️ Ai selectat mai multe dispozitive. Preluarea comună este disponibilă DOAR în Oradea.", true);
       }
 
@@ -202,7 +208,6 @@ export const CartProvider = ({ children }) => {
             <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-inner">⚠️</div>
             <h2 className="text-xl font-black text-white uppercase tracking-wider mb-4">Atenție la Coș</h2>
             
-            {/* Modal pentru Asamblare în coș deja */}
             {conflictModal.type === 'WANTS_NORMAL' && (
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
@@ -217,7 +222,6 @@ export const CartProvider = ({ children }) => {
               </>
             )}
 
-            {/* Modal vrea să adauge Asamblare peste produse */}
             {conflictModal.type === 'WANTS_ASSEMBLY' && (
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
@@ -232,7 +236,6 @@ export const CartProvider = ({ children }) => {
               </>
             )}
 
-            {/* Modal vrea să adauge SERVICIU peste HARDWARE */}
             {conflictModal.type === 'WANTS_SERVICE_OVER_HARDWARE' && (
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
@@ -247,7 +250,6 @@ export const CartProvider = ({ children }) => {
               </>
             )}
 
-            {/* Modal vrea să adauge HARDWARE peste SERVICIU */}
             {conflictModal.type === 'WANTS_HARDWARE_OVER_SERVICE' && (
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
