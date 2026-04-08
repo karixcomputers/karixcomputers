@@ -1288,3 +1288,25 @@ export async function sendAssemblyOpConfirmedEmail(to, data, invoiceBuffer) {
     console.error("❌ Eroare sendAssemblyOpConfirmedEmail:", err);
   }
 }
+
+// ============================================================
+// 🚀 ASAMBLARE: PIESE PRIMITE ÎN LABORATOR
+// ============================================================
+export async function sendAssemblyInPossessionEmail(to, data) {
+  try {
+    const tpl = loadTemplate("assemblyInPossession.html");
+    const html = render(tpl, {
+        customerName: data.customerName,
+        orderId: data.orderId
+    });
+    
+    await sendHtmlMail({ 
+      to, 
+      subject: `📦 Componente Recepționate - Asamblare #${data.orderId}`, 
+      html 
+    });
+    console.log(`✅ MAIL ASAMBLARE POSESIE TRIMIS LA: ${to}`);
+  } catch (err) {
+    console.error("❌ Eroare sendAssemblyInPossessionEmail:", err);
+  }
+}

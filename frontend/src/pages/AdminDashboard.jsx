@@ -7,7 +7,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // 👉 NOU: Starea pentru modalul de AWB acum reține și dacă este vorba de FANbox
   const [awbModal, setAwbModal] = useState({ open: false, itemId: null, orderId: null, isFanbox: false });
   const [packageWeight, setPackageWeight] = useState(1);
   const [packageCount, setPackageCount] = useState(1);
@@ -41,7 +40,6 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchOrders(); }, []);
 
-  // 👉 AICI ESTE MODIFICAREA: Interceptăm valoarea 'predat_fanbox'
   const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
     if (newStatus === "predat_curier" || newStatus === "predat_fanbox") {
       setAwbModal({ open: true, itemId, orderId, isFanbox: newStatus === "predat_fanbox" });
@@ -50,11 +48,9 @@ export default function AdminDashboard() {
     await executeItemUpdate(orderId, itemId, newStatus);
   };
 
-  // 👉 AICI ESTE MODIFICAREA: Trimitem forceFanbox la backend dacă este cazul
   const executeItemUpdate = async (orderId, itemId, status, weight = 1, packages = 1, isInsured = false, forceFanbox = false) => {
     if (status === "predat_curier" || status === "predat_fanbox") setIsGenerating(true);
     
-    // Unificăm statusul vizual pentru backend, dar îi trimitem boolean-ul forceFanbox separat
     const backendStatus = (status === "predat_fanbox") ? "predat_curier" : status;
 
     try {
@@ -130,7 +126,7 @@ export default function AdminDashboard() {
         throw new Error(data.error || "Eroare la confirmarea plății.");
       }
 
-      showToast("Plată confirmată! Factura a fost trimisă clientului.", "success");
+      showToast("Plată confirmată! Mail-urile aferente au fost trimise.", "success");
       fetchOrders(); 
     } catch (error) {
       showToast(error.message, "error");
@@ -158,9 +154,13 @@ export default function AdminDashboard() {
     }
   };
 
+  // 👉 AICI ESTE LOGICA PENTRU AFIȘAREA OPȚIUNILOR DE STATUS
   const renderStatusOptions = (item, order, handoverInfo, returnInfo) => {
     const itemName = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj', 'asamblare'];
+    
+    // Verificăm exact tipul produsului
+    const isAssembly = itemName.includes("asamblare");
+    const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj'];
     const isService = serviceKeywords.some(kw => itemName.includes(kw));
                       
     const isBankTransfer = order.paymentMethod === 'transfer_bancar';
@@ -171,66 +171,114 @@ export default function AdminDashboard() {
           ? <option value="in_asteptare">✅ Plătit</option>
           : <option value="in_asteptare">⏳ În Așteptare</option>);
 
-    let pickupText = "⏳ Așteptare Ridicare Personală (Oradea)";
-    if (handoverInfo.type.includes("Curier")) pickupText = "🚚 Așteptare Curier (Către noi)";
-    if (handoverInfo.type.includes("FANbox")) pickupText = "📦 Așteptare Predare la FANbox (De către client)";
+    // 👉 RAMURA 1: ASAMBLARE PC
+    if (isAssembly) {
+      // Determinăm metoda de livrare bazată pe info logistice
+      const isOradea = returnInfo.type.includes("Personal");
+      
+      let incomingText = isOradea ? "🚚 Așteaptă Ridicare (Mergem noi în Oradea)" : "🚚 Așteaptă Curier (Clientul trimite piesele)";
+      let awbOptionText = "📦 Predat Curier (GENEREAZĂ AWB CURIER TARA)";
+      let awbValue = "predat_curier";
 
-    let generateAwbText = "🤝 Pregătit pentru Predare Personală";
-    let awbValue = "gata_de_livrare"; 
-    let showAwbOption = false; 
+      return (
+        <>
+          {initialOption}
+          <option value="in_asteptare_ridicare">{incomingText}</option>
+          <option value="posesie">📥 Piese intrate în Laborator</option>
+          <option value="in_pregatire">⚙️ În curs de asamblare</option>
+          
+          <option value="gata_de_livrare">
+            {isOradea ? "🤝 Asamblat & Pregătit pentru Predare F2F" : "📦 Asamblat & Ambalat (Trimite MAIL)"}
+          </option>
+
+          {!isOradea && (
+             <option value={awbValue}>{awbOptionText}</option>
+          )}
+          
+          <option value="livrat">🏁 Livrat Final (Închis)</option>
+          <option value="anulat">❌ Anulat</option>
+        </>
+      );
+    } 
     
-    // 👉 AICI ESTE MODIFICAREA: Setăm corect valoarea de 'predat_fanbox'
-    if (returnInfo.type.includes("Curier")) {
-        generateAwbText = "🚚 Predat Curier (GENEREAZĂ AWB CURIER)";
-        awbValue = "predat_curier";
-        showAwbOption = true;
-    }
-    if (returnInfo.type.includes("FANbox")) {
-        generateAwbText = "📦 Predat Curier (GENEREAZĂ AWB FANBOX)";
-        awbValue = "predat_fanbox"; 
-        showAwbOption = true;
-    }
+    // 👉 RAMURA 2: SERVICE STANDARD (REPARAȚII)
+    else if (isService) {
+      let pickupText = "⏳ Așteptare Ridicare Personală (Oradea)";
+      if (handoverInfo.type.includes("Curier")) pickupText = "🚚 Așteptare Curier (Către noi)";
+      if (handoverInfo.type.includes("FANbox")) pickupText = "📦 Așteptare Predare la FANbox (De către client)";
 
-    if (isService) {
-        return (
-          <>
-            {initialOption}
-            <option value="in_asteptare_ridicare">{pickupText}</option>
-            <option value="posesie">📥 În laboratorul Karix</option>
-            <option value="diagnosticare">🔍 Diagnosticare</option>
-            <option value="reparat">✅ Reparat / Gata</option>
-            <option value="ireparabil">❌ Ireparabil</option>
-            
-            {showAwbOption ? (
+      let generateAwbText = "🤝 Pregătit pentru Predare Personală";
+      let awbValue = "gata_de_livrare"; 
+      let showAwbOption = false; 
+      
+      if (returnInfo.type.includes("Curier")) {
+          generateAwbText = "🚚 Predat Curier (GENEREAZĂ AWB CURIER)";
+          awbValue = "predat_curier";
+          showAwbOption = true;
+      }
+      if (returnInfo.type.includes("FANbox")) {
+          generateAwbText = "📦 Predat Curier (GENEREAZĂ AWB FANBOX)";
+          awbValue = "predat_fanbox"; 
+          showAwbOption = true;
+      }
+
+      return (
+        <>
+          {initialOption}
+          <option value="in_asteptare_ridicare">{pickupText}</option>
+          <option value="posesie">📥 În laboratorul Karix</option>
+          <option value="diagnosticare">🔍 Diagnosticare</option>
+          <option value="reparat">✅ Reparat / Gata</option>
+          <option value="ireparabil">❌ Ireparabil</option>
+          
+          {showAwbOption ? (
+              <option value={awbValue}>{generateAwbText}</option>
+          ) : (
+              <option value="gata_de_livrare">{generateAwbText}</option>
+          )}
+          
+          <option value="livrat">🏁 Livrat Final (Închis)</option>
+          <option value="anulat">❌ Anulat</option>
+        </>
+      );
+    } 
+    
+    // 👉 RAMURA 3: COMPONENTE & PC NOU
+    else {
+      let generateAwbText = "🤝 Pregătit pentru Predare Personală";
+      let awbValue = "gata_de_livrare"; 
+      let showAwbOption = false; 
+
+      if (returnInfo.type.includes("Curier")) {
+          generateAwbText = "🚚 Predat Curier (GENEREAZĂ AWB CURIER)";
+          awbValue = "predat_curier";
+          showAwbOption = true;
+      }
+      if (returnInfo.type.includes("FANbox")) {
+          generateAwbText = "📦 Predat Curier (GENEREAZĂ AWB FANBOX)";
+          awbValue = "predat_fanbox"; 
+          showAwbOption = true;
+      }
+
+      return (
+        <>
+          {initialOption}
+          <option value="in_procesare">⚙️ În Procesare</option>
+          <option value="in_pregatire">🛠️ În Asamblare / Pregătire</option>
+          
+          {showAwbOption ? (
+              <>
+                <option value="gata_de_livrare">📦 Ambalat (Așteaptă ridicare logistică)</option>
                 <option value={awbValue}>{generateAwbText}</option>
-            ) : (
-                <option value="gata_de_livrare">{generateAwbText}</option>
-            )}
-            
-            <option value="livrat">🏁 Livrat Final (Închis)</option>
-            <option value="anulat">❌ Anulat</option>
-          </>
-        );
-    } else {
-        return (
-          <>
-            {initialOption}
-            <option value="in_procesare">⚙️ În Procesare</option>
-            <option value="in_pregatire">🛠️ În Asamblare</option>
-            
-            {showAwbOption ? (
-                <>
-                  <option value="gata_de_livrare">📦 Ambalat (Așteaptă ridicare logistică)</option>
-                  <option value={awbValue}>{generateAwbText}</option>
-                </>
-            ) : (
-                <option value="gata_de_livrare">{generateAwbText}</option>
-            )}
-            
-            <option value="livrat">🏁 Livrat Final</option>
-            <option value="anulat">❌ Anulat</option>
-          </>
-        );
+              </>
+          ) : (
+              <option value="gata_de_livrare">{generateAwbText}</option>
+          )}
+          
+          <option value="livrat">🏁 Livrat Final</option>
+          <option value="anulat">❌ Anulat</option>
+        </>
+      );
     }
   };
 
@@ -408,14 +456,16 @@ export default function AdminDashboard() {
                       <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 text-center lg:text-left">Status Produse</h4>
                       {order.items?.map((item) => {
                          const itemName = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                         const isService = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj', 'asamblare'].some(kw => itemName.includes(kw));
+                         const isAssembly = itemName.includes("asamblare");
+                         const isService = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj'].some(kw => itemName.includes(kw));
+
                          return (
                             <div key={item.id} className={`p-6 rounded-[25px] border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 transition-all group backdrop-blur-md ${
                               item.status === 'livrat' ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/5 hover:border-white/10'
                             }`}>
                               <div className="flex-1">
-                                <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isService ? 'text-pink-400' : 'text-indigo-400'}`}>
-                                  {isService ? '🛠️ Serviciu' : '💻 Hardware'}
+                                <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isService || isAssembly ? 'text-pink-400' : 'text-indigo-400'}`}>
+                                  {isAssembly ? '⚙️ Asamblare' : (isService ? '🛠️ Serviciu' : '💻 Hardware')}
                                 </p>
                                 <h5 className="text-lg font-bold text-white uppercase italic tracking-tight">{item.productName}</h5>
                                 {item.awb && (
@@ -513,7 +563,6 @@ export default function AdminDashboard() {
                   setAwbModal({ open: false, itemId: null, orderId: null, isFanbox: false });
                   setInsurance(false);
                 }} className="flex-1 py-4 text-gray-500 font-black uppercase text-[10px] hover:text-white transition-colors">Anulare</button>
-                {/* 👉 AICI ESTE MODIFICAREA: Trimitem awbModal.isFanbox mai departe la funcția executantă */}
                 <button 
                   disabled={isGenerating}
                   onClick={() => executeItemUpdate(awbModal.orderId, awbModal.itemId, awbModal.isFanbox ? "predat_fanbox" : "predat_curier", packageWeight, packageCount, insurance)} 
@@ -535,7 +584,7 @@ export default function AdminDashboard() {
             <h2 className="text-xl font-black text-amber-400 uppercase italic mb-2">Confirmare Încasare</h2>
             <p className="text-gray-400 text-xs mb-8 font-medium leading-relaxed">
               Ești sigur că au intrat banii în cont pentru comanda <strong className="text-white">#{opModal.orderId}</strong>? <br/><br/>
-              Acest pas va <strong className="text-emerald-400">emite factura fiscală în SmartBill</strong> și o va trimite clientului pe e-mail.
+              Acest pas va <strong className="text-emerald-400">emite factura fiscală în SmartBill</strong> și o va trimite clientului pe e-mail, deblocând logistica asamblării/service-ului.
             </p>
             <div className="flex gap-4">
                 <button onClick={() => setOpModal({ open: false, orderId: null })} className="flex-1 py-4 rounded-2xl bg-white/5 text-gray-400 font-black uppercase text-[10px] hover:text-white hover:bg-white/10 transition-colors">Înapoi</button>

@@ -21,8 +21,9 @@ import {
   sendFanboxInstructionsEmail,
   sendFanboxCheckoutEmail,
   sendServiceOpConfirmedEmail,
-  sendAssemblyOpPlacedEmail,   // 👉 NOU
-  sendAssemblyOpConfirmedEmail // 👉 NOU
+  sendAssemblyOpPlacedEmail,
+  sendAssemblyOpConfirmedEmail,
+  sendAssemblyInPossessionEmail // 👉 NOU
 } from "../services/mail.service.js";
 
 import { createFanAWB, createReverseFanAWB } from "../services/fancourier.service.js";
@@ -246,8 +247,9 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
     });
 
     const userEmail = updatedItem.order.user.email;
-    const itemName = updatedItem.productName || "";
-    const isService = serviceKeywordsArray.some(kw => normalizeTxt(itemName).includes(kw));
+    const itemName = normalizeTxt(updatedItem.productName || "");
+    const isAssembly = itemName.includes("asamblare");
+    const isService = !isAssembly && serviceKeywordsArray.some(kw => itemName.includes(kw));
     
     const emailData = {
       customerName: updatedItem.order.shippingName,
@@ -257,17 +259,32 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
       phone: updatedItem.order.shippingPhone
     };
 
+    // 👉 LOGICĂ DE EMAIL PENTRU STATUSURI (INCLUSIV ASAMBLARE POSESIE)
     if (status === "posesie") {
-      await sendServiceInPossessionEmail(userEmail, emailData).catch(err => console.error(err));
-    } else if (status === "reparat") {
-      await sendServiceFinishedEmail(userEmail, emailData).catch(err => console.error(err));
-    } else if (status === "ireparabil") {
-      await sendServiceUnrepairableEmail(userEmail, emailData).catch(err => console.error(err));
-    } else if (status === "gata_de_livrare") {
-      if (!isOradea && !isService) {
+      if (isAssembly) {
+          await sendAssemblyInPossessionEmail(userEmail, emailData).catch(err => console.error(err));
+      } else if (isService) {
+          await sendServiceInPossessionEmail(userEmail, emailData).catch(err => console.error(err));
+      }
+    } 
+    else if (status === "reparat") {
+      if (isService) {
+          await sendServiceFinishedEmail(userEmail, emailData).catch(err => console.error(err));
+      }
+    } 
+    else if (status === "ireparabil") {
+      if (isService) {
+          await sendServiceUnrepairableEmail(userEmail, emailData).catch(err => console.error(err));
+      }
+    } 
+    else if (status === "gata_de_livrare") {
+      if (!isOradea && !isService && !isAssembly) {
+        await sendOrderReadyEmail(userEmail, emailData).catch(err => console.error(err));
+      } else if (isOradea) {
         await sendOrderReadyEmail(userEmail, emailData).catch(err => console.error(err));
       }
-    } else if (status === "predat_curier" && !isOradea) {
+    } 
+    else if (status === "predat_curier" && !isOradea) {
       if (isService) {
         await sendServiceShippedBackEmail(userEmail, emailData).catch(err => console.error(err));
       } else {
@@ -351,9 +368,6 @@ router.post("/", requireAuth, async (req, res, next) => {
     const uEmail = userEmail || (req.user && req.user.email);
     const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
 
-    // ===============================================
-    // LOGICA DE ASAMBLARE (CHECKOUT)
-    // ===============================================
     if (hasAssembly) {
       let proformaPdfBuffer = null;
       if (paymentMethod === 'transfer_bancar') {
@@ -373,8 +387,6 @@ router.post("/", requireAuth, async (req, res, next) => {
       let pieseText = client.assemblyNotes ? client.assemblyNotes : "Fără detalii suplimentare.";
 
       if (paymentMethod !== 'online') {
-        
-        // 👉 AICI E MODIFICAREA PENTRU OP ASAMBLARE LA CHECKOUT
         if (paymentMethod === 'transfer_bancar') {
             await sendAssemblyOpPlacedEmail(uEmail, {
                 customerName: client.isCompany ? client.companyName : client.name,
@@ -382,7 +394,6 @@ router.post("/", requireAuth, async (req, res, next) => {
                 isOradea: isOradea
             }, proformaPdfBuffer).catch(err => console.error("Eroare Mail Client Asamblare (OP):", err));
         } else {
-            // Daca e Ramburs (desi nu ai pe site, il lasam ca fallback) sau Card (e tratat altfel)
             await sendAssemblyOrderPlaced(uEmail, {
                 customerName: client.isCompany ? client.companyName : client.name,
                 orderId: newOrder.id,
@@ -407,9 +418,6 @@ router.post("/", requireAuth, async (req, res, next) => {
       }
 
     } 
-    // ===============================================
-    // LOGICA PENTRU COMENZI NORMALE (PC / Servicii)
-    // ===============================================
     else {
       let proformaPdfBuffer = null;
       if (paymentMethod === 'transfer_bancar') {
@@ -541,7 +549,6 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
         serviceKeywordsArray.some(kw => normalizeTxt(item.productName).includes(kw))
     );
     
-    // 👉 NOU: Verificăm dacă e asamblare
     const hasAssembly = order.items.some(item => normalizeTxt(item.productName).includes("asamblare"));
 
     const rawOrderAddress = order.shippingAddress || "";
@@ -549,7 +556,6 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
     const isOradea = !isFanbox && normalizeTxt(rawOrderAddress).includes("oradea");
 
     let reverseAwb = null;
-    // Nu generăm AWB de retur automat pentru Asamblare pentru că piesele vin din surse multiple 
     if (hasService && !isOradea && !hasAssembly) {
         try {
             console.log(`🔄 Generare AWB Invers (Ridicare de la client) pentru comanda #${order.id}`);
@@ -575,9 +581,7 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
       }
     });
 
-    // 👉 AICI E LOGICA NOUĂ PENTRU EMAIL-URI LA CONFIRMAREA OP
     if (hasAssembly) {
-        // Dacă e Asamblare
         const mailData = {
             customerName: order.shippingName,
             orderId: order.id,
@@ -586,7 +590,6 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
         await sendAssemblyOpConfirmedEmail(order.user.email, mailData, pdfBuffer).catch(err => console.error(err));
         
     } else if (hasService) {
-        // Dacă e Service Normal (Reparații/Curățare)
         const mailData = {
             customerName: order.shippingName,
             orderId: order.id,
@@ -597,7 +600,6 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
         await sendServiceOpConfirmedEmail(order.user.email, mailData, pdfBuffer).catch(err => console.error(err));
         
     } else {
-        // Dacă e PC NOU
         await sendFinalInvoiceEmail(order.user.email, order, pdfBuffer).catch(err => console.error(err));
     }
 
