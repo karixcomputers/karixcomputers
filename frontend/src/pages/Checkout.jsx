@@ -946,7 +946,7 @@ export default function Checkout() {
                 <div className="space-y-4 mb-10">
                   <div className="flex justify-between text-gray-400 font-medium text-sm">
                     <span>Subtotal Produse</span>
-                    <span className="text-white font-bold">{formatRON(currentSubtotal)}</span>
+                    <span className="text-white font-bold">{formatRON(totalCents)}</span>
                   </div>
 
                   {appliedCoupon && (
