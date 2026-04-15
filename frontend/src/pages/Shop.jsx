@@ -3,19 +3,22 @@ import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client"; 
 import { useCart } from "../context/CartContext.jsx"; 
 import { useWishlist } from "../context/WishlistContext.jsx"; 
-import { useAuth } from "../context/AuthContext.jsx"; // 👉 NOU
+import { useAuth } from "../context/AuthContext.jsx";
 import { formatRON } from "../utils/money"; 
 import SEO from "../components/SEO";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"; // 👉 NOU
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"; 
 
 export default function Shop() {
   const { addItem } = useCart(); 
   const { toggleWishlist, isFavorite } = useWishlist(); 
-  const { user, accessToken } = useAuth(); // 👉 NOU: Pentru verificarea adminului
+  const { user, accessToken } = useAuth(); 
   
   const [pcs, setPcs] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
+
+  // Stocare selecții custom (stocare) pentru fiecare PC în parte
+  const [customSelections, setCustomSelections] = useState({});
 
   // STATE-URI PENTRU FILTRARE ȘI SORTARE
   const [filterCpu, setFilterCpu] = useState("Toate"); 
@@ -82,6 +85,14 @@ export default function Shop() {
           !p.name.toLowerCase().includes("service")
         );
         setPcs(onlyPcs);
+        
+        // Inițializăm selecțiile custom pentru stocare cu "1TB" pentru toate sistemele la încărcare
+        const initialSelections = {};
+        onlyPcs.forEach(pc => {
+            initialSelections[pc.id] = { storage: "1TB" };
+        });
+        setCustomSelections(initialSelections);
+
       }
     } catch (err) {
       console.error("Eroare la încărcarea sistemelor PC:", err);
@@ -137,12 +148,10 @@ export default function Shop() {
     } else if (sortOrder === "desc") {
       result.sort((a, b) => (b.priceCents || 0) - (a.priceCents || 0));
     }
-    // Dacă e 'default', rămâne ordinea din server (care respectă sortOrder din DB)
 
     return result;
   }, [pcs, filterCpu, filterGpu, maxPrice, sortOrder]);
 
-  // 👉 NOU: Logica de Drag & Drop
   const handleDragEnd = (result) => {
     if (!result.destination) return;
     const items = Array.from(reorderList);
@@ -153,7 +162,6 @@ export default function Shop() {
 
   const toggleReorderMode = () => {
     if (!isReordering) {
-      // Când intrăm în reorder, anulăm filtrele ca să vedem toată lista
       setFilterCpu("Toate");
       setFilterGpu("Toate");
       setMaxPrice(maxAvailablePrice);
@@ -165,7 +173,6 @@ export default function Shop() {
 
   const saveNewOrder = async () => {
     setIsSavingOrder(true);
-    // Pregătim payload-ul: [{ id: "123", sortOrder: 0 }, { id: "456", sortOrder: 1 }]
     const updatedItems = reorderList.map((item, index) => ({
       id: item.id,
       sortOrder: index
@@ -186,7 +193,7 @@ export default function Shop() {
         setToasts((prev) => [...prev, { id: toastId, message: "Ordinea a fost salvată cu succes!" }]);
         setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toastId)), 3000);
         setIsReordering(false);
-        fetchPcs(); // Reîncărcăm lista de pe server cu noua ordine
+        fetchPcs(); 
       } else {
         const data = await res.json();
         throw new Error(data.error || "Eroare la salvare.");
@@ -198,25 +205,33 @@ export default function Shop() {
     }
   };
 
-  const handleAddToCart = (pc) => {
+  const handleAddToCart = (pc, currentPriceCents, finalStorage) => {
     const success = addItem({
       id: pc.id,
       name: pc.name,
       category: pc.category,
-      priceCents: pc.priceCents, 
+      priceCents: currentPriceCents, 
       warrantyMonths: pc.warrantyMonths || 24,
       image: getImageUrl(pc.images?.[0]), 
       specs: {
         cpu: pc.cpuBrand,
         gpu: pc.gpuBrand,
         ram: pc.ramGb, 
-        storage: pc.storageGb,
+        storage: finalStorage, // Stocarea ajustată (1TB, 2TB, 4TB)
         motherboard: pc.motherboard, 
         case: pc.case,               
         cooler: pc.cooler,
         psu: pc.psu
       }
     });
+
+    if (success === false) return;
+
+    const toastId = Date.now();
+    setToasts((prev) => [...prev, { id: toastId, message: `Sistemul "${pc.name}" a fost adăugat!` }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== toastId));
+    }, 3000);
   };
 
   const selectSort = (value) => {
@@ -256,6 +271,13 @@ export default function Shop() {
       </div>
     </div>
   );
+
+  const updateStorageSelection = (pcId, storageValue) => {
+      setCustomSelections(prev => ({
+          ...prev,
+          [pcId]: { ...prev[pcId], storage: storageValue }
+      }));
+  };
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-transparent">
@@ -297,7 +319,6 @@ export default function Shop() {
 
         <div className="max-w-6xl mx-auto relative z-10">
           
-          {/* HEADER ȘI BUTOANE ACȚIUNE */}
           <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
             <div className="max-w-xl">
               <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tighter leading-tight uppercase italic drop-shadow-2xl">
@@ -308,7 +329,6 @@ export default function Shop() {
 
             <div className="flex flex-wrap items-center gap-4 relative">
               
-              {/* 👉 NOU: Buton pentru Reordonare (Doar Admin) */}
               {user?.role === "admin" && (
                 <button 
                   onClick={toggleReorderMode}
@@ -351,7 +371,6 @@ export default function Shop() {
             </div>
           </header>
 
-          {/* MENIU FILTRE EXPANDABIL */}
           {showFilters && !isReordering && (
             <div className="mb-12 p-8 rounded-[35px] bg-[#0b1020]/60 border border-white/10 backdrop-blur-xl shadow-2xl animate-in fade-in slide-in-from-top-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -418,9 +437,7 @@ export default function Shop() {
             </div>
           )}
 
-          {/* --- CONȚINUT PRINCIPAL: GRILĂ NORMALĂ SAU LISTĂ DRAG&DROP --- */}
-          
-{isReordering ? (
+          {isReordering ? (
             
             <div className="bg-[#12192b] border border-white/10 p-8 rounded-[40px] shadow-2xl">
               <div className="flex justify-between items-center mb-8">
@@ -448,8 +465,8 @@ export default function Shop() {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              style={provided.draggableProps.style}
-                              className={`flex items-center gap-6 p-4 rounded-2xl border transition-all ${snapshot.isDragging ? 'bg-amber-500/20 border-amber-500 shadow-2xl' : 'bg-[#0b1020] border-white/10 hover:border-white/30'}`}
+                              style={provided.draggableProps.style} 
+                              className={`flex items-center gap-6 p-4 rounded-2xl border transition-all ${snapshot.isDragging ? 'bg-amber-500/20 border-amber-500 shadow-2xl scale-[1.02]' : 'bg-[#0b1020] border-white/10 hover:border-white/30'}`}
                             >
                               <div className="text-gray-500 text-2xl cursor-grab active:cursor-grabbing px-2">≡</div>
                               <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center font-black text-white/50">{index + 1}</div>
@@ -471,7 +488,6 @@ export default function Shop() {
 
           ) : (
             
-            /* GRID-UL NORMAL DE PRODUSE */
             filteredAndSortedPcs.length === 0 ? (
               <div className="text-center py-24 border border-white/5 rounded-[40px] bg-white/5 backdrop-blur-md shadow-2xl">
                 <p className="text-gray-400 font-black italic uppercase tracking-[0.2em] text-sm">Nu am găsit sisteme cu aceste specificații.</p>
@@ -484,6 +500,23 @@ export default function Shop() {
                 {filteredAndSortedPcs.map((pc) => {
                   const isCompared = compareList.find(c => c.id === pc.id);
                   
+                  // LOGICĂ PREȚ ȘI STOCARE CUSTOM (1TB Default, +2TB, +4TB)
+                  const selectedStorage = customSelections[pc.id]?.storage || "1TB";
+                  let storageAddedPrice = 0;
+                  
+                  if (selectedStorage === "2TB") {
+                      storageAddedPrice = 500 * 100; // +500 RON
+                  } else if (selectedStorage === "4TB") {
+                      storageAddedPrice = 1750 * 100; // +1750 RON
+                  }
+
+                  const currentPriceCents = (pc.priceCents || 0) + storageAddedPrice;
+
+                  // Construim stringul final pentru stocare ca să apară în coș corect, combinând numele inițial cu capacitatea extra dacă există
+                  let finalStorageText = pc.storageGb || "N/A";
+                  if (selectedStorage === "2TB") finalStorageText = "2TB NVMe M.2 (Upgrade de la 1TB)";
+                  if (selectedStorage === "4TB") finalStorageText = "4TB NVMe M.2 (Upgrade de la 1TB)";
+
                   return (
                   <div key={pc.id} className="flex flex-col rounded-[35px] bg-white/5 border border-white/10 overflow-hidden group hover:border-indigo-500/40 transition-all duration-500 backdrop-blur-md shadow-2xl relative">
                     
@@ -581,13 +614,6 @@ export default function Shop() {
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-indigo-400 text-base">💾</span>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Stocare</span>
-                            <span className="font-bold text-white/90 truncate text-[11px] leading-tight">{pc.storageGb || 'N/A'}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
                           <span className="text-indigo-400 text-base">🔌</span>
                           <div className="flex flex-col min-w-0">
                             <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Sursă</span>
@@ -603,6 +629,32 @@ export default function Shop() {
                         </div>
                       </div>
 
+                      {/* 👉 OPTIUNEA DE STOCARE CUSTOM (1TB, 2TB, 4TB) AICI */}
+                      <div className="mt-2 mb-6 p-4 rounded-[20px] bg-white/5 border border-white/10">
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">💾 Memorie Stocare</span>
+                          <div className="flex flex-col gap-2">
+                              {[
+                                  { label: "1 TB NVMe M.2", value: "1TB", extra: 0 },
+                                  { label: "2 TB NVMe M.2", value: "2TB", extra: "+500 RON" },
+                                  { label: "4 TB NVMe M.2", value: "4TB", extra: "+1.750 RON" }
+                              ].map(option => (
+                                  <button
+                                      key={option.value}
+                                      onClick={() => updateStorageSelection(pc.id, option.value)}
+                                      className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${selectedStorage === option.value ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                                  >
+                                      <div className="flex items-center gap-3">
+                                          <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedStorage === option.value ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
+                                              {selectedStorage === option.value && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                          </div>
+                                          <span>{option.label}</span>
+                                      </div>
+                                      {option.extra !== 0 && <span className="text-indigo-300">{option.extra}</span>}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+
                       <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-4">
                         <div className="flex items-center justify-center"> 
                           <div className="flex flex-col items-center text-center"> 
@@ -610,7 +662,7 @@ export default function Shop() {
                               Preț Sistem
                             </span>
                             <span className="text-2xl font-black text-white italic">
-                              {formatRON(pc.priceCents)}
+                              {formatRON(currentPriceCents)}
                             </span>
                           </div>
                         </div>
@@ -623,7 +675,7 @@ export default function Shop() {
                             Detalii
                           </Link>
                           <button 
-                            onClick={() => handleAddToCart(pc)} 
+                            onClick={() => handleAddToCart(pc, currentPriceCents, finalStorageText)} 
                             className="flex-1 h-12 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg shadow-indigo-600/20"
                           >
                             Adaugă
@@ -720,18 +772,29 @@ export default function Shop() {
                     
                     <button 
                       onClick={() => { 
+                        const selectedStorage = customSelections[pc.id]?.storage || "1TB";
+                        let storageAddedPrice = 0;
+                        if (selectedStorage === "2TB") storageAddedPrice = 500 * 100;
+                        if (selectedStorage === "4TB") storageAddedPrice = 1750 * 100;
+                        
+                        let finalStorageText = pc.storageGb || "N/A";
+                        if (selectedStorage === "2TB") finalStorageText = "2TB NVMe M.2 (Upgrade de la 1TB)";
+                        if (selectedStorage === "4TB") finalStorageText = "4TB NVMe M.2 (Upgrade de la 1TB)";
+                        
+                        const currentPriceCents = (pc.priceCents || 0) + storageAddedPrice;
+
                         const success = addItem({
                           id: pc.id,
                           name: pc.name,
                           category: pc.category,
-                          priceCents: pc.priceCents, 
+                          priceCents: currentPriceCents, 
                           warrantyMonths: pc.warrantyMonths || 24,
                           image: getImageUrl(pc.images?.[0]),
                           specs: {
                             cpu: pc.cpuBrand,
                             gpu: pc.gpuBrand,
                             ram: pc.ramGb, 
-                            storage: pc.storageGb,
+                            storage: finalStorageText,
                             motherboard: pc.motherboard, 
                             case: pc.case,               
                             cooler: pc.cooler,
@@ -760,16 +823,6 @@ export default function Shop() {
             </div>
           </div>
         )}
-
-        {/* TOAST CONTAINER */}
-        <div className="fixed bottom-10 right-4 md:right-10 flex flex-col gap-3 z-[100] pointer-events-none">
-          {toasts.map((toast) => (
-            <div key={toast.id} className="toast-card flex items-center gap-4 bg-[#1a2236]/90 border border-emerald-500/30 p-4 sm:p-5 rounded-3xl shadow-2xl backdrop-blur-2xl pointer-events-auto">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-xl font-bold text-emerald-400 shadow-lg">✓</div>
-              <p className="text-white font-bold text-xs sm:text-sm drop-shadow-md pr-4">{toast.message}</p>
-            </div>
-          ))}
-        </div>
 
       </div>
     </>
