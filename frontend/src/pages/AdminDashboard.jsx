@@ -64,7 +64,7 @@ export default function AdminDashboard() {
           packages, 
           insurance: isInsured, 
           forceFanbox: forceFanbox || status === "predat_fanbox",
-          declaredValue: isInsured && customDeclaredValue ? Number(customDeclaredValue) : null // 👉 Trimitem valoarea la backend
+          declaredValue: isInsured && customDeclaredValue ? Number(customDeclaredValue) : null 
         }) 
       });
 
@@ -162,7 +162,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // 👉 AICI ESTE LOGICA PENTRU AFIȘAREA OPȚIUNILOR DE STATUS
   const renderStatusOptions = (item, order, handoverInfo, returnInfo, isOradeaF2F) => {
     const itemName = (item.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
@@ -178,7 +177,6 @@ export default function AdminDashboard() {
           ? <option value="in_asteptare">✅ Plătit</option>
           : <option value="in_asteptare">⏳ În Așteptare</option>);
 
-    // 👉 RAMURA 1: ASAMBLARE PC
     if (isAssembly) {
       if (isOradeaF2F) {
         return (
@@ -207,8 +205,6 @@ export default function AdminDashboard() {
         );
       }
     } 
-    
-    // 👉 RAMURA 2: SERVICE STANDARD (REPARAȚII)
     else if (isService) {
       let pickupText = "⏳ Așteptare Ridicare Personală (Oradea)";
       if (handoverInfo.type.includes("Curier")) pickupText = "🚚 Așteptare Curier (Către noi)";
@@ -251,8 +247,6 @@ export default function AdminDashboard() {
         </>
       );
     } 
-    
-    // 👉 RAMURA 3: COMPONENTE & PC NOU
     else {
       let generateAwbText = "🤝 Pregătit pentru Predare Personală";
       let awbValue = "gata_de_livrare"; 
@@ -474,21 +468,43 @@ export default function AdminDashboard() {
                             <div key={item.id} className={`p-6 rounded-[25px] border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 transition-all group backdrop-blur-md ${
                               item.status === 'livrat' ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/5 hover:border-white/10'
                             }`}>
-                              <div className="flex-1">
+                              <div className="flex-1 w-full">
                                 <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isService || isAssembly ? 'text-pink-400' : 'text-indigo-400'}`}>
                                   {isAssembly ? '⚙️ Asamblare' : (isService ? '🛠️ Serviciu' : '💻 Hardware')}
                                 </p>
                                 <h5 className="text-lg font-bold text-white uppercase italic tracking-tight">{item.productName}</h5>
+                                
+                                {/* 👉 AICI SE AFIȘEAZĂ SPECIFICAȚIILE PC-ULUI PENTRU ADMIN */}
+                                {item.specs && typeof item.specs === 'object' && Object.keys(item.specs).length > 0 && (
+                                  <div className="mt-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 max-w-2xl">
+                                    {[
+                                      { label: "CPU", val: item.specs.cpu },
+                                      { label: "GPU", val: item.specs.gpu },
+                                      { label: "MB", val: item.specs.motherboard },
+                                      { label: "RAM", val: item.specs.ram || item.specs.ramGb },
+                                      { label: "SSD", val: item.specs.storage || item.specs.storageGb },
+                                      { label: "CASE", val: item.specs.case },
+                                      { label: "COOL", val: item.specs.cooler },
+                                      { label: "PSU", val: item.specs.psu },
+                                    ].map((spec, idx) => spec.val ? (
+                                      <div key={idx} className="flex flex-col bg-black/20 px-2.5 py-1.5 rounded-lg border border-white/5">
+                                        <span className="text-[8px] text-indigo-400 font-black uppercase tracking-widest">{spec.label}</span>
+                                        <span className="text-[10px] text-gray-300 font-bold truncate mt-0.5" title={spec.val}>{spec.val}</span>
+                                      </div>
+                                    ) : null)}
+                                  </div>
+                                )}
+
                                 {item.awb && (
-                                  <p className="text-[10px] text-cyan-400 font-mono mt-2 bg-cyan-500/10 px-2 py-1 rounded inline-block border border-cyan-500/20">AWB: {item.awb}</p>
+                                  <p className="text-[10px] text-cyan-400 font-mono mt-3 bg-cyan-500/10 px-2 py-1 rounded inline-block border border-cyan-500/20">AWB: {item.awb}</p>
                                 )}
                               </div>
 
-                              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                              <div className="flex flex-col gap-2 w-full sm:w-auto shrink-0 mt-4 sm:mt-0">
                                 <select 
                                   value={item.status}
                                   onChange={(e) => handleUpdateItemStatus(order.id, item.id, e.target.value, isAssembly)}
-                                  className={`bg-[#0b1020]/90 border rounded-xl px-4 py-3 text-[10px] font-black text-white uppercase tracking-widest outline-none focus:border-indigo-500 transition-all cursor-pointer backdrop-blur-md ${
+                                  className={`w-full bg-[#0b1020]/90 border rounded-xl px-4 py-3 text-[10px] font-black text-white uppercase tracking-widest outline-none focus:border-indigo-500 transition-all cursor-pointer backdrop-blur-md ${
                                     item.status === 'livrat' ? 'border-emerald-500/50 text-emerald-400' : 'border-white/10'
                                   }`}
                                 >
@@ -565,7 +581,6 @@ export default function AdminDashboard() {
                 </div>
               </label>
 
-              {/* 👉 NOU: Câmpul pentru Valoare PC la Asamblare */}
               {insurance && awbModal.isAssembly && (
                   <div className="mt-6 animate-in fade-in zoom-in duration-300 bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-2xl">
                     <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">
