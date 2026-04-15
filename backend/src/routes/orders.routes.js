@@ -349,7 +349,9 @@ router.post("/", requireAuth, async (req, res, next) => {
               qty: item.qty || 1,
               priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
               status: isServiceItem ? "in_asteptare_ridicare" : initialStatus,
-              warrantyMonths: item.warrantyMonths ? parseInt(item.warrantyMonths) : (isServiceItem ? 0 : 24)
+              warrantyMonths: item.warrantyMonths ? parseInt(item.warrantyMonths) : (isServiceItem ? 0 : 24),
+              // 👉 AICI ESTE REZOLVAREA EROARII (Salvăm specificațiile în baza de date!)
+              specs: item.specs || null
             };
           })
         }
