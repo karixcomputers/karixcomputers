@@ -521,8 +521,12 @@ export default function Shop() {
                   // LOGICĂ PREȚ ȘI STOCARE CUSTOM (1TB Default, +2TB, +4TB)
                   const selectedStorage = customSelections[pc.id]?.storage || "1TB";
                   let storageAddedPrice = 0;
-                  if (selectedStorage === "2TB") storageAddedPrice = 500 * 100;
-                  if (selectedStorage === "4TB") storageAddedPrice = 1750 * 100;
+                  
+                  if (selectedStorage === "2TB") {
+                      storageAddedPrice = 500 * 100; // +500 RON
+                  } else if (selectedStorage === "4TB") {
+                      storageAddedPrice = 1750 * 100; // +1750 RON
+                  }
 
                   // LOGICĂ CARCASĂ CUSTOM DIN BAZA DE DATE
                   const selectedCaseId = customSelections[pc.id]?.caseId || "default";
@@ -539,9 +543,10 @@ export default function Shop() {
                   // CALCUL PREȚ TOTAL 
                   const currentPriceCents = (pc.priceCents || 0) + storageAddedPrice + caseAddedPrice;
 
+                  // Construim stringul final pentru stocare ca să apară în coș corect, combinând numele inițial cu capacitatea extra dacă există
                   let finalStorageText = pc.storageGb || "N/A";
-                  if (selectedStorage === "2TB") finalStorageText = "2TB NVMe M.2 (Upgrade de la 1TB)";
-                  if (selectedStorage === "4TB") finalStorageText = "4TB NVMe M.2 (Upgrade de la 1TB)";
+                  if (selectedStorage === "2TB") finalStorageText = "2TB NVMe M.2 (Upgrade)";
+                  if (selectedStorage === "4TB") finalStorageText = "4TB NVMe M.2 (Upgrade)";
 
                   let finalCaseText = pc.case || "N/A";
                   if (selectedCaseObj) finalCaseText = selectedCaseObj.name;
