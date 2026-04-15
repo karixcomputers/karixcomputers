@@ -464,6 +464,20 @@ export default function AdminDashboard() {
                          const isAssembly = itemName.includes("asamblare");
                          const isService = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj'].some(kw => itemName.includes(kw));
 
+                         // 👉 NOU: Logica pentru a asigura că specs e obiect
+                         let safeSpecs = null;
+                         if (item.specs) {
+                           if (typeof item.specs === 'object') {
+                             safeSpecs = item.specs;
+                           } else if (typeof item.specs === 'string') {
+                             try {
+                               safeSpecs = JSON.parse(item.specs);
+                             } catch (e) {
+                               console.error("Eroare la parsarea specs:", e);
+                             }
+                           }
+                         }
+
                          return (
                             <div key={item.id} className={`p-6 rounded-[25px] border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 transition-all group backdrop-blur-md ${
                               item.status === 'livrat' ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/5 hover:border-white/10'
@@ -475,17 +489,17 @@ export default function AdminDashboard() {
                                 <h5 className="text-lg font-bold text-white uppercase italic tracking-tight">{item.productName}</h5>
                                 
                                 {/* 👉 AICI SE AFIȘEAZĂ SPECIFICAȚIILE PC-ULUI PENTRU ADMIN */}
-                                {item.specs && typeof item.specs === 'object' && Object.keys(item.specs).length > 0 && (
+                                {safeSpecs && Object.keys(safeSpecs).length > 0 && (
                                   <div className="mt-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 max-w-2xl">
                                     {[
-                                      { label: "CPU", val: item.specs.cpu },
-                                      { label: "GPU", val: item.specs.gpu },
-                                      { label: "MB", val: item.specs.motherboard },
-                                      { label: "RAM", val: item.specs.ram || item.specs.ramGb },
-                                      { label: "SSD", val: item.specs.storage || item.specs.storageGb },
-                                      { label: "CASE", val: item.specs.case },
-                                      { label: "COOL", val: item.specs.cooler },
-                                      { label: "PSU", val: item.specs.psu },
+                                      { label: "CPU", val: safeSpecs.cpu },
+                                      { label: "GPU", val: safeSpecs.gpu },
+                                      { label: "MB", val: safeSpecs.motherboard },
+                                      { label: "RAM", val: safeSpecs.ram || safeSpecs.ramGb },
+                                      { label: "SSD", val: safeSpecs.storage || safeSpecs.storageGb },
+                                      { label: "CASE", val: safeSpecs.case },
+                                      { label: "COOL", val: safeSpecs.cooler },
+                                      { label: "PSU", val: safeSpecs.psu },
                                     ].map((spec, idx) => spec.val ? (
                                       <div key={idx} className="flex flex-col bg-black/20 px-2.5 py-1.5 rounded-lg border border-white/5">
                                         <span className="text-[8px] text-indigo-400 font-black uppercase tracking-widest">{spec.label}</span>
