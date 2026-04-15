@@ -17,7 +17,10 @@ export default function Shop() {
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
-  // Stocare selecții custom (stocare) pentru fiecare PC în parte
+  // 👉 NOU: Stocare Carcase din Configurator
+  const [availableCases, setAvailableCases] = useState([]);
+
+  // Stocare selecții custom (stocare, carcasă) pentru fiecare PC în parte
   const [customSelections, setCustomSelections] = useState({});
 
   // STATE-URI PENTRU FILTRARE ȘI SORTARE
@@ -86,10 +89,9 @@ export default function Shop() {
         );
         setPcs(onlyPcs);
         
-        // Inițializăm selecțiile custom pentru stocare cu "1TB" pentru toate sistemele la încărcare
         const initialSelections = {};
         onlyPcs.forEach(pc => {
-            initialSelections[pc.id] = { storage: "1TB" };
+            initialSelections[pc.id] = { storage: "1TB", caseId: "default" };
         });
         setCustomSelections(initialSelections);
 
@@ -101,8 +103,24 @@ export default function Shop() {
     }
   };
 
+  // 👉 NOU: Funcția care cere carcasele din DB Configurator
+  const fetchCases = async () => {
+    try {
+      const res = await apiFetch("/adminconfigurator");
+      if (res.ok) {
+        const items = await res.json();
+        // Filtrăm doar cele care au category === 'case'
+        const caseItems = items.filter(item => item.category === 'case');
+        setAvailableCases(caseItems);
+      }
+    } catch (err) {
+      console.error("Eroare la aducerea carcaselor:", err);
+    }
+  };
+
   useEffect(() => {
     fetchPcs();
+    fetchCases(); // Apelăm funcția de preluare carcase
   }, []);
 
   const filteredAndSortedPcs = useMemo(() => {
@@ -205,7 +223,7 @@ export default function Shop() {
     }
   };
 
-  const handleAddToCart = (pc, currentPriceCents, finalStorage) => {
+  const handleAddToCart = (pc, currentPriceCents, finalStorage, finalCase) => {
     const success = addItem({
       id: pc.id,
       name: pc.name,
@@ -217,9 +235,9 @@ export default function Shop() {
         cpu: pc.cpuBrand,
         gpu: pc.gpuBrand,
         ram: pc.ramGb, 
-        storage: finalStorage, // Stocarea ajustată (1TB, 2TB, 4TB)
+        storage: finalStorage, 
         motherboard: pc.motherboard, 
-        case: pc.case,               
+        case: finalCase,               
         cooler: pc.cooler,
         psu: pc.psu
       }
@@ -272,10 +290,10 @@ export default function Shop() {
     </div>
   );
 
-  const updateStorageSelection = (pcId, storageValue) => {
+  const updateSelection = (pcId, type, val) => {
       setCustomSelections(prev => ({
           ...prev,
-          [pcId]: { ...prev[pcId], storage: storageValue }
+          [pcId]: { ...prev[pcId], [type]: val }
       }));
   };
 
@@ -503,28 +521,46 @@ export default function Shop() {
                   // LOGICĂ PREȚ ȘI STOCARE CUSTOM (1TB Default, +2TB, +4TB)
                   const selectedStorage = customSelections[pc.id]?.storage || "1TB";
                   let storageAddedPrice = 0;
-                  
-                  if (selectedStorage === "2TB") {
-                      storageAddedPrice = 500 * 100; // +500 RON
-                  } else if (selectedStorage === "4TB") {
-                      storageAddedPrice = 1750 * 100; // +1750 RON
+                  if (selectedStorage === "2TB") storageAddedPrice = 500 * 100;
+                  if (selectedStorage === "4TB") storageAddedPrice = 1750 * 100;
+
+                  // LOGICĂ CARCASĂ CUSTOM DIN BAZA DE DATE
+                  const selectedCaseId = customSelections[pc.id]?.caseId || "default";
+                  let caseAddedPrice = 0;
+                  let selectedCaseObj = null;
+
+                  if (selectedCaseId !== "default") {
+                      selectedCaseObj = availableCases.find(c => c.id === selectedCaseId);
+                      if (selectedCaseObj) {
+                          caseAddedPrice = selectedCaseObj.price || 0; // în cenți
+                      }
                   }
 
-                  const currentPriceCents = (pc.priceCents || 0) + storageAddedPrice;
+                  // CALCUL PREȚ TOTAL 
+                  const currentPriceCents = (pc.priceCents || 0) + storageAddedPrice + caseAddedPrice;
 
-                  // Construim stringul final pentru stocare ca să apară în coș corect, combinând numele inițial cu capacitatea extra dacă există
                   let finalStorageText = pc.storageGb || "N/A";
                   if (selectedStorage === "2TB") finalStorageText = "2TB NVMe M.2 (Upgrade de la 1TB)";
                   if (selectedStorage === "4TB") finalStorageText = "4TB NVMe M.2 (Upgrade de la 1TB)";
+
+                  let finalCaseText = pc.case || "N/A";
+                  if (selectedCaseObj) finalCaseText = selectedCaseObj.name;
 
                   return (
                   <div key={pc.id} className="flex flex-col rounded-[35px] bg-white/5 border border-white/10 overflow-hidden group hover:border-indigo-500/40 transition-all duration-500 backdrop-blur-md shadow-2xl relative">
                     
                     <div className="relative h-64 overflow-hidden bg-black/20">
                       <div className="absolute top-5 left-5 z-20 flex flex-col gap-2">
-                        <span className="px-3 py-1.5 rounded-xl bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest shadow-xl">
-                          {pc.priceCents > 0 ? 'În Stoc' : 'La Comandă'}
-                        </span>
+                        {/* 👉 MODIFICARE AICI: "Asamblat la Comandă" cu avertisment pe Hover */}
+                        <div className="group/badge relative">
+                            <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-black text-[10px] font-black uppercase tracking-widest shadow-xl cursor-help block">
+                                Asamblat la Comandă
+                            </span>
+                            <div className="absolute top-full left-0 mt-2 w-48 p-2 bg-[#0b1020] text-gray-300 text-[9px] border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover/badge:opacity-100 group-hover/badge:visible transition-all z-30">
+                                Sistem asamblat la comandă, produs personalizat ce nu se supune returului în 14 zile cf. OUG 34/2014, art.16, lit. c.
+                            </div>
+                        </div>
+
                         <span className="px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-widest border border-white/10">
                           🛡️ {pc.warrantyMonths || 24} Luni
                         </span>
@@ -620,16 +656,45 @@ export default function Shop() {
                             <span className="font-bold text-white/90 truncate text-[11px] leading-tight">{pc.psu || 'N/A'}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-indigo-400 text-base">📦</span>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Carcasă</span>
-                            <span className="font-bold text-white/90 truncate text-[11px] leading-tight">{pc.case || 'N/A'}</span>
-                          </div>
-                        </div>
                       </div>
 
-                      {/* 👉 OPTIUNEA DE STOCARE CUSTOM (1TB, 2TB, 4TB) AICI */}
+                      {/* 👉 NOU: OPȚIUNEA DE CARCASĂ (Dinamice din Configurator) */}
+                      {availableCases.length > 0 && (
+                          <div className="mt-2 mb-4 p-4 rounded-[20px] bg-white/5 border border-white/10">
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Alege Carcasa</span>
+                              <div className="flex flex-col gap-2">
+                                  
+                                  <button
+                                      onClick={() => updateSelection(pc.id, 'caseId', 'default')}
+                                      className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${selectedCaseId === 'default' ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                                  >
+                                      <div className="flex items-center gap-3">
+                                          <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedCaseId === 'default' ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
+                                              {selectedCaseId === 'default' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                          </div>
+                                          <span>Standard ({pc.case || "Inclusă"})</span>
+                                      </div>
+                                  </button>
+
+                                  {availableCases.map(caseOpt => (
+                                      <button
+                                          key={caseOpt.id}
+                                          onClick={() => updateSelection(pc.id, 'caseId', caseOpt.id)}
+                                          className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${selectedCaseId === caseOpt.id ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                                      >
+                                          <div className="flex items-center gap-3">
+                                              <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedCaseId === caseOpt.id ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
+                                                  {selectedCaseId === caseOpt.id && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                              </div>
+                                              <span>{caseOpt.name}</span>
+                                          </div>
+                                          {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price)}</span>}
+                                      </button>
+                                  ))}
+                              </div>
+                          </div>
+                      )}
+
                       <div className="mt-2 mb-6 p-4 rounded-[20px] bg-white/5 border border-white/10">
                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">💾 Memorie Stocare</span>
                           <div className="flex flex-col gap-2">
@@ -640,7 +705,7 @@ export default function Shop() {
                               ].map(option => (
                                   <button
                                       key={option.value}
-                                      onClick={() => updateStorageSelection(pc.id, option.value)}
+                                      onClick={() => updateSelection(pc.id, 'storage', option.value)}
                                       className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${selectedStorage === option.value ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
                                   >
                                       <div className="flex items-center gap-3">
@@ -675,7 +740,7 @@ export default function Shop() {
                             Detalii
                           </Link>
                           <button 
-                            onClick={() => handleAddToCart(pc, currentPriceCents, finalStorageText)} 
+                            onClick={() => handleAddToCart(pc, currentPriceCents, finalStorageText, finalCaseText)} 
                             className="flex-1 h-12 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg shadow-indigo-600/20"
                           >
                             Adaugă
@@ -777,11 +842,25 @@ export default function Shop() {
                         if (selectedStorage === "2TB") storageAddedPrice = 500 * 100;
                         if (selectedStorage === "4TB") storageAddedPrice = 1750 * 100;
                         
+                        const selectedCaseId = customSelections[pc.id]?.caseId || "default";
+                        let caseAddedPrice = 0;
+                        let selectedCaseObj = null;
+
+                        if (selectedCaseId !== "default") {
+                            selectedCaseObj = availableCases.find(c => c.id === selectedCaseId);
+                            if (selectedCaseObj) {
+                                caseAddedPrice = selectedCaseObj.price || 0; 
+                            }
+                        }
+
                         let finalStorageText = pc.storageGb || "N/A";
-                        if (selectedStorage === "2TB") finalStorageText = "2TB NVMe M.2 (Upgrade de la 1TB)";
-                        if (selectedStorage === "4TB") finalStorageText = "4TB NVMe M.2 (Upgrade de la 1TB)";
+                        if (selectedStorage === "2TB") finalStorageText = "2TB NVMe M.2 (Upgrade)";
+                        if (selectedStorage === "4TB") finalStorageText = "4TB NVMe M.2 (Upgrade)";
                         
-                        const currentPriceCents = (pc.priceCents || 0) + storageAddedPrice;
+                        let finalCaseText = pc.case || "N/A";
+                        if (selectedCaseObj) finalCaseText = selectedCaseObj.name;
+
+                        const currentPriceCents = (pc.priceCents || 0) + storageAddedPrice + caseAddedPrice;
 
                         const success = addItem({
                           id: pc.id,
@@ -796,7 +875,7 @@ export default function Shop() {
                             ram: pc.ramGb, 
                             storage: finalStorageText,
                             motherboard: pc.motherboard, 
-                            case: pc.case,               
+                            case: finalCaseText, 
                             cooler: pc.cooler,
                             psu: pc.psu
                           }
