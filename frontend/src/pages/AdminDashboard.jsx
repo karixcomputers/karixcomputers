@@ -478,6 +478,9 @@ export default function AdminDashboard() {
                            }
                          }
 
+                         // 👉 LOG DEBUG PENTRU CONSOLĂ
+                         console.log("Specs pt", item.productName, ":", safeSpecs);
+
                          return (
                             <div key={item.id} className={`p-6 rounded-[25px] border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 transition-all group backdrop-blur-md ${
                               item.status === 'livrat' ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/5 hover:border-white/10'
@@ -503,7 +506,8 @@ export default function AdminDashboard() {
                                     ].map((spec, idx) => spec.val ? (
                                       <div key={idx} className="flex flex-col bg-black/20 px-2.5 py-1.5 rounded-lg border border-white/5">
                                         <span className="text-[8px] text-indigo-400 font-black uppercase tracking-widest">{spec.label}</span>
-                                        <span className="text-[10px] text-gray-300 font-bold truncate mt-0.5" title={spec.val}>{spec.val}</span>
+                                        {/* Am înlocuit truncate cu text care se continuă pe următorul rând */}
+                                        <span className="text-[10px] text-gray-300 font-bold whitespace-normal break-words mt-0.5" title={spec.val}>{spec.val}</span>
                                       </div>
                                     ) : null)}
                                   </div>
