@@ -327,42 +327,39 @@ export default function Cart() {
                   const displayWarranty = isPC ? (baseWarrantyMonths + (item.extendedWarranty === 1 ? 12 : (item.extendedWarranty === 2 ? 24 : 0))) : 0;
 
                   return (
-                    <div key={item.id} className="group p-5 sm:p-6 rounded-[25px] sm:rounded-[35px] bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row items-start gap-4 sm:gap-8 hover:bg-white/[0.08] hover:border-indigo-500/30 transition-all duration-300 shadow-xl relative">
+                    <div key={item.id} className="group p-5 sm:p-6 rounded-[25px] sm:rounded-[35px] bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 hover:bg-white/[0.08] hover:border-indigo-500/30 transition-all duration-300 shadow-xl relative">
                       <button onClick={() => removeFromCart(item.id)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-500 hover:text-pink-500 transition-colors h-8 w-8 flex items-center justify-center rounded-full hover:bg-pink-500/10 z-20">✕</button>
 
-                      {/* Imagine și Header Produs Mobil */}
-                      <div className="flex items-center gap-4 w-full sm:w-auto pr-8 sm:pr-0 shrink-0">
-                        <div className={`h-24 w-24 sm:h-32 sm:w-32 rounded-2xl sm:rounded-3xl flex items-center justify-center border shrink-0 transition-all duration-500 overflow-hidden ${isPC ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-pink-500/10 border-pink-500/20'}`}>
+                      <div className="flex items-center gap-4 w-full sm:w-auto pr-8 sm:pr-0">
+                        <div className={`h-20 w-20 sm:h-24 sm:w-24 rounded-2xl sm:rounded-3xl flex items-center justify-center border shrink-0 transition-all duration-500 overflow-hidden ${isPC ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-pink-500/10 border-pink-500/20'}`}>
                           {imgUrl ? (
                              <img src={imgUrl} alt={item.name} className="w-full h-full object-cover" />
                           ) : (
-                             <span className="text-3xl">{isPC ? "🖥️" : "🛠️"}</span>
+                             <span className="text-2xl sm:text-3xl">{isPC ? "🖥️" : "🛠️"}</span>
                           )}
                         </div>
                         <div className="flex-1 sm:hidden">
                           <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border mb-1.5 inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
                             {isPC ? 'Hardware' : 'Service'}
                           </span>
-                          <h3 className="text-sm font-bold text-white tracking-tight italic uppercase leading-tight drop-shadow-md line-clamp-3">
+                          <h3 className="text-sm font-bold text-white tracking-tight italic uppercase leading-tight drop-shadow-md line-clamp-2">
                             {item.productName || item.name}
                           </h3>
                         </div>
                       </div>
                       
-                      {/* Detalii PC */}
-                      <div className="flex-1 w-full pt-1">
-                        <div className="hidden sm:block pr-8 mb-4">
+                      <div className="flex-1 w-full pt-1 overflow-hidden">
+                        <div className="hidden sm:block pr-8">
                           <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border mb-2 inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
                             {isPC ? 'Hardware' : 'Service'}
                           </span>
-                          <h3 className="text-xl font-bold text-white tracking-tight italic uppercase leading-tight drop-shadow-md">
+                          <h3 className="text-xl font-bold text-white tracking-tight italic uppercase leading-tight drop-shadow-md truncate">
                             {item.productName || item.name}
                           </h3>
                         </div>
 
-                        {/* 👉 AICI: Specificațiile rearanjate mai compact ca înainte */}
                         {isPC && item.specs && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 opacity-90 w-full mb-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-3 sm:mt-4 opacity-90 w-full">
                             {[
                               { icon: "⚡", label: "CPU", val: item.specs.cpu },
                               { icon: "🎮", label: "GPU", val: item.specs.gpu },
@@ -384,49 +381,52 @@ export default function Cart() {
                           </div>
                         )}
 
-                        {/* 👉 AICI: Garanția afișată una sub alta (vertical), mai elegant */}
                         {isPC && (
                            <div className="mt-4 pt-4 border-t border-white/5 w-full">
-                               <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3 block italic">🛡️ Alege Perioada de Garanție:</span>
-                               <div className="flex flex-col gap-2 w-full sm:max-w-sm">
-                                  {[
-                                    { level: 0, label: "24 Luni (Inclus)", price: 0 },
-                                    { level: 1, label: `36 Luni (+1 An)`, price: basePrice * 0.09 },
-                                    { level: 2, label: `48 Luni (+2 Ani)`, price: basePrice * 0.16 }
-                                  ].map((opt) => (
-                                    <button
-                                      key={opt.level}
-                                      onClick={() => updateItemWarranty && updateItemWarranty(item.id, opt.level)}
-                                      className={`w-full px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border text-left flex justify-between items-center group ${(!item.extendedWarranty && opt.level === 0) || item.extendedWarranty === opt.level ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40 shadow-inner' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${(!item.extendedWarranty && opt.level === 0) || item.extendedWarranty === opt.level ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-black/20 group-hover:border-gray-400'}`}>
-                                           {((!item.extendedWarranty && opt.level === 0) || item.extendedWarranty === opt.level) && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                        </div>
-                                        <span>{opt.label}</span>
-                                      </div>
-                                      {opt.price > 0 && <span className="text-gray-300 font-bold tracking-tighter">+{formatRON(opt.price)}</span>}
-                                    </button>
-                                  ))}
+                               <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Garanție Extinsă Karix (Opțional)</span>
+                               <div className="flex flex-wrap gap-2">
+                                   <button
+                                      onClick={() => updateItemWarranty && updateItemWarranty(item.id, 0)}
+                                      className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${!item.extendedWarranty || item.extendedWarranty === 0 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 shadow-inner' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'}`}
+                                   >
+                                      24 Luni (Inclus)
+                                   </button>
+                                   <button
+                                      onClick={() => updateItemWarranty && updateItemWarranty(item.id, 1)}
+                                      className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${item.extendedWarranty === 1 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 shadow-inner' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'}`}
+                                   >
+                                      +1 An (36 Luni) / +{formatRON(basePrice * 0.09)}
+                                   </button>
+                                   <button
+                                      onClick={() => updateItemWarranty && updateItemWarranty(item.id, 2)}
+                                      className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${item.extendedWarranty === 2 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 shadow-inner' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'}`}
+                                   >
+                                      +2 Ani (48 Luni) / +{formatRON(basePrice * 0.16)}
+                                   </button>
                                </div>
                            </div>
                         )}
+
+                        <div className="hidden sm:flex items-center gap-4 mt-6">
+                          <p className="text-white font-black text-lg drop-shadow-lg">{formatRON(itemPrice * quantity)}</p>
+                          {isPC && displayWarranty > 0 && (
+                            <span className="text-[9px] text-indigo-300 font-bold uppercase italic flex items-center gap-1">
+                              🛡️ {displayWarranty} Luni Garanție
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      {/* 👉 AICI: Partea de Control (Preț + Cantitate) cu textul "Preț:" */}
-                      <div className="flex items-center justify-between sm:flex-col sm:items-end sm:justify-center w-full sm:w-auto mt-4 sm:mt-0 pt-4 sm:pt-0 border-t border-white/5 sm:border-0 shrink-0 gap-4">
-                        <div className="flex flex-col items-start sm:items-end">
+                      <div className="flex items-center justify-between sm:justify-center w-full sm:w-auto mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-white/5 sm:border-0 shrink-0">
+                        <div className="sm:hidden flex flex-col">
+                          <p className="text-white font-black text-base drop-shadow-lg">{formatRON(itemPrice * quantity)}</p>
                           {isPC && displayWarranty > 0 && (
-                            <span className="text-[9px] text-indigo-300 font-bold uppercase italic flex items-center gap-1 mb-1">
+                            <span className="text-[8px] text-indigo-300 font-bold uppercase italic flex items-center gap-1">
                               🛡️ {displayWarranty} Luni
                             </span>
                           )}
-                          <div className="text-white font-black text-xl sm:text-2xl drop-shadow-lg flex items-baseline gap-1.5 leading-none">
-                            <span className="text-gray-500 text-[9px] uppercase tracking-widest italic font-bold">Preț:</span>
-                            <span>{formatRON(itemPrice * quantity)}</span>
-                          </div>
                         </div>
-                        <div className="flex items-center bg-white/5 rounded-2xl p-1 border border-white/10 shrink-0">
+                        <div className="flex items-center bg-white/5 rounded-2xl p-1 border border-white/10">
                           <button onClick={() => handleDecrement(item)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-xl transition-all">-</button>
                           <span className="w-8 text-center text-xs font-black text-indigo-400 italic">{quantity}</span>
                           <button onClick={() => updateQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-xl transition-all">+</button>
@@ -483,15 +483,10 @@ export default function Cart() {
                       )}
                     </div>
                     <div className="h-px bg-white/10 w-full my-6" />
-                    
-                    {/* 👉 AICI: Reparația pentru sumele mari (Fără wrap urât) */}
-                    <div className="flex justify-between items-baseline gap-4">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest shrink-0">Total Final</span>
-                      <span className="text-2xl sm:text-3xl font-black text-white drop-shadow-lg leading-none whitespace-nowrap text-right">
-                        {formatRON(finalTotal)}
-                      </span>
+                    <div className="flex justify-between items-end italic">
+                      <span className="text-gray-400 text-xs font-black uppercase tracking-widest leading-none">Total Final</span>
+                      <span className="text-2xl font-black text-white drop-shadow-lg leading-none">{formatRON(finalTotal)}</span>
                     </div>
-
                   </div>
                   <button
                     onClick={handleCheckoutClick}
