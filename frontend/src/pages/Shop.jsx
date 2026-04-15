@@ -17,24 +17,28 @@ export default function Shop() {
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
-  // Stocare Carcase din Configurator
+  // 👉 NOU: Stocare Carcase din Configurator
   const [availableCases, setAvailableCases] = useState([]);
 
   // Stocare selecții custom (stocare, carcasă) pentru fiecare PC în parte
   const [customSelections, setCustomSelections] = useState({});
 
+  // STATE-URI PENTRU FILTRARE ȘI SORTARE
   const [filterCpu, setFilterCpu] = useState("Toate"); 
   const [filterGpu, setFilterGpu] = useState("Toate"); 
   const [maxPrice, setMaxPrice] = useState(3000000); 
   const [sortOrder, setSortOrder] = useState("default"); 
 
+  // STATE-URI PENTRU UI MENIURI
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
 
+  // --- STATE-URI PENTRU REORDONARE DRAG & DROP (ADMIN) ---
   const [isReordering, setIsReordering] = useState(false);
   const [reorderList, setReorderList] = useState([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
 
+  // --- STATE-URI PENTRU TOOL DE COMPARARE ---
   const [compareList, setCompareList] = useState([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
   
@@ -622,42 +626,42 @@ export default function Shop() {
                           <span className="text-indigo-400 text-base">⚡</span>
                           <div className="flex flex-col min-w-0">
                             <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">CPU</span>
-                            <span className="font-bold text-white/90 truncate text-[11px] leading-tight">{pc.cpuBrand || 'N/A'}</span>
+                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.cpuBrand || 'N/A'}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-indigo-400 text-base">🎮</span>
                           <div className="flex flex-col min-w-0">
                             <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">GPU</span>
-                            <span className="font-bold text-white/90 truncate text-[11px] leading-tight">{pc.gpuBrand || 'N/A'}</span>
+                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.gpuBrand || 'N/A'}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-indigo-400 text-base">📟</span>
                           <div className="flex flex-col min-w-0">
                             <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">RAM</span>
-                            <span className="font-bold text-white/90 truncate text-[11px] leading-tight">{pc.ramGb || 'N/A'}</span>
+                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.ramGb || 'N/A'}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-indigo-400 text-base">🧩</span>
                           <div className="flex flex-col min-w-0">
                             <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Placă Bază</span>
-                            <span className="font-bold text-white/90 truncate text-[11px] leading-tight">{pc.motherboard || 'N/A'}</span>
+                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.motherboard || 'N/A'}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-indigo-400 text-base">❄️</span>
                           <div className="flex flex-col min-w-0">
                             <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Cooler</span>
-                            <span className="font-bold text-white/90 truncate text-[11px] leading-tight">{pc.cooler || 'N/A'}</span>
+                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.cooler || 'N/A'}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-indigo-400 text-base">🔌</span>
                           <div className="flex flex-col min-w-0">
                             <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Sursă</span>
-                            <span className="font-bold text-white/90 truncate text-[11px] leading-tight">{pc.psu || 'N/A'}</span>
+                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.psu || 'N/A'}</span>
                           </div>
                         </div>
                       </div>
