@@ -358,9 +358,8 @@ export default function Cart() {
                           </h3>
                         </div>
 
-                        {/* 👉 REZOLVARE: Grid compact ca înainte, previne rândurile goale și aglomerația */}
                         {isPC && item.specs && (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-3 mt-3 sm:mt-4 opacity-90 w-full">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-3 sm:mt-4 opacity-90 w-full">
                             {[
                               { icon: "⚡", label: "CPU", val: item.specs.cpu },
                               { icon: "🎮", label: "GPU", val: item.specs.gpu },
@@ -371,12 +370,10 @@ export default function Cart() {
                               { icon: "❄️", label: "COOL", val: item.specs.cooler },
                               { icon: "🔌", label: "PSU", val: item.specs.psu },
                             ].map((spec, idx) => spec.val && (
-                              <div key={idx} className="flex flex-col bg-white/5 px-3 py-2 rounded-xl border border-white/5 overflow-hidden">
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  <span className="text-[10px] grayscale brightness-200 shrink-0">{spec.icon}</span>
-                                  <span className="text-[8px] text-indigo-400 font-black uppercase tracking-tighter truncate">{spec.label}</span>
-                                </div>
-                                <span className="text-[10px] text-gray-300 font-medium italic break-words leading-snug line-clamp-2">
+                              <div key={idx} className="flex items-start gap-2 bg-white/5 px-3 py-2 rounded-lg border border-white/5 w-full">
+                                <span className="text-[11px] grayscale brightness-200 shrink-0 pt-[2px]">{spec.icon}</span>
+                                <span className="text-[9px] text-indigo-400 font-black uppercase tracking-tighter shrink-0 pt-[3px]">{spec.label}:</span>
+                                <span className="text-[10px] text-gray-300 font-medium italic flex-1 whitespace-normal break-words leading-snug">
                                   {spec.val}
                                 </span>
                               </div>
@@ -384,82 +381,57 @@ export default function Cart() {
                           </div>
                         )}
 
-                        {/* 👉 REZOLVARE: Garanții listate pe verticală, cu cerc (radio button) elegant */}
                         {isPC && (
                            <div className="mt-4 pt-4 border-t border-white/5 w-full">
-                               <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3 block">Garanție Extinsă (Opțional)</span>
-                               <div className="flex flex-col gap-2 max-w-sm">
-                                  {[
-                                    { level: 0, label: "24 Luni (Inclus)", price: 0 },
-                                    { level: 1, label: "+1 An (36 Luni)", price: basePrice * 0.09 },
-                                    { level: 2, label: "+2 Ani (48 Luni)", price: basePrice * 0.16 }
-                                  ].map((opt) => {
-                                    const isSelected = (!item.extendedWarranty && opt.level === 0) || item.extendedWarranty === opt.level;
-                                    return (
-                                      <button
-                                        key={opt.level}
-                                        onClick={() => updateItemWarranty && updateItemWarranty(item.id, opt.level)}
-                                        className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${isSelected ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40 shadow-inner' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:text-white'}`}
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          {/* "Check box" Rotund */}
-                                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-black/20'}`}>
-                                            {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                          </div>
-                                          <span className="text-[10px] font-black uppercase tracking-widest">{opt.label}</span>
-                                        </div>
-                                        {opt.price > 0 && <span className="text-[10px] font-bold tracking-widest text-white">+{formatRON(opt.price)}</span>}
-                                      </button>
-                                    );
-                                  })}
+                               <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Garanție Extinsă (Opțional)</span>
+                               <div className="flex flex-wrap gap-2">
+                                   <button
+                                      onClick={() => updateItemWarranty && updateItemWarranty(item.id, 0)}
+                                      className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${!item.extendedWarranty || item.extendedWarranty === 0 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 shadow-inner' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'}`}
+                                   >
+                                      24 Luni (Inclus)
+                                   </button>
+                                   <button
+                                      onClick={() => updateItemWarranty && updateItemWarranty(item.id, 1)}
+                                      className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${item.extendedWarranty === 1 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 shadow-inner' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'}`}
+                                   >
+                                      +1 An (36 Luni) / +{formatRON(basePrice * 0.09)}
+                                   </button>
+                                   <button
+                                      onClick={() => updateItemWarranty && updateItemWarranty(item.id, 2)}
+                                      className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${item.extendedWarranty === 2 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 shadow-inner' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'}`}
+                                   >
+                                      +2 Ani (48 Luni) / +{formatRON(basePrice * 0.16)}
+                                   </button>
                                </div>
                            </div>
                         )}
+
+                        <div className="hidden sm:flex items-center gap-4 mt-6">
+                          <p className="text-white font-black text-lg drop-shadow-lg">{formatRON(itemPrice * quantity)}</p>
+                          {isPC && displayWarranty > 0 && (
+                            <span className="text-[9px] text-indigo-300 font-bold uppercase italic flex items-center gap-1">
+                              🛡️ {displayWarranty} Luni Garanție
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      {/* 👉 REZOLVARE: "Preț:" adăugat înainte de suma */}
                       <div className="flex items-center justify-between sm:justify-center w-full sm:w-auto mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-white/5 sm:border-0 shrink-0">
                         <div className="sm:hidden flex flex-col">
-                          <p className="text-white font-black text-base drop-shadow-lg flex items-baseline gap-1">
-                            <span className="text-[9px] text-gray-500 font-bold uppercase italic tracking-widest">Preț:</span>
-                            {formatRON(itemPrice * quantity)}
-                          </p>
+                          <p className="text-white font-black text-base drop-shadow-lg">{formatRON(itemPrice * quantity)}</p>
                           {isPC && displayWarranty > 0 && (
                             <span className="text-[8px] text-indigo-300 font-bold uppercase italic flex items-center gap-1">
                               🛡️ {displayWarranty} Luni
                             </span>
                           )}
                         </div>
-                        
-                        {/* Pe desktop, prețul și cantitatea sunt împreună în dreapta */}
-                        <div className="hidden sm:flex flex-col items-end gap-3">
-                          <div className="flex items-center bg-white/5 rounded-2xl p-1 border border-white/10 w-fit">
-                            <button onClick={() => handleDecrement(item)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-xl transition-all">-</button>
-                            <span className="w-8 text-center text-xs font-black text-indigo-400 italic">{quantity}</span>
-                            <button onClick={() => updateQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-xl transition-all">+</button>
-                          </div>
-                          
-                          <div className="text-right">
-                            <div className="text-white font-black text-xl drop-shadow-lg flex items-baseline gap-1.5 justify-end">
-                              <span className="text-gray-500 text-[10px] uppercase tracking-widest italic font-bold">Preț:</span>
-                              {formatRON(itemPrice * quantity)}
-                            </div>
-                            {isPC && displayWarranty > 0 && (
-                              <span className="text-[9px] text-indigo-300 font-bold uppercase italic mt-1 block">
-                                🛡️ {displayWarranty} Luni Garanție
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Butoane mobile cantitate (dreapta jos) */}
-                        <div className="sm:hidden flex items-center bg-white/5 rounded-2xl p-1 border border-white/10">
+                        <div className="flex items-center bg-white/5 rounded-2xl p-1 border border-white/10">
                           <button onClick={() => handleDecrement(item)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-xl transition-all">-</button>
                           <span className="w-8 text-center text-xs font-black text-indigo-400 italic">{quantity}</span>
                           <button onClick={() => updateQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-xl transition-all">+</button>
                         </div>
                       </div>
-
                     </div>
                   );
                 })}
@@ -511,15 +483,10 @@ export default function Cart() {
                       )}
                     </div>
                     <div className="h-px bg-white/10 w-full my-6" />
-                    
-                    {/* 👉 REZOLVARE: Prevenirea spargerii textului la sume de >30.000 RON */}
-                    <div className="flex justify-between items-baseline gap-4">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest shrink-0">Total Final</span>
-                      <span className="text-2xl sm:text-3xl font-black text-white drop-shadow-lg leading-none break-all text-right">
-                        {formatRON(finalTotal)}
-                      </span>
+                    <div className="flex justify-between items-end italic">
+                      <span className="text-gray-400 text-xs font-black uppercase tracking-widest leading-none">Total Final</span>
+                      <span className="text-2xl font-black text-white drop-shadow-lg leading-none">{formatRON(finalTotal)}</span>
                     </div>
-
                   </div>
                   <button
                     onClick={handleCheckoutClick}
