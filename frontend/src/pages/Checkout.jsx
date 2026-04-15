@@ -430,15 +430,25 @@ export default function Checkout() {
       if (item.extendedWarranty === 1) extraText = " (+ Garanție Extinsă 1 An)";
       if (item.extendedWarranty === 2) extraText = " (+ Garanție Extinsă 2 Ani)";
 
+      // 👉 LOGICA REPARATĂ PENTRU SPECS: Asigurăm transformarea obiectului specs într-un string JSON, dacă există.
+      let safeSpecsString = null;
+      if (item.specs) {
+          if (typeof item.specs === 'object') {
+              safeSpecsString = JSON.stringify(item.specs);
+          } else if (typeof item.specs === 'string') {
+              safeSpecsString = item.specs; // dacă deja e string, îl lăsăm așa
+          }
+      }
+
       return {
         ...item,
         id: item.id,
         productName: (item.name || item.productName) + extraText, 
         qty: parseInt(item.qty || item.quantity || 1),
-        // 👉 AICI: Acum trimitem prețul de bază (fără garanție inclusă) către DB și Proformă!
         priceCents: basePrice,
         priceCentsAtBuy: basePrice,
-        warrantyMonths: finalWarranty
+        warrantyMonths: finalWarranty,
+        specs: safeSpecsString // Trimitem specs ca string valid
       };
     });
 
@@ -471,7 +481,6 @@ export default function Checkout() {
         ...serviceOpts 
       }, 
       cartItems: enrichedItems,
-      // 👉 Iar totalul este suma cu tot cu garanție (Așa Proforma va adăuga rândul lipsă!)
       total: finalTotalCents, 
       shippingCents: shippingCents,
       userEmail: user?.email, 
@@ -975,6 +984,16 @@ export default function Checkout() {
                 </div>
 
                 <div className="mb-6">
+                  {/* 👉 NOU: Eticheta pentru Asamblare la comandă din Checkout (doar dacă sunt PC-uri în coș) */}
+                  {cartAnalysis.hasPC && (
+                      <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+                          <span className="text-amber-400 mt-0.5">⚠️</span>
+                          <p className="text-xs text-amber-400 font-medium leading-relaxed italic">
+                              Acest sistem este asamblat la comandă pe baza alegerilor tale (custom-build) și <strong>nu beneficiază de drept de retur de 14 zile</strong>, conform OUG 34/2014, art. 16.
+                          </p>
+                      </div>
+                  )}
+
                   <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors">
                     <div className="relative flex items-center mt-0.5">
                       <input 
