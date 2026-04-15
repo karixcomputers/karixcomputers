@@ -61,7 +61,7 @@ export default function Retur() {
              <p className="text-indigo-300 text-center font-medium italic">
                Conform OUG 34/2014, clienții <strong>persoane fizice</strong> au dreptul de a returna produsele achiziționate online în termen de 
                <span className="text-white font-black mx-1 underline decoration-indigo-500">14 zile calendaristice</span> 
-               de la primirea acestora, fără penalități și fără necesitatea unei justificări.
+               de la primirea acestora, fără penalități și fără necesitatea unei justificări, <strong className="text-pink-400">cu excepția produselor asamblate la comandă</strong>.
              </p>
           </div>
 
@@ -69,7 +69,7 @@ export default function Retur() {
 
             <ReturSection number="01" title="Verifică Eligibilitatea">
               <p>
-                Pentru a fi acceptat, produsul trebuie returnat în aceeași stare în care a fost livrat, în ambalajul original, cu toate accesoriile și etichetele intacte.
+                Pentru a fi acceptat, produsul eligibil pentru retur trebuie returnat în aceeași stare în care a fost livrat, în ambalajul original, cu toate accesoriile și etichetele intacte.
               </p>
               <p className="p-4 rounded-2xl bg-white/5 border border-white/5 text-xs italic text-left">
                 * Produsele hardware care prezintă urme de uzură, lovituri sau modificări hardware (ex: ruperea sigiliilor) nu pot fi acceptate pentru retur integral.
@@ -87,7 +87,7 @@ export default function Retur() {
             </ReturSection>
 
             <ReturSection number="02" title="Anunță Returul">
-              <p>Procesul este digitalizat și poate fi inițiat din contul tău:</p>
+              <p>Procesul este digitalizat și poate fi inițiat din contul tău (pentru produsele eligibile):</p>
               <div className="flex flex-col gap-3 mt-4">
                 <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 transition-all hover:bg-white/[0.08]">
                   <div className="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-xs border border-indigo-500/20">1</div>
@@ -123,15 +123,15 @@ export default function Retur() {
             </ReturSection>
 
             <ReturSection number="✕" title="Excepții de la retur" isWarning>
-              <p className="mb-4">Nu pot fi returnate conform legii:</p>
+              <p className="mb-4 text-white font-bold">Conform OUG 34/2014, art. 16, nu pot fi returnate următoarele:</p>
               <ul className="space-y-4">
                 {[
-                  "Sistemele PC Custom Build asamblate la cerere, conform specificațiilor alese de client (produse personalizate).",
+                  "Sistemele PC (Desktop) asamblate la comandă pe baza opțiunilor selectate de client (produse confecționate după specificațiile prezentate de consumator sau personalizate în mod clar).",
                   "Licențele software care au fost deja activate.",
                   "Serviciile care au fost deja prestate (manoperă asamblare, diagnosticare).",
                   "Produse desigilate care nu pot fi revândute din motive de igienă sau securitate."
                 ].map((text) => (
-                  <li key={text} className="flex items-start gap-4 p-4 rounded-2xl bg-pink-500/[0.03] border border-pink-500/10 text-gray-400 text-sm text-left">
+                  <li key={text} className="flex items-start gap-4 p-4 rounded-2xl bg-pink-500/[0.03] border border-pink-500/10 text-gray-300 text-sm text-left">
                      <span className="text-pink-500 font-black">✕</span>
                      <span>{text}</span>
                   </li>

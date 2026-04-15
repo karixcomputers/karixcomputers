@@ -105,17 +105,23 @@ export default function Terms() {
 
             <TermsSection number="05" title="Dreptul de Retragere / Retur">
               <p>
-                Conform OUG 34/2014, <strong>persoanele fizice (consumatorii)</strong> au dreptul de a returna produsele hardware în termen de 14 zile calendaristice de la primirea acestora, fără a invoca un motiv. <strong>Costul transportului pentru returnarea produselor este suportat integral de către client.</strong>
+                Conform OUG 34/2014, <strong>persoanele fizice (consumatorii)</strong> au dreptul de a returna produsele hardware în termen de 14 zile calendaristice de la primirea acestora, fără a invoca un motiv, <strong>cu excepția produselor asamblate la comandă.</strong> Costul transportului pentru returnarea produselor eligibile este suportat integral de către client.
               </p>
               
               <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-sm text-amber-200/70 my-4 text-left">
                 <p>
-                  <strong>Notă importantă:</strong> Persoanele juridice (firme, PFA, ONG, asociații) nu beneficiază de dreptul de retragere (retur în 14 zile) conform legislației în vigoare, contractul fiind unul comercial între profesioniști. Orice solicitare de retur pentru persoanele juridice va fi analizată individual și poate fi acceptată sau refuzată de Karix Computers.
+                  <strong>Sisteme PC Personalizate:</strong> Sistemele PC (Desktop) prezentate pe site sunt asamblate la comandă pe baza opțiunilor selectate de client (capacitate stocare, model carcasă, garanție etc.). Conform OUG 34/2014, art. 16, lit. c, produsele confecționate după specificațiile prezentate de consumator sau personalizate în mod clar sunt exceptate de la dreptul de retragere din contract (retur în 14 zile).
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-sm text-amber-200/70 my-4 text-left">
+                <p>
+                  <strong>Persoane Juridice:</strong> Persoanele juridice (firme, PFA, ONG, asociații) nu beneficiază de dreptul de retragere (retur în 14 zile) conform legislației în vigoare, contractul fiind unul comercial între profesioniști. Orice solicitare de retur pentru persoanele juridice va fi analizată individual și poate fi acceptată sau refuzată de Karix Computers.
                 </p>
               </div>
               
               <p>
-                Rambursarea sumei se face în maximum 14 zile de la recepția și verificarea integrității produsului returnat. Pentru comenzile achitate online, <strong>restituirea banilor se va efectua exclusiv pe același card</strong> utilizat la momentul tranzacției inițiale.
+                Rambursarea sumei (pentru produsele eligibile) se face în maximum 14 zile de la recepția și verificarea integrității produsului returnat. Pentru comenzile achitate online, <strong>restituirea banilor se va efectua exclusiv pe același card</strong> utilizat la momentul tranzacției inițiale.
               </p>
             </TermsSection>
 
