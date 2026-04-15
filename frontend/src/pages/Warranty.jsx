@@ -128,7 +128,7 @@ export default function Warranty() {
               </p>
             </WarrantySection>
 
-            <WarrantySection number="05" title="Politica Garanției Extinse (Karix Extra)">
+            <WarrantySection number="05" title="Politica Garanției Extinse">
               <p>
                 Garanția Extinsă reprezintă un contract comercial facultativ, aplicabil după expirarea garanției legale de 24 de luni. În această perioadă, se aplică următoarele reguli specifice privind înlocuirea componentelor defecte:
               </p>

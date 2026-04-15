@@ -381,15 +381,17 @@ export default function Cart() {
                           </div>
                         )}
 
-                        {/* 👉 Garanții extinse verticale + checkbox */}
                         {isPC && (
                            <div className="mt-4 pt-4 border-t border-white/5 w-full">
-                               <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Garanție Extinsă (Opțional)</span>
-                               <div className="flex flex-col gap-2 w-full max-w-xs">
+                               <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">Garanție Extinsă (Opțional)</span>
+                                  <Link to="/warranty" className="px-2 py-0.5 rounded-full border border-indigo-500/30 text-[8px] font-black uppercase tracking-widest text-indigo-400 hover:bg-indigo-500/20 transition-all">Detalii</Link>
+                               </div>
+                               <div className="flex flex-col gap-2 max-w-sm">
                                   {[
                                     { level: 0, label: "24 LUNI (INCLUS)", price: 0 },
-                                    { level: 1, label: `+1 AN (36 LUNI)`, price: basePrice * 0.09 },
-                                    { level: 2, label: `+2 ANI (48 LUNI)`, price: basePrice * 0.16 }
+                                    { level: 1, label: "+1 AN (36 LUNI)", price: basePrice * 0.09 },
+                                    { level: 2, label: "+2 ANI (48 LUNI)", price: basePrice * 0.16 }
                                   ].map((opt) => {
                                     const isSelected = (!item.extendedWarranty && opt.level === 0) || item.extendedWarranty === opt.level;
                                     return (
@@ -413,8 +415,7 @@ export default function Cart() {
                         )}
 
                         <div className="hidden sm:flex items-center gap-4 mt-6">
-                          {/* 👉 "Pret:" adăugat aici */}
-                          <p className="text-white font-black text-lg drop-shadow-lg"><span className="text-gray-500 text-[10px] font-bold italic tracking-widest mr-1">Pret:</span>{formatRON(itemPrice * quantity)}</p>
+                          <p className="text-white font-black text-lg drop-shadow-lg">{formatRON(itemPrice * quantity)}</p>
                           {isPC && displayWarranty > 0 && (
                             <span className="text-[9px] text-indigo-300 font-bold uppercase italic flex items-center gap-1">
                               🛡️ {displayWarranty} Luni Garanție
@@ -489,10 +490,9 @@ export default function Cart() {
                       )}
                     </div>
                     <div className="h-px bg-white/10 w-full my-6" />
-                    <div className="flex justify-between items-baseline gap-2 italic">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none shrink-0">Total Final</span>
-                      {/* 👉 Fix sume mari */}
-                      <span className="text-2xl font-black text-white drop-shadow-lg leading-none break-all text-right">{formatRON(finalTotal)}</span>
+                    <div className="flex justify-between items-end italic">
+                      <span className="text-gray-400 text-xs font-black uppercase tracking-widest leading-none">Total Final</span>
+                      <span className="text-2xl font-black text-white drop-shadow-lg leading-none">{formatRON(finalTotal)}</span>
                     </div>
                   </div>
                   <button
