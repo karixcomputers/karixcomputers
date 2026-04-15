@@ -330,22 +330,32 @@ export default function Cart() {
                     <div key={item.id} className="group p-5 sm:p-6 rounded-[25px] sm:rounded-[35px] bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 hover:bg-white/[0.08] hover:border-indigo-500/30 transition-all duration-300 shadow-xl relative">
                       <button onClick={() => removeFromCart(item.id)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-500 hover:text-pink-500 transition-colors h-8 w-8 flex items-center justify-center rounded-full hover:bg-pink-500/10 z-20">✕</button>
 
-                      <div className="flex items-center gap-4 w-full sm:w-auto pr-8 sm:pr-0">
-                        <div className={`h-20 w-20 sm:h-24 sm:w-24 rounded-2xl sm:rounded-3xl flex items-center justify-center border shrink-0 transition-all duration-500 overflow-hidden ${isPC ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-pink-500/10 border-pink-500/20'}`}>
-                          {imgUrl ? (
-                             <img src={imgUrl} alt={item.name} className="w-full h-full object-cover" />
-                          ) : (
-                             <span className="text-2xl sm:text-3xl">{isPC ? "🖥️" : "🛠️"}</span>
-                          )}
+                      <div className="flex flex-col items-center gap-2 w-full sm:w-auto pr-8 sm:pr-0">
+                        <div className="flex items-center gap-4 w-full sm:w-auto">
+                            <div className={`h-20 w-20 sm:h-24 sm:w-24 rounded-2xl sm:rounded-3xl flex items-center justify-center border shrink-0 transition-all duration-500 overflow-hidden ${isPC ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-pink-500/10 border-pink-500/20'}`}>
+                              {imgUrl ? (
+                                 <img src={imgUrl} alt={item.name} className="w-full h-full object-cover" />
+                              ) : (
+                                 <span className="text-2xl sm:text-3xl">{isPC ? "🖥️" : "🛠️"}</span>
+                              )}
+                            </div>
+                            <div className="flex-1 sm:hidden">
+                              <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border mb-1.5 inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
+                                {isPC ? 'Hardware' : 'Service'}
+                              </span>
+                              <h3 className="text-sm font-bold text-white tracking-tight italic uppercase leading-tight drop-shadow-md line-clamp-2">
+                                {item.productName || item.name}
+                              </h3>
+                            </div>
                         </div>
-                        <div className="flex-1 sm:hidden">
-                          <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border mb-1.5 inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
-                            {isPC ? 'Hardware' : 'Service'}
-                          </span>
-                          <h3 className="text-sm font-bold text-white tracking-tight italic uppercase leading-tight drop-shadow-md line-clamp-2">
-                            {item.productName || item.name}
-                          </h3>
-                        </div>
+                        {/* 👉 NOU: Eticheta de avertizare sub imagine (Mobile & Desktop) */}
+                        {isPC && (
+                            <div className="mt-2 text-center w-full sm:w-24 px-1">
+                                <span className="inline-block text-[8px] leading-tight font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-1 shadow-sm">
+                                    ⚠️ Asamblat la Comandă
+                                </span>
+                            </div>
+                        )}
                       </div>
                       
                       <div className="flex-1 w-full pt-1 overflow-hidden">
@@ -415,7 +425,7 @@ export default function Cart() {
                         )}
 
                         <div className="hidden sm:flex items-center gap-4 mt-6">
-                          <p className="text-white font-black text-lg drop-shadow-lg">{formatRON(itemPrice * quantity)}</p>
+                          <p className="text-white font-black text-lg drop-shadow-lg"><span className="text-gray-500 text-[10px] font-bold italic tracking-widest mr-1">Pret:</span>{formatRON(itemPrice * quantity)}</p>
                           {isPC && displayWarranty > 0 && (
                             <span className="text-[9px] text-indigo-300 font-bold uppercase italic flex items-center gap-1">
                               🛡️ {displayWarranty} Luni Garanție
@@ -490,9 +500,9 @@ export default function Cart() {
                       )}
                     </div>
                     <div className="h-px bg-white/10 w-full my-6" />
-                    <div className="flex justify-between items-end italic">
-                      <span className="text-gray-400 text-xs font-black uppercase tracking-widest leading-none">Total Final</span>
-                      <span className="text-2xl font-black text-white drop-shadow-lg leading-none">{formatRON(finalTotal)}</span>
+                    <div className="flex justify-between items-baseline gap-2 italic">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none shrink-0">Total Final</span>
+                      <span className="text-2xl font-black text-white drop-shadow-lg leading-none break-all text-right">{formatRON(finalTotal)}</span>
                     </div>
                   </div>
                   <button

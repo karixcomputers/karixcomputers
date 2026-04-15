@@ -144,12 +144,6 @@ export default function Retur() {
           <div className="mt-20 text-center relative z-20">
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <Link
-                to="/orders"
-                className="inline-flex items-center justify-center gap-3 px-10 py-4 rounded-2xl bg-indigo-600 text-white font-black uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20"
-              >
-                Cere un Retur →
-              </Link>
-              <Link
                 to="/"
                 className="inline-flex items-center justify-center gap-3 px-10 py-4 rounded-2xl bg-white/[0.03] border border-white/10 text-white font-bold hover:bg-white/[0.08] transition-all"
               >
