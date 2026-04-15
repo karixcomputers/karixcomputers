@@ -17,28 +17,24 @@ export default function Shop() {
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
-  // 👉 NOU: Stocare Carcase din Configurator
+  // Stocare Carcase din Configurator
   const [availableCases, setAvailableCases] = useState([]);
 
   // Stocare selecții custom (stocare, carcasă) pentru fiecare PC în parte
   const [customSelections, setCustomSelections] = useState({});
 
-  // STATE-URI PENTRU FILTRARE ȘI SORTARE
   const [filterCpu, setFilterCpu] = useState("Toate"); 
   const [filterGpu, setFilterGpu] = useState("Toate"); 
   const [maxPrice, setMaxPrice] = useState(3000000); 
   const [sortOrder, setSortOrder] = useState("default"); 
 
-  // STATE-URI PENTRU UI MENIURI
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
 
-  // --- STATE-URI PENTRU REORDONARE DRAG & DROP (ADMIN) ---
   const [isReordering, setIsReordering] = useState(false);
   const [reorderList, setReorderList] = useState([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
 
-  // --- STATE-URI PENTRU TOOL DE COMPARARE ---
   const [compareList, setCompareList] = useState([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
   
@@ -75,11 +71,24 @@ export default function Shop() {
     if (maxAvailablePrice > 0) setMaxPrice(maxAvailablePrice);
   }, [maxAvailablePrice]);
 
-  const fetchPcs = async () => {
+  const fetchCasesAndPcs = async () => {
     try {
-      const res = await apiFetch("/products");
-      if (res.ok) {
-        const data = await res.json();
+      // Pasul 1: Aducem carcasele întâi
+      const casesRes = await apiFetch("/adminconfigurator");
+      let fetchedCases = [];
+      if (casesRes.ok) {
+        const items = await casesRes.json();
+        fetchedCases = items.filter(item => item.category === 'case');
+        setAvailableCases(fetchedCases);
+      }
+
+      // Setăm primul ID de carcasă găsit (dacă există) ca default pentru configurator
+      const initialCaseId = fetchedCases.length > 0 ? fetchedCases[0].id : null;
+
+      // Pasul 2: Aducem produsele
+      const pcRes = await apiFetch("/products");
+      if (pcRes.ok) {
+        const data = await pcRes.json();
         const onlyPcs = data.filter(p => 
           p.category !== "service" &&
           p.isVisible !== false && 
@@ -89,38 +98,25 @@ export default function Shop() {
         );
         setPcs(onlyPcs);
         
+        // Pasul 3: Inițializăm selecțiile (SSD=1TB, Case=primul id găsit din baza de date)
         const initialSelections = {};
         onlyPcs.forEach(pc => {
-            initialSelections[pc.id] = { storage: "1TB", caseId: "default" };
+            initialSelections[pc.id] = { 
+                storage: "1TB", 
+                caseId: initialCaseId // 👉 Setăm prima carcasă din listă automat
+            };
         });
         setCustomSelections(initialSelections);
-
       }
     } catch (err) {
-      console.error("Eroare la încărcarea sistemelor PC:", err);
+      console.error("Eroare la încărcarea datelor:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // 👉 NOU: Funcția care cere carcasele din DB Configurator
-  const fetchCases = async () => {
-    try {
-      const res = await apiFetch("/adminconfigurator");
-      if (res.ok) {
-        const items = await res.json();
-        // Filtrăm doar cele care au category === 'case'
-        const caseItems = items.filter(item => item.category === 'case');
-        setAvailableCases(caseItems);
-      }
-    } catch (err) {
-      console.error("Eroare la aducerea carcaselor:", err);
-    }
-  };
-
   useEffect(() => {
-    fetchPcs();
-    fetchCases(); // Apelăm funcția de preluare carcase
+    fetchCasesAndPcs();
   }, []);
 
   const filteredAndSortedPcs = useMemo(() => {
@@ -211,7 +207,7 @@ export default function Shop() {
         setToasts((prev) => [...prev, { id: toastId, message: "Ordinea a fost salvată cu succes!" }]);
         setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toastId)), 3000);
         setIsReordering(false);
-        fetchPcs(); 
+        fetchCasesAndPcs(); 
       } else {
         const data = await res.json();
         throw new Error(data.error || "Eroare la salvare.");
@@ -523,27 +519,31 @@ export default function Shop() {
                   let storageAddedPrice = 0;
                   
                   if (selectedStorage === "2TB") {
-                      storageAddedPrice = 500 * 100; // +500 RON
+                      storageAddedPrice = 500 * 100;
                   } else if (selectedStorage === "4TB") {
-                      storageAddedPrice = 1750 * 100; // +1750 RON
+                      storageAddedPrice = 1750 * 100;
                   }
 
-                  // LOGICĂ CARCASĂ CUSTOM DIN BAZA DE DATE
-                  const selectedCaseId = customSelections[pc.id]?.caseId || "default";
+                  // LOGICĂ CARCASĂ CUSTOM DIN BAZA DE DATE (DOAR CE ESTE ÎN ADMIN CONFIGURATOR)
+                  const selectedCaseId = customSelections[pc.id]?.caseId || (availableCases.length > 0 ? availableCases[0].id : null);
                   let caseAddedPrice = 0;
                   let selectedCaseObj = null;
 
-                  if (selectedCaseId !== "default") {
+                  if (selectedCaseId && availableCases.length > 0) {
                       selectedCaseObj = availableCases.find(c => c.id === selectedCaseId);
                       if (selectedCaseObj) {
-                          caseAddedPrice = selectedCaseObj.price || 0; // în cenți
+                          caseAddedPrice = selectedCaseObj.price || 0; 
+                      } else {
+                          // Dacă dintr-un motiv anume ID-ul nu s-a găsit, selectăm default prima opțiune
+                          selectedCaseObj = availableCases[0];
+                          caseAddedPrice = selectedCaseObj.price || 0;
                       }
                   }
 
                   // CALCUL PREȚ TOTAL 
                   const currentPriceCents = (pc.priceCents || 0) + storageAddedPrice + caseAddedPrice;
 
-                  // Construim stringul final pentru stocare ca să apară în coș corect, combinând numele inițial cu capacitatea extra dacă există
+                  // Construim stringul final pentru stocare ca să apară în coș corect
                   let finalStorageText = pc.storageGb || "N/A";
                   if (selectedStorage === "2TB") finalStorageText = "2TB NVMe M.2 (Upgrade)";
                   if (selectedStorage === "4TB") finalStorageText = "4TB NVMe M.2 (Upgrade)";
@@ -556,7 +556,6 @@ export default function Shop() {
                     
                     <div className="relative h-64 overflow-hidden bg-black/20">
                       <div className="absolute top-5 left-5 z-20 flex flex-col gap-2">
-                        {/* 👉 MODIFICARE AICI: "Asamblat la Comandă" cu avertisment pe Hover */}
                         <div className="group/badge relative">
                             <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-black text-[10px] font-black uppercase tracking-widest shadow-xl cursor-help block">
                                 Asamblat la Comandă
@@ -663,39 +662,31 @@ export default function Shop() {
                         </div>
                       </div>
 
-                      {/* 👉 NOU: OPȚIUNEA DE CARCASĂ (Dinamice din Configurator) */}
+                      {/* 👉 OPTIUNEA DE CARCASĂ (Dinamice din Configurator - FĂRĂ 'Standard' Default Hardcodat) */}
                       {availableCases.length > 0 && (
                           <div className="mt-2 mb-4 p-4 rounded-[20px] bg-white/5 border border-white/10">
                               <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Alege Carcasa</span>
                               <div className="flex flex-col gap-2">
-                                  
-                                  <button
-                                      onClick={() => updateSelection(pc.id, 'caseId', 'default')}
-                                      className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${selectedCaseId === 'default' ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                                  >
-                                      <div className="flex items-center gap-3">
-                                          <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedCaseId === 'default' ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
-                                              {selectedCaseId === 'default' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                          </div>
-                                          <span>Standard ({pc.case || "Inclusă"})</span>
-                                      </div>
-                                  </button>
+                                  {availableCases.map(caseOpt => {
+                                      // Pentru a ne asigura că prima opțiune este selectată by default dacă 'selectedCaseId' nu se potrivește cu nimic sau nu a fost schimbat încă.
+                                      const isSelected = selectedCaseId === caseOpt.id || (!selectedCaseId && caseOpt.id === availableCases[0].id);
 
-                                  {availableCases.map(caseOpt => (
-                                      <button
-                                          key={caseOpt.id}
-                                          onClick={() => updateSelection(pc.id, 'caseId', caseOpt.id)}
-                                          className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${selectedCaseId === caseOpt.id ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                                      >
-                                          <div className="flex items-center gap-3">
-                                              <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedCaseId === caseOpt.id ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
-                                                  {selectedCaseId === caseOpt.id && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                      return (
+                                          <button
+                                              key={caseOpt.id}
+                                              onClick={() => updateSelection(pc.id, 'caseId', caseOpt.id)}
+                                              className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${isSelected ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                                          >
+                                              <div className="flex items-center gap-3">
+                                                  <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
+                                                      {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                                  </div>
+                                                  <span>{caseOpt.name}</span>
                                               </div>
-                                              <span>{caseOpt.name}</span>
-                                          </div>
-                                          {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price)}</span>}
-                                      </button>
-                                  ))}
+                                              {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price)}</span>}
+                                          </button>
+                                      );
+                                  })}
                               </div>
                           </div>
                       )}
@@ -847,14 +838,17 @@ export default function Shop() {
                         if (selectedStorage === "2TB") storageAddedPrice = 500 * 100;
                         if (selectedStorage === "4TB") storageAddedPrice = 1750 * 100;
                         
-                        const selectedCaseId = customSelections[pc.id]?.caseId || "default";
+                        const selectedCaseId = customSelections[pc.id]?.caseId || (availableCases.length > 0 ? availableCases[0].id : null);
                         let caseAddedPrice = 0;
                         let selectedCaseObj = null;
 
-                        if (selectedCaseId !== "default") {
+                        if (selectedCaseId && availableCases.length > 0) {
                             selectedCaseObj = availableCases.find(c => c.id === selectedCaseId);
                             if (selectedCaseObj) {
                                 caseAddedPrice = selectedCaseObj.price || 0; 
+                            } else {
+                                selectedCaseObj = availableCases[0];
+                                caseAddedPrice = selectedCaseObj.price || 0;
                             }
                         }
 
