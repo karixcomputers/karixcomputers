@@ -130,6 +130,7 @@ model OrderItem {
   warrantyMonths  Int     @default(24) 
   status          String  @default("in_asteptare")
   awb             String?
+  specs           String?
 }
 
 model Ticket {
