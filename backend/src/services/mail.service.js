@@ -1310,3 +1310,27 @@ export async function sendAssemblyInPossessionEmail(to, data) {
     console.error("❌ Eroare sendAssemblyInPossessionEmail:", err);
   }
 }
+
+// ============================================================
+// 🚀 NOU: FUNCȚIE AWB GARANȚIE RESPINSĂ
+// ============================================================
+export async function sendServiceAwbRejectedEmail(to, data) {
+  try {
+    const tpl = loadTemplate("serviceAwbRejected.html");
+    const html = render(tpl, {
+      customerName: data.customerName,
+      productName: data.productName,
+      awb: data.awb
+    });
+
+    await sendHtmlMail({ 
+      to, 
+      subject: `📦 Dispozitivul tău a fost expediat (Garanție Respinsă) - Karix`, 
+      html
+    });
+    
+    console.log(`✅ MAIL AWB RESPINS TRIMIS LA: ${to}`);
+  } catch (err) {
+    console.error("❌ Eroare sendServiceAwbRejectedEmail:", err);
+  }
+}

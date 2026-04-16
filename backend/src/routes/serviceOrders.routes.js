@@ -9,7 +9,8 @@ import {
   sendServiceOrderPlaced,
   sendServiceShippedWithAwbEmail,
   // 👉 1. IMPORTĂM FUNCȚIA DE RESPINGERE GARANȚIE
-  sendWarrantyRejectedEmail 
+  sendWarrantyRejectedEmail,
+  sendServiceAwbRejectedEmail
 } from "../services/mail.service.js";
 
 // 👉 IMPORTĂM MULTER PENTRU UPLOAD-URI
@@ -289,14 +290,20 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
       awb: generatedAwb || updatedOrder.awb
     };
 
+// 👉 TRIMITERE MAIL-URI PE BAZA STATUSULUI
     if (status === "in_laborator") {
       await sendServiceInPossessionEmail(userEmail, emailData).catch(() => {});
     } 
     else if (status === "finalizat") {
       await sendServiceFinishedEmail(userEmail, emailData).catch(() => {});
     }
-    else if (status === "awb_finalizat" || status === "awb_respins" || status === "livrat") {
+    else if (status === "awb_finalizat" || status === "expediat") {
+      // Mail AWB pentru produs reparat/ok
       await sendServiceShippedWithAwbEmail(userEmail, emailData).catch(() => {});
+    }
+    else if (status === "awb_respins") {
+      // 👉 NOU: Mail AWB pentru produs respins
+      await sendServiceAwbRejectedEmail(userEmail, emailData).catch(() => {});
     }
 
     res.json(updatedOrder);
