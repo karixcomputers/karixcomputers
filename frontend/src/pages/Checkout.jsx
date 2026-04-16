@@ -186,6 +186,7 @@ export default function Checkout() {
     
     let hardwareSubtotal = 0;
     let totalServicesInCart = 0;
+    let disableFanbox = false; // 👉 NOU: Variabilă pentru a bloca locker-ul
     
     const hasPC = items.some(item => {
       const nameStr = (item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -214,12 +215,24 @@ export default function Checkout() {
         if (!isAddon) {
             totalServicesInCart += (item.qty || 1);
         }
+
+        // 👉 NOU: Dacă serviciul conține cuvintele astea, clar este un PC Desktop mare și greu.
+        if (nameStr.includes("pc") || nameStr.includes("sistem") || nameStr.includes("desktop") || nameStr.includes("unitate")) {
+            disableFanbox = true;
+        }
       }
       return isSrv;
     });
 
-    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart };
+    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart, disableFanbox };
   }, [items]);
+
+  // Dacă utilizatorul are un PC la service și FANbox e blocat, îl forțăm automat pe curier
+  useEffect(() => {
+    if (cartAnalysis.disableFanbox && serviceDeliveryMethod === "fanbox") {
+        setServiceDeliveryMethod("courier");
+    }
+  }, [cartAnalysis.disableFanbox, serviceDeliveryMethod]);
 
   useEffect(() => {
       if (cartAnalysis.totalServicesInCart > 1) {
@@ -430,13 +443,12 @@ export default function Checkout() {
       if (item.extendedWarranty === 1) extraText = " (+ Garanție Extinsă 1 An)";
       if (item.extendedWarranty === 2) extraText = " (+ Garanție Extinsă 2 Ani)";
 
-      // 👉 LOGICA REPARATĂ PENTRU SPECS: Asigurăm transformarea obiectului specs într-un string JSON, dacă există.
       let safeSpecsString = null;
       if (item.specs) {
           if (typeof item.specs === 'object') {
               safeSpecsString = JSON.stringify(item.specs);
           } else if (typeof item.specs === 'string') {
-              safeSpecsString = item.specs; // dacă deja e string, îl lăsăm așa
+              safeSpecsString = item.specs; 
           }
       }
 
@@ -448,7 +460,7 @@ export default function Checkout() {
         priceCents: basePrice,
         priceCentsAtBuy: basePrice,
         warrantyMonths: finalWarranty,
-        specs: safeSpecsString // Trimitem specs ca string valid
+        specs: safeSpecsString 
       };
     });
 
@@ -683,7 +695,7 @@ export default function Checkout() {
                         Ai în coș <strong>{cartAnalysis.totalServicesInCart} dispozitive</strong> pentru service.
                       </p>
                       <p className="text-[11px] text-amber-500/80 mt-1 leading-snug">
-                        Din motive logistice (generare AWB per colet), preluarea comună este disponibilă <strong>exclusiv în Oradea</strong> (ne deplasăm noi sau ni le aduci tu). Dacă dorești trimitere prin Curier/FANbox din alt județ, te rugăm să plasezi comenzi separate pentru fiecare dispozitiv.
+                        Din motive logistice (generare AWB per colet), preluarea comună este disponibilă <strong>exclusiv în Oradea</strong> (ne deplasăm noi sau ni le aduci tu). Dacă dorești trimitere prin Curier din alt județ, te rugăm să plasezi comenzi separate pentru fiecare dispozitiv.
                       </p>
                     </div>
                   </div>
@@ -803,7 +815,9 @@ export default function Checkout() {
                            <h4 className="text-white font-black text-xs uppercase tracking-wider mb-4 flex items-center gap-2">
                               <span>📦</span> Cum ne trimiți dispozitivul defect?
                            </h4>
-                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                           
+                           {/* 👉 NOU: Aici ascundem fanbox-ul dacă dispozitivul din coș este un PC desktop */}
+                           <div className={`grid grid-cols-1 ${!cartAnalysis.disableFanbox ? 'sm:grid-cols-2' : ''} gap-4`}>
                               <button 
                                 type="button" 
                                 onClick={() => setServiceDeliveryMethod("courier")} 
@@ -813,17 +827,19 @@ export default function Checkout() {
                                 <div className="text-xs opacity-70 mt-1">Curierul vine la adresa ta (+30 RON)</div>
                               </button>
                               
-                              <button 
-                                type="button" 
-                                onClick={() => setServiceDeliveryMethod("fanbox")} 
-                                className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "fanbox" ? "bg-cyan-500 text-black border-cyan-400 shadow-lg shadow-cyan-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
-                              >
-                                <div className="font-bold text-sm">Predare la FANbox</div>
-                                <div className="text-xs opacity-70 mt-1">Îl lași la locker (+15 RON)</div>
-                              </button>
+                              {!cartAnalysis.disableFanbox && (
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setServiceDeliveryMethod("fanbox")} 
+                                    className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "fanbox" ? "bg-cyan-500 text-black border-cyan-400 shadow-lg shadow-cyan-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
+                                  >
+                                    <div className="font-bold text-sm">Predare la FANbox</div>
+                                    <div className="text-xs opacity-70 mt-1">Îl lași la locker (+15 RON)</div>
+                                  </button>
+                              )}
                            </div>
 
-                           {serviceDeliveryMethod === "fanbox" && (
+                           {serviceDeliveryMethod === "fanbox" && !cartAnalysis.disableFanbox && (
                               <div className="mt-6 p-4 rounded-xl bg-black/40 border border-cyan-500/20 animate-in fade-in zoom-in duration-300">
                                 {!selectedFanbox ? (
                                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -984,7 +1000,6 @@ export default function Checkout() {
                 </div>
 
                 <div className="mb-6">
-                  {/* 👉 NOU: Eticheta pentru Asamblare la comandă din Checkout (doar dacă sunt PC-uri în coș) */}
                   {cartAnalysis.hasPC && (
                       <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
                           <span className="text-amber-400 mt-0.5">⚠️</span>

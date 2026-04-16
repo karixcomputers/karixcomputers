@@ -164,7 +164,6 @@ export default function AdminService() {
   // Helper pentru a formata Order ID-ul frumos
   const formatOrderId = (id) => {
       if (!id) return "N/A";
-      // Dacă e un ID de prisma normal (int sau cuid lung), încercăm să-l afișăm scurt și lizibil
       return `#${String(id).slice(-8).toUpperCase()}`;
   };
 
@@ -217,7 +216,14 @@ export default function AdminService() {
                 {currentList.map((order) => (
                   <tr key={order.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                     <td className="p-6">
-                      <div className="font-bold text-sm text-white mb-1">{order.customerName}</div>
+                      <div className="flex items-baseline gap-3 mb-1">
+                        <div className="font-bold text-sm text-white">{order.customerName}</div>
+                        {order.phoneNumber && (
+                          <div className="text-[10px] text-gray-400 font-mono tracking-widest bg-black/20 px-2 py-0.5 rounded border border-white/5">
+                            📞 {order.phoneNumber}
+                          </div>
+                        )}
+                      </div>
                       <div className="flex items-center gap-3">
                           <span className="text-[10px] text-indigo-400 font-black uppercase italic">{order.productName}</span>
                           <span className="text-[9px] font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/10 tracking-widest">
