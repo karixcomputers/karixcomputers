@@ -10,6 +10,10 @@ import {
   sendServiceShippedWithAwbEmail 
 } from "../services/mail.service.js";
 
+// 👉 IMPORTĂM MULTER PENTRU UPLOAD-URI
+import multer from "multer";
+import path from "path";
+
 // 👉 IMPORTĂM TOT CE AVEM NEVOIE PENTRU AWB-URI ȘI DEVALORIZARE
 import { createReverseFanAWB, createFanAWB, calculateDepreciatedValue } from "../services/fancourier.service.js";
 
@@ -23,6 +27,21 @@ const requireAdmin = (req, res, next) => {
     res.status(403).json({ error: "Acces interzis. Necesită administrator." });
   }
 };
+
+// ==========================================
+// CONFIGURARE MULTER PENTRU POZELE DE RESPINGERE
+// ==========================================
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Salvează pozele în folderul uploads (asigură-te că există)
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, "reject-" + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+const upload = multer({ storage });
 
 /**
  * 1. POST /api/service-orders
@@ -115,7 +134,7 @@ router.post("/", requireAuth, async (req, res) => {
         address: address || "Nespecificat", 
         preferredDate,
         userId: userId,
-        status: "in_asteptare",
+        status: "in_drum_laborator", // 👉 Modificat statusul default cum ai cerut
         awb: generatedAwb 
       }
     });
@@ -288,7 +307,8 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
     else if (status === "finalizat") {
       await sendServiceFinishedEmail(userEmail, emailData).catch(() => {});
     }
-    else if (status === "awb_finalizat" || status === "awb_respins" || status === "expediat") {
+    else if (status === "awb_finalizat" || status === "awb_respins" || status === "livrat") {
+      // Opțional: dacă vrei să trimiți mail și la awb_respins
       await sendServiceShippedWithAwbEmail(userEmail, emailData).catch(() => {});
     }
 
@@ -296,6 +316,60 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
   } catch (error) { 
     console.error("❌ UPDATE STATUS ERROR:", error);
     res.status(500).json({ error: "Eroare la actualizarea statusului." }); 
+  }
+});
+
+/**
+ * 👉 5. POST /api/service-orders/:id/reject-warranty
+ * Ruta pe care o caută frontend-ul!
+ */
+router.post("/:id/reject-warranty", requireAuth, requireAdmin, upload.array("images", 5), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    
+    // Obținem array-ul cu fișierele uploadate
+    const files = req.files || [];
+    
+    // Construim calea fișierelor pentru a fi trimise în email sau salvate în DB
+    // Ex: https://karixcomputers.ro/uploads/reject-12345.jpg
+    const imageUrls = files.map(f => `${process.env.CLIENT_URL}/uploads/${f.filename}`);
+
+    const serviceOrder = await prisma.serviceOrder.findUnique({
+      where: { id },
+      include: { user: { select: { email: true, name: true } } }
+    });
+
+    if (!serviceOrder) return res.status(404).json({ error: "Cererea nu a fost găsită." });
+
+    // Actualizăm statusul în "garantie_respinsa"
+    const updatedOrder = await prisma.serviceOrder.update({
+      where: { id },
+      data: { status: "garantie_respinsa" }
+    });
+
+    // Pregătim datele pentru mail-ul pe care vrei să îl trimiți clientului
+    const emailData = {
+      customerName: serviceOrder.customerName,
+      orderId: serviceOrder.orderId,
+      productName: serviceOrder.productName,
+      reason: reason,
+      imageUrls: imageUrls
+    };
+
+    // Apelăm funcția ta de mail pentru garanție respinsă (trebuie să o ai definită sau să folosești o alternativă)
+    // Momentan presupunem că ai o funcție generică sau ai denumit-o `sendServiceUnrepairableEmail`. 
+    // Dacă ai creat una dedicată (ex: `sendWarrantyRejectedEmail`), apeleaz-o pe aia!
+    const userEmail = serviceOrder.user.email;
+    
+    // IMPORTĂ ACEASTĂ FUNCȚIE ÎN mail.service.js dacă nu o ai!
+    // Dacă momentan nu ai funcție dedicată, poti comenta rândul ăsta ca să nu crăpe, și mă anunți.
+    // await sendWarrantyRejectedEmail(userEmail, emailData).catch(err => console.error("Eroare mail:", err));
+
+    res.json({ success: true, message: "Garanție respinsă", order: updatedOrder });
+  } catch (error) {
+    console.error("❌ EROARE REJECT WARRANTY:", error);
+    res.status(500).json({ error: "Eroare la procesarea refuzului." });
   }
 });
 
