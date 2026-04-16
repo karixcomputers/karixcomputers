@@ -28,6 +28,9 @@ export default function AdminService() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
   
+  // State-uri pentru Tab-uri
+  const [activeTab, setActiveTab] = useState("active"); // "active" | "history"
+
   // State-uri pentru Modale
   const [showAwbModal, setShowAwbModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -61,7 +64,11 @@ export default function AdminService() {
     },
   });
 
-  const activeOrders = allOrders?.filter((o) => o.status !== "livrat");
+  // Împărțim comenzile în Active și Istoric
+  const activeOrders = allOrders?.filter((o) => o.status !== "livrat") || [];
+  const historyOrders = allOrders?.filter((o) => o.status === "livrat") || [];
+
+  const currentList = activeTab === "active" ? activeOrders : historyOrders;
 
   // Mutație Update Status (Simplu sau cu AWB)
   const updateStatusMutation = useMutation({
@@ -154,59 +161,97 @@ export default function AdminService() {
       });
   };
 
-  if (isLoading) return <div className="min-h-screen pt-32 px-6 text-white italic animate-pulse">Se încarcă...</div>;
+  // Helper pentru a formata Order ID-ul frumos
+  const formatOrderId = (id) => {
+      if (!id) return "N/A";
+      // Dacă e un ID de prisma normal (int sau cuid lung), încercăm să-l afișăm scurt și lizibil
+      return `#${String(id).slice(-8).toUpperCase()}`;
+  };
+
+  if (isLoading) return <div className="min-h-screen pt-32 px-6 text-white italic animate-pulse flex justify-center items-center"><div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div>;
 
   return (
     <div className="min-h-screen pt-32 pb-20 px-6 relative z-10">
       <div className="max-w-7xl mx-auto">
-        <header className="mb-10 flex justify-between items-end">
-          <h1 className="text-4xl font-black text-white italic uppercase tracking-tighter">
-            Service <span className="text-indigo-500">Activ</span>
-          </h1>
+        <header className="mb-12 flex flex-col lg:flex-row justify-between items-end gap-8">
+          <div className="text-left w-full lg:w-auto">
+            <h1 className="text-5xl font-black text-white italic uppercase tracking-tighter drop-shadow-2xl">
+              Control <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Service</span>
+            </h1>
+            
+            {/* Butoane Tab-uri */}
+            <div className="flex gap-4 mt-8 bg-white/5 p-1.5 rounded-[20px] border border-white/10 w-fit backdrop-blur-xl">
+              <button 
+                onClick={() => setActiveTab("active")}
+                className={`px-6 py-3 rounded-[15px] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "active" ? 'bg-indigo-500 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                Service Activ ({activeOrders.length})
+              </button>
+              <button 
+                onClick={() => setActiveTab("history")}
+                className={`px-6 py-3 rounded-[15px] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "history" ? 'bg-emerald-500 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                Istoric Finalizate ({historyOrders.length})
+              </button>
+            </div>
+          </div>
         </header>
 
-        <div className="overflow-x-auto rounded-[35px] border border-white/5 bg-[#0b1020]/50 backdrop-blur-3xl shadow-2xl">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
-                <th className="p-6">Client / Produs</th>
-                <th className="p-6">Status Actual</th>
-                <th className="p-6 text-right">Schimbă Status</th>
-              </tr>
-            </thead>
-            <tbody className="text-white">
-              {activeOrders?.map((order) => (
-                <tr key={order.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                  <td className="p-6">
-                    <div className="font-bold text-sm">{order.customerName}</div>
-                    <div className="text-[10px] text-indigo-400 font-black uppercase italic">{order.productName}</div>
-                  </td>
-                  <td className="p-6">
-                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase border whitespace-nowrap ${STATUS_COLORS[order.status] || "bg-gray-500/10 text-gray-400 border-gray-500/20"}`}>
-                      {STATUS_LABELS[order.status] || order.status}
-                    </span>
-                  </td>
-                  <td className="p-6 text-right">
-                    <select
-                      className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:border-indigo-500 text-white"
-                      value={order.status}
-                      onChange={(e) => handleStatusChange(order, e.target.value)}
-                    >
-                      <option value="in_drum_laborator" className="bg-[#0b1020]">🚚 În drum spre laborator</option>
-                      <option value="in_laborator" className="bg-[#0b1020]">📥 În laborator</option>
-                      <option value="in_lucru" className="bg-[#0b1020]">⚙️ În lucru</option>
-                      <option value="finalizat" className="bg-[#0b1020]">✅ Finalizat</option>
-                      <option value="garantie_respinsa" className="bg-[#0b1020]">❌ Garanție Respinsă</option>
-                      <option value="awb_finalizat" className="bg-[#0b1020]">📦 Generare AWB Retur (Finalizat)</option>
-                      <option value="awb_respins" className="bg-[#0b1020]">📦 Generare AWB Retur (Garanție Respinsă)</option>
-                      <option value="livrat" className="bg-[#0b1020]">🏁 Livrat</option>
-                    </select>
-                  </td>
+        {currentList.length === 0 ? (
+          <div className="p-20 rounded-[45px] bg-white/5 border border-white/10 backdrop-blur-xl text-center shadow-2xl border-dashed">
+            <p className="text-gray-500 font-black uppercase tracking-widest text-sm italic">
+              {activeTab === 'active' ? 'Nu există cereri de service active.' : 'Nu există istoric de service.'}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-[35px] border border-white/5 bg-[#0b1020]/50 backdrop-blur-3xl shadow-2xl">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
+                  <th className="p-6">Detalii Client & Comandă</th>
+                  <th className="p-6">Status Actual</th>
+                  <th className="p-6 text-right">Acțiuni</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="text-white">
+                {currentList.map((order) => (
+                  <tr key={order.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="p-6">
+                      <div className="font-bold text-sm text-white mb-1">{order.customerName}</div>
+                      <div className="flex items-center gap-3">
+                          <span className="text-[10px] text-indigo-400 font-black uppercase italic">{order.productName}</span>
+                          <span className="text-[9px] font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/10 tracking-widest">
+                             {formatOrderId(order.orderId)}
+                          </span>
+                      </div>
+                    </td>
+                    <td className="p-6">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase border whitespace-nowrap ${STATUS_COLORS[order.status] || "bg-gray-500/10 text-gray-400 border-gray-500/20"}`}>
+                        {STATUS_LABELS[order.status] || order.status}
+                      </span>
+                    </td>
+                    <td className="p-6 text-right">
+                      <select
+                        className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:border-indigo-500 text-white cursor-pointer"
+                        value={order.status}
+                        onChange={(e) => handleStatusChange(order, e.target.value)}
+                      >
+                        <option value="in_drum_laborator" className="bg-[#0b1020]">🚚 În drum spre laborator</option>
+                        <option value="in_laborator" className="bg-[#0b1020]">📥 În laborator</option>
+                        <option value="in_lucru" className="bg-[#0b1020]">⚙️ În lucru</option>
+                        <option value="finalizat" className="bg-[#0b1020]">✅ Finalizat</option>
+                        <option value="garantie_respinsa" className="bg-[#0b1020]">❌ Garanție Respinsă</option>
+                        <option value="awb_finalizat" className="bg-[#0b1020]">📦 Generare AWB Retur (Finalizat)</option>
+                        <option value="awb_respins" className="bg-[#0b1020]">📦 Generare AWB Retur (Garanție Respinsă)</option>
+                        <option value="livrat" className="bg-[#0b1020]">🏁 Livrat (Mută în Istoric)</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* MODAL RESPINGERE GARANȚIE */}
@@ -246,7 +291,7 @@ export default function AdminService() {
                     📸
                   </button>
                   {rejectImages.map((img, idx) => (
-                    <div key={idx} className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-[8px] text-gray-500 p-2 text-center overflow-hidden">
+                    <div key={idx} className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-[8px] text-gray-500 p-2 text-center overflow-hidden break-all">
                       {img.name}
                     </div>
                   ))}
@@ -254,7 +299,7 @@ export default function AdminService() {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <button onClick={closeModals} className="flex-1 py-4 rounded-2xl bg-white/5 text-white font-black uppercase text-[10px] tracking-widest transition-all">Anulează</button>
+                <button onClick={closeModals} className="flex-1 py-4 rounded-2xl bg-white/5 text-white font-black uppercase text-[10px] tracking-widest transition-all hover:bg-white/10">Anulează</button>
                 <button 
                   disabled={!rejectReason || rejectWarrantyMutation.isPending}
                   onClick={handleRejectSubmit}
@@ -304,7 +349,7 @@ export default function AdminService() {
             </div>
 
             <div className="mb-8">
-              <label className="flex items-center cursor-pointer group">
+              <label className="flex items-center cursor-pointer group w-fit">
                 <div className="relative flex items-center justify-center">
                   <input 
                     type="checkbox" 
