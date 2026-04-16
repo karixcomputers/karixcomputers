@@ -428,4 +428,28 @@ router.post("/verify-reset-token", async (req, res) => {
   }
 });
 
+// 👉 NOU: 11. ACTUALIZARE DATE PROFIL (Ex: Telefon)
+router.patch("/update", requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.sub;
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ error: "Numărul de telefon este obligatoriu." });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { phone }
+    });
+
+    const userWithStats = await getFullUser(userId);
+    res.json({ success: true, user: userWithStats });
+
+  } catch (error) {
+    console.error("Eroare la actualizarea profilului:", error);
+    res.status(500).json({ error: "Eroare la actualizarea datelor." });
+  }
+});
+
 export default router;
