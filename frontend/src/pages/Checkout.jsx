@@ -181,53 +181,47 @@ export default function Checkout() {
     });
   }, [items]);
 
+  // 👉 AICI ESTE LOGICA REPARATĂ: folosim forEach în loc de some, astfel numărăm corect absolut tot!
   const cartAnalysis = useMemo(() => {
     const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick', 'upgrade', 'instalare', 'reinstalare', 'windows', 'software', 'bios', 'recuperare'];
     
     let hardwareSubtotal = 0;
     let totalServicesInCart = 0;
-    let disableFanbox = false; // 👉 NOU: Variabilă pentru a bloca locker-ul
+    let disableFanbox = false; 
+    let hasPC = false;
+    let hasService = false;
     
-    const hasPC = items.some(item => {
-      const nameStr = (item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const isSrv = item.category === 'service' || isServiceKeywords.some(kw => nameStr.includes(kw));
-      if (!isSrv) {
+    items.forEach(item => {
+      const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const isSrv = item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => nameStr.includes(kw)));
+      
+      if (isSrv) {
+        hasService = true;
+        const addonKeywords = ['upgrade', 'asamblare', 'instalare', 'reinstalare', 'windows', 'software', 'recuperare', 'devirusare', 'bios'];
+        const isAddon = addonKeywords.some(kw => nameStr.includes(kw));
+        
+        if (!isAddon) {
+            // Calculăm cantitatea corect 
+            totalServicesInCart += parseInt(item.qty || item.quantity || 1, 10);
+        }
+
+        if (nameStr.includes("pc") || nameStr.includes("sistem") || nameStr.includes("desktop") || nameStr.includes("unitate")) {
+            disableFanbox = true;
+        }
+      } else {
+        hasPC = true;
         const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
         let extraWarrantyPrice = 0;
         if (item.extendedWarranty === 1) extraWarrantyPrice = Math.round(basePrice * 0.09);
         if (item.extendedWarranty === 2) extraWarrantyPrice = Math.round(basePrice * 0.16);
         
-        hardwareSubtotal += ((basePrice + extraWarrantyPrice) * (item.qty || 1));
-        return true;
+        hardwareSubtotal += ((basePrice + extraWarrantyPrice) * parseInt(item.qty || item.quantity || 1, 10));
       }
-      return false;
-    });
-
-    const hasService = items.some(item => {
-      const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      
-      const isSrv = item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => nameStr.includes(kw)));
-      
-      if (isSrv) {
-        const addonKeywords = ['upgrade', 'asamblare', 'instalare', 'reinstalare', 'windows', 'software', 'recuperare', 'devirusare', 'bios'];
-        const isAddon = addonKeywords.some(kw => nameStr.includes(kw));
-        
-        if (!isAddon) {
-            totalServicesInCart += (item.qty || 1);
-        }
-
-        // 👉 NOU: Dacă serviciul conține cuvintele astea, clar este un PC Desktop mare și greu.
-        if (nameStr.includes("pc") || nameStr.includes("sistem") || nameStr.includes("desktop") || nameStr.includes("unitate")) {
-            disableFanbox = true;
-        }
-      }
-      return isSrv;
     });
 
     return { hasPC, hasService, hardwareSubtotal, totalServicesInCart, disableFanbox };
   }, [items]);
 
-  // Dacă utilizatorul are un PC la service și FANbox e blocat, îl forțăm automat pe curier
   useEffect(() => {
     if (cartAnalysis.disableFanbox && serviceDeliveryMethod === "fanbox") {
         setServiceDeliveryMethod("courier");
@@ -235,6 +229,7 @@ export default function Checkout() {
   }, [cartAnalysis.disableFanbox, serviceDeliveryMethod]);
 
   useEffect(() => {
+      // Acum condiția asta se va declanșa corect dacă ai 2 sau mai multe PC-uri/Servicii!
       if (cartAnalysis.totalServicesInCart > 1) {
           setPickupByKarix(true);
       }
@@ -816,7 +811,7 @@ export default function Checkout() {
                               <span>📦</span> Cum ne trimiți dispozitivul defect?
                            </h4>
                            
-                           {/* 👉 NOU: Aici ascundem fanbox-ul dacă dispozitivul din coș este un PC desktop */}
+                           {/* 👉 AICI ESTE LOGICA PENTRU ASCUNDEREA FANBOX-ULUI DACĂ E PC */}
                            <div className={`grid grid-cols-1 ${!cartAnalysis.disableFanbox ? 'sm:grid-cols-2' : ''} gap-4`}>
                               <button 
                                 type="button" 
