@@ -19,6 +19,8 @@ export default function ServiceRequest() {
   
   const [method, setMethod] = useState("curier"); 
   const [isSubmitted, setIsSubmitted] = useState(false); 
+  const [generatedAwb, setGeneratedAwb] = useState(null); // 👉 NOU: Stocăm AWB-ul returnat de backend
+
   const [formData, setFormData] = useState({
     issueDescription: "",
     judet: "",
@@ -39,7 +41,7 @@ export default function ServiceRequest() {
           issueDescription: data.issueDescription,
           judet: method === "curier" ? data.judet : "Bihor",
           oras: method === "curier" ? data.oras : "Oradea",
-          address: data.pickupAddress, // 👉 NOU: Trimitem adresa de preluare indiferent de metodă
+          address: data.pickupAddress, 
           phoneNumber: data.phoneNumber,
           preferredDate: data.preferredDate
         }),
@@ -51,7 +53,10 @@ export default function ServiceRequest() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data.awb) {
+        setGeneratedAwb(data.awb); // Salvăm AWB-ul dacă a fost generat
+      }
       setIsSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -73,10 +78,25 @@ export default function ServiceRequest() {
               ✨
             </div>
             <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-4">Solicitare Primită!</h2>
-            <p className="text-gray-400 italic text-sm mb-8 leading-relaxed">
-              Echipa tehnică <span className="text-indigo-400 font-bold">Karix Computers</span> a preluat cererea ta. 
-              Verificăm detaliile și te vom contacta în curând pentru procesarea garanției.
-            </p>
+            
+            {/* 👉 NOU: Afișăm AWB-ul dacă a venit cu curierul, altfel mesajul standard */}
+            {generatedAwb ? (
+              <div className="mb-8">
+                <p className="text-gray-400 italic text-sm mb-4 leading-relaxed">
+                  Am generat automat scrisoarea de transport (AWB) pentru ridicarea coletului tău. Un curier FAN Courier va veni la adresa specificată.
+                </p>
+                <div className="p-4 bg-black/40 border border-cyan-500/30 rounded-2xl">
+                  <p className="text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-1">AWB FAN Courier</p>
+                  <p className="text-xl font-mono font-bold text-white tracking-widest">{generatedAwb}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-400 italic text-sm mb-8 leading-relaxed">
+                Echipa tehnică <span className="text-indigo-400 font-bold">Karix Computers</span> a preluat cererea ta. 
+                Te așteptăm cu produsul la locația noastră sau te vom contacta în curând pentru detalii.
+              </p>
+            )}
+
             <div className="space-y-3">
               <Link 
                 to="/account/warranties" 
@@ -214,7 +234,6 @@ export default function ServiceRequest() {
                   <p>Vom veni noi la tine! După confirmarea solicitării, vom prelua personal produsul de la adresa ta din Oradea. Diagnosticarea se face în laboratorul nostru în cel mult 24 de ore de la ridicare.</p>
                 </div>
                 
-                {/* NOU: Câmp pentru adresa din Oradea */}
                 <div>
                   <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-2">Adresa de ridicare din Oradea</label>
                   <input 
