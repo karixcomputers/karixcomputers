@@ -1,29 +1,53 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function AdminWarranties() {
+  const queryClient = useQueryClient();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("active"); // "active" | "history"
 
-  useEffect(() => {
-    const fetchAllOrders = async () => {
-      try {
-        const res = await apiFetch("/orders/admin/history");
-        if (res.ok) {
-          const data = await res.json();
-          setOrders(Array.isArray(data) ? data : data.orders || []);
-        }
-      } catch (err) {
-        console.error("Eroare la preluarea garanțiilor:", err);
-      } finally {
-        setLoading(false);
+  const fetchAllOrders = async () => {
+    try {
+      const res = await apiFetch("/orders/admin/history");
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(Array.isArray(data) ? data : data.orders || []);
       }
-    };
+    } catch (err) {
+      console.error("Eroare la preluarea garanțiilor:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAllOrders();
   }, []);
+
+  // MUTAȚIE PENTRU REACTIVAREA GARANȚIEI
+  const reactivateMutation = useMutation({
+    mutationFn: async (itemId) => {
+      const res = await apiFetch(`/orders/item/${itemId}/reactivate-warranty`, {
+        method: "PATCH",
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Eroare la reactivarea garanției.");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      alert("Garanția a fost reactivată cu succes!");
+      fetchAllOrders(); // Reîncărcăm datele pentru a muta înapoi în "Active"
+    },
+    onError: (err) => {
+      alert(err.message);
+    }
+  });
 
   // 1. GENERĂM ȘI CATEGORIZĂM GARANȚIILE
   const { activeWarranties, historyWarranties } = useMemo(() => {
@@ -54,23 +78,33 @@ export default function AdminWarranties() {
 
             const isExpired = new Date() > expiryDate;
             const isReturned = finalizedReturnedProducts.includes(item.productName);
+            // 👉 AICI ESTE NOUA PROPRIETATE PENTRU GARANȚII ANULATE DIN SERVICE
+            const isVoided = item.warrantyVoided === true; 
+
             const warrantyId = `WR-${String(item.id).slice(-4).toUpperCase()}`;
+
+            let currentStatus = "Activă";
+            if (isReturned) currentStatus = "Anulată (Retur)";
+            else if (isVoided) currentStatus = "Anulată (Service)";
+            else if (isExpired) currentStatus = "Expirată";
 
             const warrantyObj = {
               id: warrantyId,
+              itemId: item.id, // Avem nevoie de ID-ul item-ului pt reactivare
               clientName: order.shippingName,
               clientEmail: order.user?.email || "N/A",
               productName: item.productName,
               purchaseDate: purchaseDate,
               expiryDate: expiryDate,
-              orderRef: String(order.id).slice(-8).toUpperCase(), // Pus la 8 caractere pentru consistență
+              orderRef: String(order.id).slice(-8).toUpperCase(),
               isReturned: isReturned,
               isExpired: isExpired,
-              duration: `${months} Luni`, // Durata dinamică
-              status: isReturned ? "Anulată (Retur)" : (isExpired ? "Expirată" : "Activă")
+              isVoided: isVoided, // Adăugat
+              duration: `${months} Luni`, 
+              status: currentStatus
             };
 
-            if (isReturned || isExpired) {
+            if (isReturned || isExpired || isVoided) {
               historyArr.push(warrantyObj);
             } else {
               activeArr.push(warrantyObj);
@@ -90,7 +124,7 @@ export default function AdminWarranties() {
       w.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       w.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       w.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.orderRef.toLowerCase().includes(searchTerm.toLowerCase()) // Se poate căuta și după ID-ul comenzii acum
+      w.orderRef.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [searchTerm, currentList]);
 
@@ -152,8 +186,8 @@ export default function AdminWarranties() {
               <div 
                 key={idx} 
                 className={`group relative p-[1px] rounded-[35px] bg-gradient-to-br transition-all duration-500 shadow-2xl ${
-                  w.isReturned || w.isExpired 
-                    ? 'from-white/5 to-transparent grayscale opacity-70' 
+                  w.isReturned || w.isExpired || w.isVoided
+                    ? 'from-white/5 to-transparent grayscale opacity-70 hover:opacity-100' 
                     : 'from-white/10 to-transparent hover:from-indigo-500/30'
                 }`}
               >
@@ -163,17 +197,17 @@ export default function AdminWarranties() {
                     <div className={`h-20 w-20 rounded-3xl flex items-center justify-center text-3xl border shadow-inner transition-transform group-hover:scale-110 ${
                       activeTab === 'active' 
                         ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' 
-                        : 'bg-white/5 border-white/10 text-gray-500'
+                        : (w.isVoided ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' : 'bg-white/5 border-white/10 text-gray-500')
                     }`}>
-                      {w.isReturned ? '📦' : (w.isExpired ? '⌛' : '🛡️')}
+                      {w.isReturned ? '📦' : (w.isVoided ? '❌' : (w.isExpired ? '⌛' : '🛡️'))}
                     </div>
                     <div className="text-left flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className={`text-2xl font-black italic uppercase tracking-tight truncate ${w.isReturned ? 'line-through text-gray-500' : ''}`}>
+                        <h3 className={`text-2xl font-black italic uppercase tracking-tight truncate ${(w.isReturned || w.isVoided) ? 'line-through text-gray-500' : ''}`}>
                           {w.productName}
                         </h3>
                         <span className="shrink-0 ml-3 px-2 py-0.5 rounded bg-white/10 text-[8px] font-black text-indigo-300 border border-indigo-500/20 tracking-widest uppercase">
-                          {w.isReturned ? "Fără Garanție" : w.duration}
+                          {w.isReturned || w.isVoided ? "Fără Garanție" : w.duration}
                         </span>
                       </div>
                       <p className="text-sm font-bold text-gray-400 italic mb-2">{w.clientName} • <span className="text-xs opacity-50">{w.clientEmail}</span></p>
@@ -186,25 +220,38 @@ export default function AdminWarranties() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between lg:justify-end gap-12 w-full lg:w-1/2 border-t lg:border-t-0 border-white/5 pt-6 lg:pt-0">
-                    <div className="text-left md:text-right">
-                      <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Data Achiziției</p>
-                      <p className="text-sm font-bold text-gray-300">{w.purchaseDate.toLocaleDateString('ro-RO')}</p>
+                  <div className="flex flex-col items-center lg:items-end w-full lg:w-1/2 border-t lg:border-t-0 border-white/5 pt-6 lg:pt-0">
+                    <div className="flex items-center justify-between lg:justify-end gap-12 w-full mb-3">
+                      <div className="text-left md:text-right">
+                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Data Achiziției</p>
+                        <p className="text-sm font-bold text-gray-300">{w.purchaseDate.toLocaleDateString('ro-RO')}</p>
+                      </div>
+                      <div className="text-left md:text-right">
+                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Data Expirării</p>
+                        <p className={`text-lg font-black italic ${activeTab === 'active' ? 'text-white' : 'text-rose-500'}`}>
+                          {w.expiryDate.toLocaleDateString('ro-RO')}
+                        </p>
+                      </div>
+                      
+                      <div className={`px-6 py-3 rounded-2xl border font-black uppercase text-[10px] tracking-widest shadow-lg whitespace-nowrap ${
+                        w.status === 'Activă' 
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-500'
+                      }`}>
+                        {w.status}
+                      </div>
                     </div>
-                    <div className="text-left md:text-right">
-                      <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Data Expirării</p>
-                      <p className={`text-lg font-black italic ${activeTab === 'active' ? 'text-white' : 'text-rose-500'}`}>
-                        {w.expiryDate.toLocaleDateString('ro-RO')}
-                      </p>
-                    </div>
-                    
-                    <div className={`px-6 py-3 rounded-2xl border font-black uppercase text-[10px] tracking-widest shadow-lg ${
-                      w.status === 'Activă' 
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                        : 'bg-rose-500/10 border-rose-500/30 text-rose-500'
-                    }`}>
-                      {w.status}
-                    </div>
+
+                    {/* BUTON REACTIVARE GARANȚIE */}
+                    {w.isVoided && (
+                      <button
+                        onClick={() => reactivateMutation.mutate(w.itemId)}
+                        disabled={reactivateMutation.isPending}
+                        className="px-6 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 font-black text-[9px] uppercase tracking-widest border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                      >
+                        {reactivateMutation.isPending ? "Se procesează..." : "🔄 Reactivează Garanția"}
+                      </button>
+                    )}
                   </div>
 
                 </div>
