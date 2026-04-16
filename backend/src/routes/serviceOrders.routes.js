@@ -290,7 +290,7 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
       awb: generatedAwb || updatedOrder.awb
     };
 
-// 👉 TRIMITERE MAIL-URI PE BAZA STATUSULUI
+    // 👉 TRIMITERE MAIL-URI PE BAZA STATUSULUI
     if (status === "in_laborator") {
       await sendServiceInPossessionEmail(userEmail, emailData).catch(() => {});
     } 
@@ -298,11 +298,9 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
       await sendServiceFinishedEmail(userEmail, emailData).catch(() => {});
     }
     else if (status === "awb_finalizat" || status === "expediat") {
-      // Mail AWB pentru produs reparat/ok
       await sendServiceShippedWithAwbEmail(userEmail, emailData).catch(() => {});
     }
     else if (status === "awb_respins") {
-      // 👉 NOU: Mail AWB pentru produs respins
       await sendServiceAwbRejectedEmail(userEmail, emailData).catch(() => {});
     }
 
@@ -336,6 +334,22 @@ router.post("/:id/reject-warranty", requireAuth, requireAdmin, upload.array("ima
       data: { status: "garantie_respinsa" }
     });
 
+    // 👉 AICI ESTE FIX-UL PENTRU BAZA DE DATE!
+    // Căutăm produsul din comanda originală și setăm warrantyVoided la true
+    const numericOrderId = Number(serviceOrder.orderId);
+    if (!isNaN(numericOrderId)) {
+        await prisma.orderItem.updateMany({
+            where: {
+                orderId: numericOrderId,
+                productName: serviceOrder.productName
+            },
+            data: {
+                warrantyVoided: true
+            }
+        });
+        console.log(`✅ Garanție anulată în BD pentru: ${serviceOrder.productName}`);
+    }
+
     const emailData = {
       customerName: serviceOrder.customerName,
       orderId: serviceOrder.orderId,
@@ -345,7 +359,7 @@ router.post("/:id/reject-warranty", requireAuth, requireAdmin, upload.array("ima
 
     const userEmail = serviceOrder.user.email;
     
-    // 👉 3. APELĂM FUNCȚIA DE EMAIL PENTRU RESPINGERE
+    // 👉 APELĂM FUNCȚIA DE EMAIL PENTRU RESPINGERE
     await sendWarrantyRejectedEmail(userEmail, emailData, files).catch(err => console.error("Eroare mail respingere:", err));
 
     res.json({ success: true, message: "Garanție respinsă", order: updatedOrder });
