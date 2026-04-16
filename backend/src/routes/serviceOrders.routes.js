@@ -46,19 +46,34 @@ router.post("/", requireAuth, async (req, res) => {
     const dbUser = await prisma.user.findUnique({ where: { id: userId } });
     const finalName = dbUser?.name || userEmail.split('@')[0];
 
-    // 👉 CĂUTĂM COMANDA ORIGINALĂ CA SĂ ȘTIM PREȚUL ȘI DATA
+    // 👉 CĂUTĂM COMANDA ORIGINALĂ ȘI PRODUSUL EXACT
     let purchaseOrderId = orderId;
+    let targetItemPriceCents = 0; // Vom stoca aici prețul DOAR pentru PC-ul vizat
+    let orderCreatedAt = new Date();
+
     const realOrder = await prisma.order.findFirst({
       where: {
         userId: userId,
         items: { some: { productName: productName } }
       },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, totalCents: true, createdAt: true }
+      include: { items: true } // 👉 INCLUDEM ITEMS PENTRU A PUTEA FILTRA
     });
 
     if (realOrder) {
       purchaseOrderId = String(realOrder.id);
+      orderCreatedAt = realOrder.createdAt;
+
+      // Căutăm exact item-ul pentru care s-a cerut service-ul
+      const specificItem = realOrder.items.find(i => i.productName === productName);
+      
+      if (specificItem && specificItem.priceCentsAtBuy) {
+          // Luăm prețul per bucată al produsului (fără restul comenzii)
+          targetItemPriceCents = specificItem.priceCentsAtBuy;
+      } else {
+          // Fallback de siguranță (foarte puțin probabil să ajungă aici)
+          targetItemPriceCents = realOrder.totalCents;
+      }
     } else {
       if (!purchaseOrderId || purchaseOrderId === "") {
         purchaseOrderId = "S" + Date.now().toString().slice(-6);
@@ -72,7 +87,7 @@ router.post("/", requireAuth, async (req, res) => {
 
     if (method === "curier") {
         try {
-            // Trimitem comanda către generatorul AWB. El are acces la totalCents și createdAt pentru devalorizare.
+            // Trimitem comanda către generatorul AWB cu prețul SPECIFIC al PC-ului
             const fakeOrderForAWB = {
                 id: purchaseOrderId,
                 shippingName: finalName,
@@ -80,13 +95,13 @@ router.post("/", requireAuth, async (req, res) => {
                 shippingAddress: fullAddress, 
                 user: { email: userEmail },
                 fanboxLocationId: null,
-                totalCents: realOrder ? realOrder.totalCents : 0,
-                createdAt: realOrder ? realOrder.createdAt : new Date()
+                totalCents: targetItemPriceCents, // 👉 AICI ACUM INTRĂ DOAR VALOAREA UNUI SINGUR PC
+                createdAt: orderCreatedAt
             };
 
             // Apelăm funcția cu isInsured = true
             generatedAwb = await createReverseFanAWB(fakeOrderForAWB, false, true);
-            console.log(`✅ AWB Retur Generat Automat cu asigurare calculată: ${generatedAwb}`);
+            console.log(`✅ AWB Retur Generat Automat. Valoare bază pt calcul: ${targetItemPriceCents / 100} RON. AWB: ${generatedAwb}`);
         } catch (awbErr) {
             console.error("⚠️ Eroare la generarea automată a AWB-ului:", awbErr.message);
         }
