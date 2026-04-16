@@ -32,6 +32,12 @@ export default function Account() {
     ticketsCount: user?.ticketsCount || 0
   });
 
+  // State-uri pentru editarea numărului de telefon
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [newPhone, setNewPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [isSavingPhone, setIsSavingPhone] = useState(false);
+
   const fetchFreshStats = async () => {
     if (!accessToken) return;
     
@@ -59,6 +65,44 @@ export default function Account() {
   const handleLogout = async () => {
     await logout();
     navigate("/auth/login");
+  };
+
+  const handleEditPhoneClick = () => {
+    setNewPhone(user?.phone || "");
+    setIsEditingPhone(true);
+    setPhoneError("");
+  };
+
+  const handleSavePhone = async () => {
+    if (!newPhone || newPhone.length < 9) {
+      setPhoneError("Introdu un număr valid.");
+      return;
+    }
+    
+    setIsSavingPhone(true);
+    setPhoneError("");
+
+    try {
+      // NOTĂ: Dacă endpoint-ul tău din backend pentru update profil are altă denumire (ex: /auth/profile), modifică aici.
+      const response = await apiFetch("/auth/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: newPhone })
+      });
+
+      if (response.ok) {
+        setIsEditingPhone(false);
+        // Reîncărcăm pagina pentru a asigura sincronizarea numărului de telefon în întreg site-ul (AuthContext)
+        window.location.reload(); 
+      } else {
+        const data = await response.json();
+        setPhoneError(data.error || "Eroare la salvare.");
+      }
+    } catch (error) {
+      setPhoneError("Eroare de conexiune.");
+    } finally {
+      setIsSavingPhone(false);
+    }
   };
 
   return (
@@ -97,9 +141,9 @@ export default function Account() {
               </div>
 
               <nav className="flex flex-col gap-3">
-                <MenuLink to="/orders" icon="📦" label="Comenzile Mele" badge={stats.ordersCount} />
+                <MenuLink to="/orders" icon="📦" label="Comenzile Mele"  />
                 <MenuLink to="/account/warranties" icon="🛠️" label="Garanții" />
-                <MenuLink to="/tickets" icon="🔄" label="Tichete Suport" badge={stats.ticketsCount} />
+                <MenuLink to="/tickets" icon="🔄" label="Tichete Suport"  />
                 
                 <button 
                   onClick={handleLogout}
@@ -125,9 +169,48 @@ export default function Account() {
                     <p className="text-white font-bold text-lg border-b border-white/5 pb-2 truncate">{user?.email}</p>
                   </div>
                   
+                  {/* 👉 SECȚIUNE ACTUALIZATĂ PENTRU EDITAREA TELEFONULUI */}
                   <div className="group">
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 group-hover:text-pink-400 transition-colors">Telefon</p>
-                    <p className="text-white font-bold text-lg border-b border-white/5 pb-2">{user?.phone || "—"}</p>
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-pink-400 transition-colors">Telefon</p>
+                      {!isEditingPhone && (
+                        <button onClick={handleEditPhoneClick} className="text-[9px] text-indigo-400 hover:text-white uppercase tracking-widest font-black transition-colors">
+                          Modifică
+                        </button>
+                      )}
+                    </div>
+
+                    {isEditingPhone ? (
+                      <div className="flex flex-col gap-2 mt-1 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex gap-2">
+                          <input 
+                            type="tel"
+                            value={newPhone}
+                            onChange={(e) => setNewPhone(e.target.value)}
+                            className="flex-1 bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-white text-xs outline-none focus:border-indigo-500 transition-colors"
+                            placeholder="Ex: 0712345678"
+                            disabled={isSavingPhone}
+                          />
+                          <button 
+                            onClick={handleSavePhone} 
+                            disabled={isSavingPhone}
+                            className="bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
+                          >
+                            {isSavingPhone ? "..." : "✓"}
+                          </button>
+                          <button 
+                            onClick={() => setIsEditingPhone(false)} 
+                            disabled={isSavingPhone}
+                            className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {phoneError && <span className="text-[9px] text-pink-500 font-bold uppercase tracking-widest">{phoneError}</span>}
+                      </div>
+                    ) : (
+                      <p className="text-white font-bold text-lg border-b border-white/5 pb-2">{user?.phone || "—"}</p>
+                    )}
                   </div>
 
                   <div className="group">
@@ -157,7 +240,7 @@ export default function Account() {
                   { val: stats.wishlistCount, label: "Wishlist", icon: "❤️", color: "pink" },
                   { val: stats.ticketsCount, label: "Tichete Suport", icon: "🛠️", color: "emerald" }
                 ].map((stat, i) => (
-                  <div key={i} className="group p-8 rounded-[32px] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all relative overflow-hidden backdrop-blur-sm">
+                  <div key={i} className={`group p-8 rounded-[32px] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-${stat.color}-500/30 transition-all relative overflow-hidden backdrop-blur-sm`}>
                     <div className="absolute -right-4 -bottom-4 text-6xl opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">{stat.icon}</div>
                     <p className="text-4xl font-black text-white mb-1 tracking-tighter animate-in fade-in slide-in-from-bottom-2 duration-500">
                       {stat.val || 0}
