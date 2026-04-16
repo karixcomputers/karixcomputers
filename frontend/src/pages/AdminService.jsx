@@ -33,12 +33,20 @@ export default function AdminService() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   
+  // State pentru Toast-uri frumoase
+  const [toastMsg, setToastMsg] = useState({ open: false, text: "", type: "success" });
+
+  const showToast = (text, type = "success") => {
+    setToastMsg({ open: true, text, type });
+    setTimeout(() => setToastMsg({ open: false, text: "", type: "success" }), 4000);
+  };
+
   // State pentru AWB
   const [packageWeight, setPackageWeight] = useState(1);
   const [packageCount, setPackageCount] = useState(1);
   const [insurance, setInsurance] = useState(false);
   const [declaredValue, setDeclaredValue] = useState("");
-  const [targetAwbStatus, setTargetAwbStatus] = useState(""); // Poate fi "awb_finalizat" sau "awb_respins"
+  const [targetAwbStatus, setTargetAwbStatus] = useState("");
 
   // Form State pentru Respingere
   const [rejectReason, setRejectReason] = useState("");
@@ -72,9 +80,13 @@ export default function AdminService() {
       return res.json();
     },
     onSuccess: () => {
+      showToast("Statusul comenzii a fost actualizat cu succes!", "success");
       queryClient.invalidateQueries(["adminServiceOrders"]);
       closeModals();
     },
+    onError: (error) => {
+      showToast(error.message, "error");
+    }
   });
 
   // Mutație Respingere Garanție (cu Email și Poze)
@@ -88,10 +100,13 @@ export default function AdminService() {
       return res.json();
     },
     onSuccess: () => {
-      alert("Garanția a fost respinsă și emailul a fost trimis clientului.");
+      showToast("Garanția a fost respinsă. Clientul a primit email cu detaliile.", "success");
       queryClient.invalidateQueries(["adminServiceOrders"]);
       closeModals();
     },
+    onError: (error) => {
+      showToast(error.message, "error");
+    }
   });
 
   const closeModals = () => {
@@ -339,6 +354,22 @@ export default function AdminService() {
                   {updateStatusMutation.isPending ? "Se trimite..." : "Confirmă & Generează AWB"}
                 </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST NOTIFICATION */}
+      {toastMsg.open && (
+        <div className="fixed bottom-10 right-10 z-[150] animate-in slide-in-from-right duration-300">
+          <div className={`rounded-3xl border p-6 shadow-3xl flex items-center gap-5 backdrop-blur-2xl ${
+            toastMsg.type === "error" ? "bg-rose-900/90 border-rose-500/30" : "bg-[#1a2236]/90 border-emerald-500/30"
+          }`}>
+            <div className={`h-10 w-10 rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg ${
+              toastMsg.type === "error" ? "bg-rose-500/20 text-rose-400" : "bg-emerald-500/20 text-emerald-400"
+            }`}>
+              {toastMsg.type === "error" ? "!" : "✓"}
+            </div>
+            <div className="flex-1 text-sm font-bold text-white drop-shadow-md">{toastMsg.text}</div>
           </div>
         </div>
       )}
