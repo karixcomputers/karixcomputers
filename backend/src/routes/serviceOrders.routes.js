@@ -9,7 +9,9 @@ import {
   sendServiceOrderPlaced,
   sendServiceShippedWithAwbEmail 
 } from "../services/mail.service.js";
-import { createReverseFanAWB } from "../services/fancourier.service.js";
+
+// 👉 IMPORTĂM TOT CE AVEM NEVOIE PENTRU AWB-URI ȘI DEVALORIZARE
+import { createReverseFanAWB, createFanAWB, calculateDepreciatedValue } from "../services/fancourier.service.js";
 
 const prisma = new PrismaClient();
 const router = express.Router();
@@ -24,7 +26,7 @@ const requireAdmin = (req, res, next) => {
 
 /**
  * 1. POST /api/service-orders
- * Creare cerere service / garanție
+ * Creare cerere service / garanție (Aici se face Reverse AWB)
  */
 router.post("/", requireAuth, async (req, res) => {
   try {
@@ -46,9 +48,8 @@ router.post("/", requireAuth, async (req, res) => {
     const dbUser = await prisma.user.findUnique({ where: { id: userId } });
     const finalName = dbUser?.name || userEmail.split('@')[0];
 
-    // 👉 CĂUTĂM COMANDA ORIGINALĂ ȘI PRODUSUL EXACT
     let purchaseOrderId = orderId;
-    let targetItemPriceCents = 0; // Vom stoca aici prețul DOAR pentru PC-ul vizat
+    let targetItemPriceCents = 0;
     let orderCreatedAt = new Date();
 
     const realOrder = await prisma.order.findFirst({
@@ -57,21 +58,17 @@ router.post("/", requireAuth, async (req, res) => {
         items: { some: { productName: productName } }
       },
       orderBy: { createdAt: 'desc' },
-      include: { items: true } // 👉 INCLUDEM ITEMS PENTRU A PUTEA FILTRA
+      include: { items: true }
     });
 
     if (realOrder) {
       purchaseOrderId = String(realOrder.id);
       orderCreatedAt = realOrder.createdAt;
 
-      // Căutăm exact item-ul pentru care s-a cerut service-ul
       const specificItem = realOrder.items.find(i => i.productName === productName);
-      
       if (specificItem && specificItem.priceCentsAtBuy) {
-          // Luăm prețul per bucată al produsului (fără restul comenzii)
           targetItemPriceCents = specificItem.priceCentsAtBuy;
       } else {
-          // Fallback de siguranță (foarte puțin probabil să ajungă aici)
           targetItemPriceCents = realOrder.totalCents;
       }
     } else {
@@ -87,7 +84,6 @@ router.post("/", requireAuth, async (req, res) => {
 
     if (method === "curier") {
         try {
-            // Trimitem comanda către generatorul AWB cu prețul SPECIFIC al PC-ului
             const fakeOrderForAWB = {
                 id: purchaseOrderId,
                 shippingName: finalName,
@@ -95,11 +91,10 @@ router.post("/", requireAuth, async (req, res) => {
                 shippingAddress: fullAddress, 
                 user: { email: userEmail },
                 fanboxLocationId: null,
-                totalCents: targetItemPriceCents, // 👉 AICI ACUM INTRĂ DOAR VALOAREA UNUI SINGUR PC
+                totalCents: targetItemPriceCents, 
                 createdAt: orderCreatedAt
             };
 
-            // Apelăm funcția cu isInsured = true
             generatedAwb = await createReverseFanAWB(fakeOrderForAWB, false, true);
             console.log(`✅ AWB Retur Generat Automat. Valoare bază pt calcul: ${targetItemPriceCents / 100} RON. AWB: ${generatedAwb}`);
         } catch (awbErr) {
@@ -202,17 +197,78 @@ router.get("/admin/all", requireAuth, requireAdmin, async (req, res) => {
 
 /**
  * 4. PATCH /api/service-orders/:id/status
+ * Aici interceptăm generarea de AWB (Karix -> Client)
  */
 router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, awb } = req.body;
+    const { status, awb, weight, packages, insurance, declaredValue } = req.body;
+
+    const serviceOrder = await prisma.serviceOrder.findUnique({
+      where: { id },
+      include: { user: { select: { email: true, name: true } } }
+    });
+
+    if (!serviceOrder) return res.status(404).json({ error: "Comanda de service nu a fost găsită." });
+
+    let generatedAwb = awb || serviceOrder.awb;
+
+    // 👉 LOGICĂ GENERARE AWB (Trimitere înapoi la client)
+    if (status === "awb_finalizat" || status === "awb_respins") {
+        
+        // Preluăm comanda originală pentru a trage detaliile
+        const realOrder = await prisma.order.findUnique({
+            where: { id: parseInt(serviceOrder.orderId) || 0 },
+            include: { items: true }
+        });
+
+        // Calculăm prețul produsului și devalorizarea pentru asigurare
+        let finalDeclaredValue = 0;
+        if (insurance) {
+            if (declaredValue) {
+                finalDeclaredValue = Number(declaredValue);
+            } else if (realOrder) {
+                const specificItem = realOrder.items.find(i => i.productName === serviceOrder.productName);
+                const targetPriceCents = specificItem ? specificItem.priceCentsAtBuy : realOrder.totalCents;
+                
+                finalDeclaredValue = calculateDepreciatedValue(targetPriceCents, realOrder.createdAt);
+            }
+        }
+
+        const fakeOrderForAWB = {
+            id: serviceOrder.orderId,
+            shippingName: serviceOrder.customerName,
+            shippingPhone: serviceOrder.phoneNumber,
+            shippingAddress: serviceOrder.judet === "Bihor" && serviceOrder.oras === "Oradea" 
+                ? serviceOrder.address 
+                : `${serviceOrder.address}, ${serviceOrder.oras}, ${serviceOrder.judet}`, 
+            user: { email: serviceOrder.user.email },
+            fanboxLocationId: null 
+        };
+
+        try {
+            // Apelăm generarea AWB Standard (Karix -> Client)
+            generatedAwb = await createFanAWB(
+                fakeOrderForAWB, 
+                false, 
+                weight || 5, 
+                packages || 1, 
+                insurance, 
+                false, 
+                finalDeclaredValue
+            );
+            console.log(`✅ AWB Retur către client Generat: ${generatedAwb} (Asigurat: ${finalDeclaredValue} RON)`);
+        } catch (awbErr) {
+            console.error("⚠️ Eroare generare AWB către client:", awbErr.message);
+            return res.status(500).json({ error: "Nu s-a putut genera AWB: " + awbErr.message });
+        }
+    }
 
     const updatedOrder = await prisma.serviceOrder.update({
       where: { id },
       data: { 
         status,
-        awb: awb !== undefined ? awb : undefined 
+        awb: generatedAwb !== undefined ? generatedAwb : undefined 
       },
       include: { user: { select: { email: true, name: true } } }
     });
@@ -222,16 +278,17 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
       customerName: updatedOrder.customerName,
       orderId: updatedOrder.orderId, 
       productName: updatedOrder.productName,
-      awb: awb || updatedOrder.awb
+      awb: generatedAwb || updatedOrder.awb
     };
 
-    if (status === "in_service") {
+    // 👉 TRIMITERE MAIL-URI PE BAZA STATUSULUI
+    if (status === "in_laborator") {
       await sendServiceInPossessionEmail(userEmail, emailData).catch(() => {});
     } 
     else if (status === "finalizat") {
       await sendServiceFinishedEmail(userEmail, emailData).catch(() => {});
     }
-    else if (status === "expediat") {
+    else if (status === "awb_finalizat" || status === "awb_respins" || status === "expediat") {
       await sendServiceShippedWithAwbEmail(userEmail, emailData).catch(() => {});
     }
 
