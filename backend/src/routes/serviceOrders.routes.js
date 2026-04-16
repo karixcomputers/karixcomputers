@@ -7,12 +7,13 @@ import {
   sendServiceInPossessionEmail,
   sendServiceFinishedEmail,
   sendServiceOrderPlaced,
-  sendServiceShippedWithAwbEmail 
+  sendServiceShippedWithAwbEmail,
+  // 👉 1. IMPORTĂM FUNCȚIA DE RESPINGERE GARANȚIE
+  sendWarrantyRejectedEmail 
 } from "../services/mail.service.js";
 
 // 👉 IMPORTĂM MULTER PENTRU UPLOAD-URI
 import multer from "multer";
-import path from "path";
 
 // 👉 IMPORTĂM TOT CE AVEM NEVOIE PENTRU AWB-URI ȘI DEVALORIZARE
 import { createReverseFanAWB, createFanAWB, calculateDepreciatedValue } from "../services/fancourier.service.js";
@@ -29,19 +30,13 @@ const requireAdmin = (req, res, next) => {
 };
 
 // ==========================================
-// CONFIGURARE MULTER PENTRU POZELE DE RESPINGERE
+// 👉 2. REPARAT MULTER: Folosim memoryStorage
 // ==========================================
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Salvează pozele în folderul uploads (asigură-te că există)
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, "reject-" + uniqueSuffix + path.extname(file.originalname));
-  },
+const storage = multer.memoryStorage();
+const upload = multer({ 
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 } // limităm la 5MB per poză, e suficient
 });
-const upload = multer({ storage });
 
 /**
  * 1. POST /api/service-orders
@@ -134,7 +129,7 @@ router.post("/", requireAuth, async (req, res) => {
         address: address || "Nespecificat", 
         preferredDate,
         userId: userId,
-        status: "in_drum_laborator", // 👉 Modificat statusul default cum ai cerut
+        status: "in_drum_laborator", 
         awb: generatedAwb 
       }
     });
@@ -216,7 +211,6 @@ router.get("/admin/all", requireAuth, requireAdmin, async (req, res) => {
 
 /**
  * 4. PATCH /api/service-orders/:id/status
- * Aici interceptăm generarea de AWB (Karix -> Client)
  */
 router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -232,16 +226,12 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
 
     let generatedAwb = awb || serviceOrder.awb;
 
-    // 👉 LOGICĂ GENERARE AWB (Trimitere înapoi la client)
     if (status === "awb_finalizat" || status === "awb_respins") {
-        
-        // Preluăm comanda originală pentru a trage detaliile
         const realOrder = await prisma.order.findUnique({
             where: { id: parseInt(serviceOrder.orderId) || 0 },
             include: { items: true }
         });
 
-        // Calculăm prețul produsului și devalorizarea pentru asigurare
         let finalDeclaredValue = 0;
         if (insurance) {
             if (declaredValue) {
@@ -266,7 +256,6 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
         };
 
         try {
-            // Apelăm generarea AWB Standard (Karix -> Client)
             generatedAwb = await createFanAWB(
                 fakeOrderForAWB, 
                 false, 
@@ -300,7 +289,6 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
       awb: generatedAwb || updatedOrder.awb
     };
 
-    // 👉 TRIMITERE MAIL-URI PE BAZA STATUSULUI
     if (status === "in_laborator") {
       await sendServiceInPossessionEmail(userEmail, emailData).catch(() => {});
     } 
@@ -308,7 +296,6 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
       await sendServiceFinishedEmail(userEmail, emailData).catch(() => {});
     }
     else if (status === "awb_finalizat" || status === "awb_respins" || status === "livrat") {
-      // Opțional: dacă vrei să trimiți mail și la awb_respins
       await sendServiceShippedWithAwbEmail(userEmail, emailData).catch(() => {});
     }
 
@@ -321,19 +308,14 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
 
 /**
  * 👉 5. POST /api/service-orders/:id/reject-warranty
- * Ruta pe care o caută frontend-ul!
  */
 router.post("/:id/reject-warranty", requireAuth, requireAdmin, upload.array("images", 5), async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
     
-    // Obținem array-ul cu fișierele uploadate
+    // Extragem fișierele trimise prin Multer
     const files = req.files || [];
-    
-    // Construim calea fișierelor pentru a fi trimise în email sau salvate în DB
-    // Ex: https://karixcomputers.ro/uploads/reject-12345.jpg
-    const imageUrls = files.map(f => `${process.env.CLIENT_URL}/uploads/${f.filename}`);
 
     const serviceOrder = await prisma.serviceOrder.findUnique({
       where: { id },
@@ -342,29 +324,22 @@ router.post("/:id/reject-warranty", requireAuth, requireAdmin, upload.array("ima
 
     if (!serviceOrder) return res.status(404).json({ error: "Cererea nu a fost găsită." });
 
-    // Actualizăm statusul în "garantie_respinsa"
     const updatedOrder = await prisma.serviceOrder.update({
       where: { id },
       data: { status: "garantie_respinsa" }
     });
 
-    // Pregătim datele pentru mail-ul pe care vrei să îl trimiți clientului
     const emailData = {
       customerName: serviceOrder.customerName,
       orderId: serviceOrder.orderId,
       productName: serviceOrder.productName,
-      reason: reason,
-      imageUrls: imageUrls
+      reason: reason
     };
 
-    // Apelăm funcția ta de mail pentru garanție respinsă (trebuie să o ai definită sau să folosești o alternativă)
-    // Momentan presupunem că ai o funcție generică sau ai denumit-o `sendServiceUnrepairableEmail`. 
-    // Dacă ai creat una dedicată (ex: `sendWarrantyRejectedEmail`), apeleaz-o pe aia!
     const userEmail = serviceOrder.user.email;
     
-    // IMPORTĂ ACEASTĂ FUNCȚIE ÎN mail.service.js dacă nu o ai!
-    // Dacă momentan nu ai funcție dedicată, poti comenta rândul ăsta ca să nu crăpe, și mă anunți.
-    // await sendWarrantyRejectedEmail(userEmail, emailData).catch(err => console.error("Eroare mail:", err));
+    // 👉 3. APELĂM FUNCȚIA DE EMAIL PENTRU RESPINGERE
+    await sendWarrantyRejectedEmail(userEmail, emailData, files).catch(err => console.error("Eroare mail respingere:", err));
 
     res.json({ success: true, message: "Garanție respinsă", order: updatedOrder });
   } catch (error) {
