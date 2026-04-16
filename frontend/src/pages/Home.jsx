@@ -171,7 +171,7 @@ export default function Home() {
             <div className="relative p-8 md:p-12 rounded-[40px] bg-white/[0.02] border border-white/10 backdrop-blur-xl flex flex-col md:flex-row-reverse items-center gap-12 overflow-hidden shadow-2xl">
               <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-emerald-600/10 blur-[80px] rounded-full"></div>
               
-              <div className="flex-1 text-left relative z-10">
+<div className="flex-1 text-left relative z-10">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest mb-6">
                   🚀 Karix for Business
                 </div>
@@ -181,9 +181,14 @@ export default function Home() {
                   <span className="text-emerald-400">Echipa Ta.</span>
                 </h2>
                 
-                <p className="text-gray-400 text-base md:text-lg font-medium leading-relaxed mb-8 max-w-xl">
-                  Ai o firmă în Oradea și angajații tăi folosesc numeroase PC-uri sau laptopuri? Productivitatea lor depinde de sănătatea sistemelor. <span className="text-white">Nu lăsa praful sau erorile să îți încetinească afacerea.</span> Ne ocupăm noi de mentenanța completă a tuturor echipamentelor, direct la sediul tău.
-                </p>
+                <div className="text-gray-400 text-base md:text-lg font-medium leading-relaxed mb-8 max-w-xl space-y-4">
+                  <p>
+                    Ai o firmă în Oradea și angajații tăi folosesc numeroase PC-uri sau laptopuri? Productivitatea lor depinde direct de sănătatea sistemelor IT. <span className="text-white">Nu lăsa praful, erorile de software sau hardware-ul depășit să îți încetinească afacerea.</span> Ne ocupăm noi de mentenanța completă a tuturor echipamentelor, rapid și eficient, direct la sediul tău.
+                  </p>
+                  <p>
+                    Mai mult, dacă tehnologia actuală nu mai ține pasul cu volumul de muncă, te ajutăm să faci un <span className="text-white">upgrade inteligent</span>. Înlocuim dispozitivele vechi cu stații de lucru performante și stabile, perfect optimizate pentru nevoile companiei tale. Oferim soluții complete – de la diagnosticare și curățare, până la sisteme noi și migrare de date – pentru ca echipa ta să lucreze fără întreruperi.
+                  </p>
+                </div>
                 
                 <Link to="/contact" className="inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[13px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20 group/btn">
                   Contactează-ne pentru ofertă personalizată

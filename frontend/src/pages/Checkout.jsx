@@ -690,7 +690,7 @@ export default function Checkout() {
                         Ai în coș <strong>{cartAnalysis.totalServicesInCart} dispozitive</strong> pentru service.
                       </p>
                       <p className="text-[11px] text-amber-500/80 mt-1 leading-snug">
-                        Din motive logistice (generare AWB per colet), preluarea comună este disponibilă <strong>exclusiv în Oradea</strong> (ne deplasăm noi sau ni le aduci tu). Dacă dorești trimitere prin Curier din alt județ, te rugăm să plasezi comenzi separate pentru fiecare dispozitiv.
+                        Din motive logistice (generare AWB per colet), preluarea comună este disponibilă <strong>exclusiv în Oradea</strong>. Dacă dorești trimitere prin Curier din alt județ, te rugăm să plasezi comenzi separate pentru fiecare dispozitiv.
                       </p>
                     </div>
                   </div>
