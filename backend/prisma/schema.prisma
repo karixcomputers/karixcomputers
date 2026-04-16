@@ -131,6 +131,7 @@ model OrderItem {
   status          String  @default("in_asteptare")
   awb             String?
   specs           String?
+  warrantyVoided  Boolean  @default(false)
 }
 
 model Ticket {
