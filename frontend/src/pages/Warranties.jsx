@@ -12,8 +12,11 @@ function ServiceStatusBadge({ status }) {
     in_asteptare: { label: "În așteptare", color: "text-amber-400 border-amber-500/20 bg-amber-500/5", icon: "⏳" },
     preluat_curier: { label: "Preluat Curier", color: "text-blue-400 border-blue-500/20 bg-blue-500/5", icon: "🚚" },
     in_laborator: { label: "În laborator", color: "text-purple-400 border-purple-500/20 bg-purple-500/5", icon: "🔬" },
+    in_lucru: { label: "În lucru", color: "text-indigo-400 border-indigo-500/20 bg-indigo-500/5", icon: "⚙️" },
     finalizat: { label: "Finalizat (Gata de livrare)", color: "text-emerald-400 border-emerald-500/20 bg-emerald-500/5", icon: "✨" },
-    predat_curier: { label: "Predat la Curier", color: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5", icon: "📦" },
+    garantie_respinsa: { label: "Garanție Respinsă", color: "text-rose-500 border-rose-500/20 bg-rose-500/5", icon: "❌" },
+    awb_finalizat: { label: "AWB Retur (Finalizat)", color: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5", icon: "📦" },
+    awb_respins: { label: "AWB Retur (Respins)", color: "text-orange-400 border-orange-500/20 bg-orange-500/5", icon: "📦" },
     livrat: { label: "Livrat", color: "text-gray-400 border-white/10 bg-white/5", icon: "✅" },
   };
 
@@ -72,19 +75,29 @@ export default function Warranties() {
           if (!isService) {
             const months = item.warrantyMonths || 24; 
             const isReturned = finalizedReturnedProducts.includes(item.productName);
+            // 👉 NOU: Verificăm dacă garanția a fost anulată din Admin Service
+            const isVoided = item.warrantyVoided === true;
+
             const purchaseDate = new Date(order.createdAt);
             const expiryDate = new Date(order.createdAt);
             expiryDate.setMonth(expiryDate.getMonth() + months);
             const isExpired = new Date() > expiryDate;
 
+            let currentStatus = "Activă";
+            if (isReturned) currentStatus = "Produs Returnat";
+            else if (isVoided) currentStatus = "Garanție Anulată (Service)";
+            else if (isExpired) currentStatus = "Expirată";
+
             results.push({
               id: `WR-${String(item.id).slice(-4).toUpperCase()}`,
-              orderRef: String(order.id).slice(-8).toUpperCase(), // Păstrăm 8 caractere pentru consistență
+              orderRef: String(order.id).slice(-8).toUpperCase(),
               product: item.productName,
               purchaseDate,
               expiryDate,
-              status: isReturned ? "Produs Returnat" : (isExpired ? "Expirată" : "Activă"),
+              status: currentStatus,
               isReturned,
+              isVoided, // Trecem starea mai departe către UI
+              isExpired,
               duration: `${months} Luni`
             });
           }
@@ -131,29 +144,39 @@ export default function Warranties() {
             </div>
           </header>
 
-          {/* TAB 1: GARANȚII ACTIVE */}
+          {/* TAB 1: GARANȚII (Toate, cu design diferențiat pentru cele anulate) */}
           {activeTab === "active_warranties" && (
             <div className="grid gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {warranties.length > 0 ? (
                 warranties.map((w, idx) => (
-                  <div key={idx} className={`group relative p-[1px] rounded-[35px] bg-gradient-to-br transition-all duration-500 shadow-2xl ${w.isReturned ? 'from-white/5 grayscale opacity-60' : 'from-white/10 hover:from-indigo-500/30'}`}>
+                  <div key={idx} className={`group relative p-[1px] rounded-[35px] bg-gradient-to-br transition-all duration-500 shadow-2xl ${
+                    (w.isReturned || w.isVoided) ? 'from-white/5 grayscale opacity-60' : 'from-white/10 hover:from-indigo-500/30'
+                  }`}>
                     <div className="p-8 md:p-10 rounded-[34px] bg-[#0b1020]/70 backdrop-blur-3xl flex flex-col gap-6">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 text-left">
                         <div className="flex items-center gap-6">
-                          <div className={`h-16 w-16 rounded-2xl flex items-center justify-center text-2xl border shadow-inner ${w.isReturned ? 'bg-white/5' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>
-                            {w.isReturned ? '📦' : '🛡️'}
+                          <div className={`h-16 w-16 rounded-2xl flex items-center justify-center text-2xl border shadow-inner ${
+                            w.isReturned ? 'bg-white/5' : (w.isVoided ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400')
+                          }`}>
+                            {w.isReturned ? '📦' : (w.isVoided ? '❌' : '🛡️')}
                           </div>
                           <div className="text-left">
                             <div className="flex flex-wrap items-center gap-3 mb-1">
-                              <h3 className={`text-xl font-black italic uppercase tracking-tight ${w.isReturned ? 'text-gray-500 line-through' : 'text-white'}`}>{w.product}</h3>
+                              <h3 className={`text-xl font-black italic uppercase tracking-tight ${(w.isReturned || w.isVoided) ? 'text-gray-500 line-through' : 'text-white'}`}>{w.product}</h3>
+                              
                               {w.isReturned && (
-                                <span className="px-2 py-0.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[8px] font-black uppercase tracking-[0.2em] italic shadow-lg">
+                                <span className="px-2 py-0.5 rounded-lg bg-gray-500/10 border border-gray-500/20 text-gray-400 text-[8px] font-black uppercase tracking-[0.2em] italic shadow-lg">
                                   Produs Returnat
+                                </span>
+                              )}
+                              
+                              {w.isVoided && (
+                                <span className="px-2 py-0.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[8px] font-black uppercase tracking-[0.2em] italic shadow-lg">
+                                  Garanție Anulată
                                 </span>
                               )}
                             </div>
                             
-                            {/* NOU: Afișare număr comandă, ID garanție și durată */}
                             <div className="flex items-center gap-2 mt-2">
                                 <span className="px-2 py-1 rounded bg-black/20 border border-white/5 text-[9px] font-bold text-indigo-300 uppercase tracking-widest">
                                     Comandă: #{w.orderRef}
@@ -166,17 +189,28 @@ export default function Warranties() {
                         </div>
                         <div className="text-left md:text-right">
                           <p className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] mb-1">Dată Expirare</p>
-                          <p className={`text-lg font-black italic ${w.isReturned ? 'text-gray-500' : 'text-white'}`}>{w.expiryDate.toLocaleDateString('ro-RO')}</p>
+                          <p className={`text-lg font-black italic ${(w.isReturned || w.isVoided) ? 'text-gray-500' : 'text-white'}`}>{w.expiryDate.toLocaleDateString('ro-RO')}</p>
                         </div>
                       </div>
-                      {w.status === 'Activă' && !w.isReturned && (
+                      
+                      {/* Buton Service activ DOAR pentru produsele cu garanție validă */}
+                      {w.status === 'Activă' && !w.isReturned && !w.isVoided && (
                         <button onClick={() => navigate("/service-request", { state: { product: w.product, warrantyId: w.id } })} className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase text-[10px] tracking-[0.2em] hover:bg-white hover:text-[#0b1020] transition-all italic">
                           Solicită intervenție service 🛠️
                         </button>
                       )}
+                      
+                      {/* Mesaj pentru Retur */}
                       {w.isReturned && (
                         <div className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-gray-500 font-black uppercase text-[9px] tracking-widest text-center italic opacity-50">
                           Garanție închisă automat în urma returului
+                        </div>
+                      )}
+
+                      {/* Mesaj pentru Garanție Respinsă */}
+                      {w.isVoided && (
+                        <div className="w-full py-3 rounded-2xl bg-rose-500/5 border border-rose-500/10 text-rose-500/70 font-black uppercase text-[9px] tracking-widest text-center italic opacity-80">
+                          Garanție anulată în urma unei decizii de service (Deteriorare/Șoc mecanic/Contact Lichide)
                         </div>
                       )}
                     </div>
