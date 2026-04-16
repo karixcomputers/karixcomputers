@@ -9,7 +9,6 @@ import {
   sendServiceOrderPlaced,
   sendServiceShippedWithAwbEmail 
 } from "../services/mail.service.js";
-// 👉 IMPORTĂM FUNCȚIA DE GENERARE AWB INVERS
 import { createReverseFanAWB } from "../services/fancourier.service.js";
 
 const prisma = new PrismaClient();
@@ -44,27 +43,28 @@ router.post("/", requireAuth, async (req, res) => {
     const userId = req.user.id || req.user.sub;
     const userEmail = req.user.email;
 
-    // 1. Preluăm numele real din DB
     const dbUser = await prisma.user.findUnique({ where: { id: userId } });
     const finalName = dbUser?.name || userEmail.split('@')[0];
 
-    // 2. EXTRACȚIE AUTOMATĂ ID COMANDĂ (CIFRE)
+    // 👉 CĂUTĂM COMANDA ORIGINALĂ CA SĂ ȘTIM PREȚUL ȘI DATA
     let purchaseOrderId = orderId;
+    const realOrder = await prisma.order.findFirst({
+      where: {
+        userId: userId,
+        items: { some: { productName: productName } }
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, totalCents: true, createdAt: true }
+    });
 
-    if (!purchaseOrderId || purchaseOrderId === "") {
-      const realOrder = await prisma.order.findFirst({
-        where: {
-          userId: userId,
-          items: { some: { productName: productName } }
-        },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true }
-      });
-      
-      purchaseOrderId = realOrder ? String(realOrder.id) : "S" + Date.now().toString().slice(-6);
+    if (realOrder) {
+      purchaseOrderId = String(realOrder.id);
+    } else {
+      if (!purchaseOrderId || purchaseOrderId === "") {
+        purchaseOrderId = "S" + Date.now().toString().slice(-6);
+      }
     }
 
-    // 👉 3. GENERARE AWB AUTOMATĂ (DOAR DACA METODA ESTE CURIER)
     let generatedAwb = null;
     const fullAddress = method === "curier" 
         ? `${address}, ${oras}, ${judet}`
@@ -72,25 +72,26 @@ router.post("/", requireAuth, async (req, res) => {
 
     if (method === "curier") {
         try {
-            // Construim un "fake order" pentru a fi compatibil cu funcția din fancourier.service.js
+            // Trimitem comanda către generatorul AWB. El are acces la totalCents și createdAt pentru devalorizare.
             const fakeOrderForAWB = {
                 id: purchaseOrderId,
                 shippingName: finalName,
                 shippingPhone: phoneNumber,
-                shippingAddress: fullAddress, // Adresa completată în formular
+                shippingAddress: fullAddress, 
                 user: { email: userEmail },
-                fanboxLocationId: null // La ridicare de acasă nu e fanbox, deci null
+                fanboxLocationId: null,
+                totalCents: realOrder ? realOrder.totalCents : 0,
+                createdAt: realOrder ? realOrder.createdAt : new Date()
             };
 
-            generatedAwb = await createReverseFanAWB(fakeOrderForAWB);
-            console.log(`✅ AWB Retur Generat Automat: ${generatedAwb}`);
+            // Apelăm funcția cu isInsured = true
+            generatedAwb = await createReverseFanAWB(fakeOrderForAWB, false, true);
+            console.log(`✅ AWB Retur Generat Automat cu asigurare calculată: ${generatedAwb}`);
         } catch (awbErr) {
             console.error("⚠️ Eroare la generarea automată a AWB-ului:", awbErr.message);
-            // Dacă dă eroare la AWB, continuăm să salvăm cererea de service, dar fără AWB (va trebui generat manual)
         }
     }
 
-    // 4. Salvare în ServiceOrder
     const newServiceOrder = await prisma.serviceOrder.create({
       data: {
         orderId: String(purchaseOrderId), 
@@ -105,13 +106,11 @@ router.post("/", requireAuth, async (req, res) => {
         preferredDate,
         userId: userId,
         status: "in_asteptare",
-        awb: generatedAwb // 👉 Salvăm AWB-ul dacă a fost generat cu succes
+        awb: generatedAwb 
       }
     });
 
-    // 5. Trimitere mail-uri
     try {
-      // Către CLIENT
       await sendServiceOrderPlaced(userEmail, {
         customerName: finalName,
         orderId: newServiceOrder.orderId, 
@@ -120,10 +119,9 @@ router.post("/", requireAuth, async (req, res) => {
         phone: phoneNumber,
         method: method,
         issueDescription: issueDescription,
-        awb: generatedAwb // Transmitem awb-ul și către mail, dacă există
+        awb: generatedAwb 
       });
       
-      // Către ADMIN
       if (method === "curier") {
         await sendAdminServiceCourierAlert({
           productName,
@@ -149,7 +147,6 @@ router.post("/", requireAuth, async (req, res) => {
       console.error("⚠️ Eroare mail:", mailErr);
     }
 
-    // Returnăm Răspunsul. Va conține și `awb: "123..."` pe care frontend-ul îl preia.
     res.status(201).json(newServiceOrder);
   } catch (error) {
     console.error("❌ SERVICE ORDER CREATE ERROR:", error);

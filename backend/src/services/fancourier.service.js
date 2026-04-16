@@ -75,7 +75,7 @@ const formatForFan = (str) => {
 };
 
 // ==========================================
-// MOTOR INTELIGENT DE EXTRAGERE A ADRESELOR (GĂSEȘTE JUDEȚUL ORIUNDE AR FI)
+// MOTOR INTELIGENT DE EXTRAGERE A ADRESELOR
 // ==========================================
 const roCounties = ["alba", "arad", "arges", "bacau", "bihor", "bistrita-nasaud", "botosani", "braila", "brasov", "bucuresti", "buzau", "calarasi", "caras-severin", "cluj", "constanta", "covasna", "dambovita", "dolj", "galati", "giurgiu", "gorj", "harghita", "hunedoara", "ialomita", "iasi", "ilfov", "maramures", "mehedinti", "mures", "neamt", "olt", "prahova", "salaj", "satu mare", "sibiu", "suceava", "teleorman", "timis", "tulcea", "valcea", "vaslui", "vrancea"];
 
@@ -91,7 +91,6 @@ function extractIntelligently(str) {
     let c = "", l = "", s = [];
     let cIndex = -1;
     
-    // Căutăm județul în segmentele de text
     for (let i = 0; i < parts.length; i++) {
         let normalizedPart = parts[i].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, '');
         if (normalizedPart === 'bistritanasaud') normalizedPart = 'bistrita-nasaud';
@@ -106,13 +105,10 @@ function extractIntelligently(str) {
     }
 
     if (cIndex !== -1) {
-        // Dacă a găsit județul la final (Stradă, Oraș, Județ)
         if (cIndex > 0 && cIndex === parts.length - 1) {
             l = parts[cIndex - 1];
             s = parts.slice(0, cIndex - 1);
-        } 
-        // Dacă a găsit județul la început (Județ, Oraș, Stradă - format Widget FANbox)
-        else if (cIndex < parts.length - 1) {
+        } else if (cIndex < parts.length - 1) {
             l = parts[cIndex + 1];
             s = parts.filter((_, idx) => idx !== cIndex && idx !== (cIndex + 1));
         } else {
@@ -120,7 +116,6 @@ function extractIntelligently(str) {
             s = parts;
         }
     } else {
-        // Fallback dacă scrie ceva total necunoscut
         if (parts.length >= 3) {
             c = parts[parts.length - 1];
             l = parts[parts.length - 2];
@@ -180,9 +175,35 @@ function parseAddresses(rawAddress, providedPudoId) {
 }
 
 // ==========================================
+// 👉 FUNCȚIE NOUĂ: CALCUL DEVALORIZARE
+// O poți exporta și folosi oriunde pe backend
+// ==========================================
+export function calculateDepreciatedValue(totalCents, createdAtDate) {
+    if (!totalCents || !createdAtDate) return 0;
+    
+    const purchaseDate = new Date(createdAtDate);
+    const currentDate = new Date();
+    
+    // Calculăm diferența exactă în luni
+    const monthsDiff = (currentDate.getFullYear() - purchaseDate.getFullYear()) * 12 + (currentDate.getMonth() - purchaseDate.getMonth());
+
+    let percentage = 100;
+    if (monthsDiff <= 2) percentage = 100;
+    else if (monthsDiff <= 6) percentage = 90;
+    else if (monthsDiff <= 12) percentage = 75;
+    else if (monthsDiff <= 18) percentage = 65;
+    else if (monthsDiff <= 24) percentage = 60;
+    else if (monthsDiff <= 36) percentage = 50;
+    else if (monthsDiff <= 48) percentage = 35;
+    else percentage = 25; // Am setat o valoare minimă de 25% pentru produsele foarte vechi (>4 ani)
+
+    const originalValueRon = totalCents / 100;
+    return Math.round(originalValueRon * (percentage / 100));
+}
+
+// ==========================================
 // 2. GENERARE AWB STANDARD (Karix -> Client)
 // ==========================================
-// 👉 NOU: Am adăugat customDeclaredValue ca ultim parametru
 export async function createFanAWB(order, isTestMode = false, weight = 1, packagesCount = 1, isInsured = false, forceFanbox = false, customDeclaredValue = null) { 
     if (isTestMode) return `TEST_AWB_${Math.floor(Math.random() * 100000000)}`; 
 
@@ -200,14 +221,12 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
         const rambursValue = (order.paymentMethod === 'online' || order.paymentMethod === 'transfer_bancar') ? 0 : orderTotalRon;
         const serviceType = rambursValue > 0 ? "Cont Colector" : "Standard";
 
-        // 👉 NOU: Logica de stabilire a valorii declarate (pentru asigurare)
         let finalDeclaredValue = 0;
         if (isInsured) {
-            // Dacă din Admin ți-a venit o valoare specifică (ex: 20000 lei pentru piesele de Asamblare)
             if (customDeclaredValue !== null && !isNaN(customDeclaredValue)) {
                 finalDeclaredValue = Number(customDeclaredValue);
             } else {
-                // Dacă nu, folosește valoarea coșului (cum era înainte)
+                // Dacă nu primește o valoare custom, pentru un produs NOU pleacă la valoarea integrală
                 finalDeclaredValue = orderTotalRon;
             }
         }
@@ -225,7 +244,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
                         content: "Sistem PC / Componente Hardware",
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: rambursValue,
-                        declaredValue: finalDeclaredValue, // Acum folosește valoarea calculată inteligent mai sus
+                        declaredValue: finalDeclaredValue, 
                         options: [] 
                     },
                     recipient: {
@@ -268,7 +287,7 @@ export async function createFanAWB(order, isTestMode = false, weight = 1, packag
 // ==========================================
 // 3. GENERARE AWB INVERS (Client -> Karix)
 // ==========================================
-export async function createReverseFanAWB(order, isTestMode = false) { 
+export async function createReverseFanAWB(order, isTestMode = false, isInsured = false, customDeclaredValue = 0) { 
     if (isTestMode) return `TEST_REV_AWB_${Math.floor(Math.random() * 100000000)}`; 
 
     try {
@@ -281,6 +300,17 @@ export async function createReverseFanAWB(order, isTestMode = false) {
         
         const isDropOff = Boolean(parsedData.pudoId);
         
+        // 👉 AICI APLICĂM MATEMATICA PENTRU ASIGURARE
+        let finalDeclaredValue = 0;
+        if (isInsured) {
+            if (customDeclaredValue > 0) {
+                finalDeclaredValue = Number(customDeclaredValue); // Dacă forțezi tu o valoare (ex din Admin)
+            } else if (order.totalCents && order.createdAt) {
+                // Dacă știe valoarea originală, o trece prin devalorizare
+                finalDeclaredValue = calculateDepreciatedValue(order.totalCents, order.createdAt);
+            }
+        }
+
         const payload = {
             clientId: clientIdNum,
             shipments: [
@@ -291,10 +321,10 @@ export async function createReverseFanAWB(order, isTestMode = false) {
                         weight: 5,
                         payment: "recipient", 
                         observation: `Retur Service Comanda #${String(order.id).slice(-8)}`,
-                        content: "Laptop / Consola (Service)",
+                        content: "Laptop / Consola / PC (Service)",
                         dimensions: { length: 40, height: 40, width: 20 }, 
                         cod: 0,
-                        declaredValue: 0,
+                        declaredValue: finalDeclaredValue, // Valoarea devalorizată
                         options: isDropOff ? ["W"] : []
                     },
                     sender: {
