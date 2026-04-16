@@ -1,12 +1,8 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useCart } from "../context/CartContext.jsx";
-import { useAuth } from "../context/AuthContext.jsx";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { formatRON } from "../utils/money";
 import { apiFetch } from "../api/client";
-import axios from "axios";
 import SEO from "../components/SEO";
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchMyOrders } from "../api/orders";
 
@@ -205,19 +201,6 @@ export default function Orders() {
     return order.items.every(it => cancelableStatuses.includes(it.status));
   };
 
-  const getReturnInfo = (order) => {
-    if (order.status !== 'livrat') return null;
-    const deliveryDate = new Date(order.updatedAt || order.createdAt);
-    const expiryDate = new Date(deliveryDate);
-    expiryDate.setDate(expiryDate.getDate() + 14);
-    const isExpired = new Date() > expiryDate;
-    
-    return {
-      isExpired,
-      expiryDate: expiryDate.toLocaleDateString('ro-RO', { day: 'numeric', month: 'long' })
-    };
-  };
-
   const handleDownloadInvoice = async (orderId) => {
     setDownloadingId(orderId);
     try {
@@ -308,18 +291,7 @@ export default function Orders() {
               )}
 
               {data?.map(o => {
-                const returnInfo = getReturnInfo(o);
-                const returnRequests = o.returnRequests || [];
                 const serviceKeywords = ['service', 'mentenanta', 'curatare', 'reparatie', 'montaj', 'diagnosticare', 'upgrade'];
-                
-                const returnableItemsCount = o.items.filter(it => {
-                    const name = (it.productName || "").toLowerCase();
-                    return !serviceKeywords.some(kw => name.includes(kw));
-                }).length;
-
-                const returnedItemsNames = returnRequests.flatMap(req => req.returnedItems || []);
-                const uniqueReturnedCount = [...new Set(returnedItemsNames)].length;
-                const isFullyReturned = returnableItemsCount > 0 && uniqueReturnedCount >= returnableItemsCount;
                 
                 const isOradea = o.shippingAddress?.toLowerCase().includes('oradea');
 
@@ -400,35 +372,6 @@ export default function Orders() {
                           );
                         })}
                       </div>
-
-                      {returnInfo && (
-                        <div className="mt-10 pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-6">
-                          <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">
-                            Sistem Retur Parțial Karix (14 zile)
-                          </div>
-
-                          {!returnInfo.isExpired && !isFullyReturned && (
-                            <button 
-                              onClick={() => navigate("/return-request", { state: { order: o } })}
-                              className="px-6 py-2.5 rounded-xl bg-white text-[#0b1020] font-black uppercase text-[9px] tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-xl italic"
-                            >
-                              Inițiază Retur Nou 📦
-                            </button>
-                          )}
-
-                          {isFullyReturned && (
-                              <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-500 text-[9px] font-black uppercase tracking-widest italic">
-                                  Toate produsele au fost returnate ✅
-                              </div>
-                          )}
-                          
-                          {returnInfo.isExpired && !isFullyReturned && (
-                             <div className="text-[9px] text-rose-500/40 font-black uppercase italic">
-                               Perioada de retur a expirat ({returnInfo.expiryDate})
-                             </div>
-                          )}
-                        </div>
-                      )}
 
                       <div className="mt-8 pt-6 border-t border-white/5 flex flex-col gap-4 text-gray-400">
                         <div className="flex items-start gap-4">
