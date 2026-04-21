@@ -1,11 +1,27 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { formatRON } from "../utils/money";
 import { useCart } from "../context/CartContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-// IMPORTĂM COMPONENTA SEO
 import SEO from "../components/SEO";
+
+// --- PREȚURI UPGRADE (La fel ca în Shop) ---
+const UPGRADES = {
+  storage: [
+    { label: "512GB M.2", value: "512GB", price: 0 },
+    { label: "1TB M.2", value: "1TB", price: 25000 }, // +250 RON
+    { label: "2TB M.2", value: "2TB", price: 55000 }  // +550 RON
+  ]
+};
+
+// Funcție pentru a extrage numărul și a compara GB cu TB
+const extractNumber = (str) => {
+  if (!str) return 0;
+  const num = parseInt(str.replace(/[^0-9]/g, ''));
+  if (str.toLowerCase().includes('tb')) return num * 1024;
+  return num;
+};
 
 export default function ProductDetails() {
   const { id } = useParams();
@@ -17,34 +33,29 @@ export default function ProductDetails() {
   const [quantity, setQuantity] = useState(1);
   const [activeSection, setActiveSection] = useState("Detalii");
   
+  // --- STATE-URI PENTRU CONFIGURATOR ---
+  const [selectedStorage, setSelectedStorage] = useState("");
+  const [selectedCase, setSelectedCase] = useState("");
+  const [availableCases, setAvailableCases] = useState([]);
+
   // State pentru mesajul de confirmare coș
   const [cartMessage, setCartMessage] = useState({ show: false, text: "" });
 
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
   const [submittingReview, setSubmittingReview] = useState(false);
-  
-  // State pentru pozele atașate la review
   const [reviewImages, setReviewImages] = useState([]);
-  
-  // State pentru poza mărită (fullscreen)
   const [fullscreenImage, setFullscreenImage] = useState(null);
-
-  // State pentru a detecta dacă bara este 'sticky'
   const [isSticky, setIsSticky] = useState(false);
 
-  // Refs pentru secțiuni
   const detailsRef = useRef(null);
   const benchmarkRef = useRef(null);
   const warrantyRef = useRef(null);
   const deliveryRef = useRef(null);
   const reviewsRef = useRef(null);
-
-  // Refs pentru containerele de navigație (pentru auto-scroll orizontal)
   const mobileNavRef = useRef(null);
   const desktopNavRef = useRef(null);
   const buttonRefs = useRef({});
 
-  // 1. LOGICĂ DETECTARE SECȚIUNE ACTIVĂ LA SCROLL
   useEffect(() => {
     const handleScroll = () => {
       const sections = [
@@ -74,22 +85,16 @@ export default function ProductDetails() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [activeSection]);
 
-  // 1.5 LOGICĂ STICKY SEPARATĂ
   useEffect(() => {
     const handleSticky = () => {
-      if (window.scrollY > 120) {
-        setIsSticky(true);
-      } else {
-        setIsSticky(false);
-      }
+      if (window.scrollY > 120) setIsSticky(true);
+      else setIsSticky(false);
     };
-
     window.addEventListener("scroll", handleSticky, { passive: true });
     handleSticky(); 
     return () => window.removeEventListener("scroll", handleSticky);
   }, []);
 
-  // 2. AUTO-SCROLL ORIZONTAL ÎN BARĂ
   useEffect(() => {
     const activeBtn = buttonRefs.current[activeSection];
     const containers = [mobileNavRef.current, desktopNavRef.current];
@@ -112,27 +117,75 @@ export default function ProductDetails() {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  // --- PRELUARE DATE + CARCASE ---
   useEffect(() => {
-    const getProduct = async () => {
+    const fetchData = async () => {
       try {
         const cleanId = id.split(":")[0];
         const res = await apiFetch(`/products/${cleanId}`);
-        if (res.ok) setProduct(await res.json());
+        if (res.ok) {
+          const pcData = await res.json();
+          setProduct(pcData);
+          // Setăm valorile de bază în configurator
+          setSelectedStorage(pcData.storageGb || "");
+          setSelectedCase(pcData.case || "");
+        }
+
+        // Preluăm carcasele disponibile din DB
+        const casesRes = await apiFetch("/products?category=case");
+        if (casesRes.ok) {
+          const casesData = await casesRes.json();
+          if(casesData.length > 0) {
+            setAvailableCases(casesData.map(c => c.name));
+          } else {
+            setAvailableCases(["Carcasă Standard Karix", "AQIRYS Aquilla White", "Corsair 4000D Airflow", "NZXT H5 Flow"]);
+          }
+        } else {
+          setAvailableCases(["Carcasă Standard Karix", "AQIRYS Aquilla White", "Corsair 4000D Airflow", "NZXT H5 Flow"]);
+        }
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
     };
-    getProduct();
+    fetchData();
   }, [id]);
+
+  // --- FILTRARE SSD (Nu poți alege mai puțin decât baza) ---
+  const validStorageOptions = useMemo(() => {
+    if (!product) return [];
+    const baseVal = extractNumber(product.storageGb);
+    return UPGRADES.storage.filter(opt => extractNumber(opt.value) >= baseVal);
+  }, [product]);
+
+  // --- CALCUL PREȚ DINAMIC ---
+  const currentUpgradePrice = useMemo(() => {
+    if (!product) return 0;
+    let extra = 0;
+    if (selectedStorage && selectedStorage !== product.storageGb) {
+      const opt = UPGRADES.storage.find(o => o.value === selectedStorage);
+      if (opt) extra += opt.price;
+    }
+    return extra;
+  }, [selectedStorage, product]);
+
+  const finalPriceCents = product ? product.priceCents + currentUpgradePrice : 0;
 
   const handleAddToCart = () => {
     if (!product) return;
+    
+    // Adăugăm în coș produsul cu noul preț și cu specificațiile modificate
     addItem({
       ...product,
+      priceCents: finalPriceCents,
       qty: quantity,
       specs: {
-        cpu: product.cpuBrand, gpu: product.gpuBrand, ram: product.ramGb,
-        storage: product.storageGb, motherboard: product.motherboard,
-        case: product.case, cooler: product.cooler, psu: product.psu
+        cpu: product.cpuBrand, 
+        gpu: product.gpuBrand, 
+        ram: product.ramGb,
+        storage: selectedStorage || product.storageGb, 
+        motherboard: product.motherboard,
+        case: selectedCase || product.case, 
+        cooler: product.cooler, 
+        psu: product.psu
       }
     });
 
@@ -183,13 +236,14 @@ export default function ProductDetails() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-transparent"><div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div>;
   if (!product) return <div className="min-h-screen flex flex-col items-center justify-center text-white bg-transparent"><h1>Produs negăsit.</h1><Link to="/shop">Catalog</Link></div>;
 
+  // Actualizăm afișarea specificațiilor live cu ce e selectat
   const allSpecs = [
     { label: "CPU", val: product.cpuBrand, icon: "⚡" },
     { label: "GPU", val: product.gpuBrand, icon: "🎮" },
     { label: "RAM", val: product.ramGb, icon: "📟" },
-    { label: "STOCARE", val: product.storageGb, icon: "💾" },
+    { label: "STOCARE", val: selectedStorage || product.storageGb, icon: "💾" },
     { label: "PLACĂ DE BAZĂ", val: product.motherboard, icon: "🧩" },
-    { label: "CARCASĂ", val: product.case, icon: "📦" },
+    { label: "CARCASĂ", val: selectedCase || product.case, icon: "📦" },
     { label: "COOLER", val: product.cooler, icon: "❄️" },
     { label: "SURSĂ", val: product.psu, icon: "🔌" }
   ];
@@ -209,7 +263,6 @@ export default function ProductDetails() {
 
   return (
     <>
-      {/* SEO DINAMIC: Titlu și descriere generate pentru Google */}
       <SEO 
         title={product.name}
         description={`${product.name} - ${product.longDescription?.substring(0, 150) || product.description}. Build PC de performanță asamblat și testat de Karix Computers Oradea.`}
@@ -219,7 +272,6 @@ export default function ProductDetails() {
 
       <div className="min-h-screen pt-32 pb-24 px-4 md:px-8 text-white relative bg-transparent overflow-hidden text-left font-sans">
         
-        {/* WRAPPER-UL NAVIGAȚIEI STICKY */}
         <div className={`w-full z-[100] transition-all duration-300 pointer-events-none px-4 flex justify-center ${
             isSticky 
               ? "fixed top-4 md:top-6 left-0" 
@@ -308,9 +360,61 @@ export default function ProductDetails() {
                 </div>
               )}
 
-              <div className="flex flex-col items-center gap-4 mt-4">
+              {/* --- CONFIGURATOR OPȚIUNI AICI --- */}
+              <div className="flex flex-col gap-6 pt-6 border-t border-white/5">
+                
+                {/* UPGRADE STOCARE */}
+                {validStorageOptions.length > 1 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] text-gray-400 font-black uppercase tracking-widest italic">Stocare (SSD)</h4>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {validStorageOptions.map((opt) => {
+                        const isSelected = selectedStorage === opt.value;
+                        const isBase = opt.value === product.storageGb;
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => setSelectedStorage(opt.value)}
+                            className={`flex flex-col p-3 rounded-2xl border transition-all ${
+                              isSelected
+                                ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' 
+                                : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                            }`}
+                          >
+                            <span className="text-xs font-black uppercase tracking-widest italic text-center w-full">{opt.label}</span>
+                            <span className={`text-[9px] font-bold mt-1 text-center w-full ${isSelected ? 'text-indigo-400' : 'text-gray-500'}`}>
+                              {isBase ? 'Inclus' : `+${formatRON(opt.price)}`}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* SCHIMBARE CARCASĂ */}
+                {availableCases.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] text-gray-400 font-black uppercase tracking-widest italic">Schimbă Carcasa</h4>
+                    <select 
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white text-sm font-bold outline-none focus:border-indigo-500/50 transition-all appearance-none cursor-pointer"
+                      value={selectedCase}
+                      onChange={(e) => setSelectedCase(e.target.value)}
+                      style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}
+                    >
+                      {availableCases.map((c) => (
+                        <option key={c} value={c} className="bg-[#0b1020] text-white py-2">{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col items-center gap-4 mt-2">
                   <span className="text-4xl md:text-6xl font-black text-white italic tracking-tighter drop-shadow-2xl mb-2">
-                      {formatRON(product.priceCents)}
+                      {formatRON(finalPriceCents)}
                   </span>
                   
                   <div className="flex gap-5 w-full">

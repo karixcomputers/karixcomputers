@@ -70,7 +70,7 @@ export default function Terms() {
               <ul className="space-y-3">
                 <li className="flex items-center gap-3">
                   <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0"/>
-                  <span>Prețurile sunt exprimate în <strong>RON</strong> și includ toate taxele.</span>
+                  <span>Prețurile afișate pe site sunt exprimate în <strong>RON</strong> și <strong>includ TVA</strong> conform legislației în vigoare.</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0"/>
@@ -78,7 +78,7 @@ export default function Terms() {
                 </li>
                 <li className="flex items-center gap-3">
                   <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0"/>
-                  <span>Karix Computers oferă servicii de mentenanță și reparații. Prețul acestora reprezintă manopera și, unde este cazul, materialele consumabile.</span>
+                  <span>Karix Computers oferă servicii de mentenanță și reparații. Prețul acestora reprezintă manopera și, unde este cazul, materialele consumabile (include TVA).</span>
                 </li>
               </ul>
             </TermsSection>
@@ -168,7 +168,7 @@ export default function Terms() {
               to="/"
               className="inline-flex items-center gap-3 px-10 py-4 rounded-2xl bg-white/[0.03] border border-white/10 text-white font-bold hover:bg-indigo-500/20 hover:border-indigo-500/50 transition-all group backdrop-blur-md"
             >
-              Înapoila site
+              Înapoi la site
             </Link>
           </div>
 

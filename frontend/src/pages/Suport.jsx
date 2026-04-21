@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-// IMPORTĂM COMPONENTA SEO
 import SEO from "../components/SEO";
 
 export default function Support() {
@@ -10,19 +9,39 @@ export default function Support() {
   const faqs = [
     {
       question: "Cât durează asamblarea și livrarea unui sistem Karix?",
-      answer: "Asamblarea profesională, cable management-ul și testele de stres durează de obicei 3-5 zile lucrătoare. Livrarea se face prin curier rapid în 24-48h."
+      answer: "Asamblarea profesională, cable management-ul și testele de stres durează de obicei 3-5 zile lucrătoare. Livrarea se face prin curier rapid în 24-48h pe tot teritoriul României."
+    },
+    {
+      question: "Pot returna sistemul PC dacă m-am răzgândit?",
+      answer: "Sistemele Karix nu sunt produse de serie, ci sunt asamblate exclusiv la comandă (custom-build) și personalizate conform specificațiilor tale. Prin urmare, conform OUG 34/2014 art. 16, acestea sunt exceptate de la dreptul de retur de 14 zile. Totuși, beneficiezi de suport tehnic dedicat și garanție completă."
     },
     {
       question: "Garanția este valabilă dacă îmi fac singur upgrade la componente?",
-      answer: "Da, sistemele Karix nu au sigilii care să restricționeze upgrade-ul. Garanția rămâne valabilă pentru componentele originale, atâta timp cât nu apar defecte cauzate de o instalare necorespunzătoare."
+      answer: "Da, sistemele Karix nu au sigilii care să restricționeze upgrade-ul. Garanția rămâne valabilă pentru componentele originale, atâta timp cât nu apar defecte cauzate de o instalare necorespunzătoare sau de daune fizice."
+    },
+    {
+      question: "Ce fac dacă PC-ul se defectează în perioada de garanție?",
+      answer: "Ne contactezi! Primul pas este o diagnosticare remote (prin AnyDesk). Dacă problema este hardware, vom trimite curierul să ridice PC-ul (sau doar componenta defectă), o vom înlocui/repara prin furnizorii noștri autorizați și îți vom trimite sistemul înapoi în cel mai scurt timp."
+    },
+    {
+      question: "Primesc și cutiile originale ale componentelor?",
+      answer: "Nu, din motive logistice și de siguranță pe timpul transportului, nu expediem cutiile individuale ale componentelor. Vei primi sistemul complet asamblat (în cutia de protecție a carcasei), împreună cu manualele, cablurile și accesoriile suplimentare nefolosite la asamblare."
     },
     {
       question: "Componentele folosite sunt noi sau utilizate?",
       answer: "Karix Computers utilizează EXCLUSIV componente noi, sigilate, achiziționate de la furnizori autorizați. Fiecare piesă beneficiază de garanția producătorului, pe lângă garanția oferită de noi pentru întreg sistemul."
     },
     {
+      question: "Sistemul vine cu Windows instalat și activat?",
+      answer: "Toate sistemele noastre sunt livrate cu Windows 11 Pro preinstalat în versiune curată (fără Bloatware), având toate driverele și update-urile la zi. Licența (cheia de activare) nu este inclusă standard; o poți achiziționa separat sau poți folosi o licență pe care o deții deja."
+    },
+    {
+      question: "Sunt din alt județ. Vă pot trimite laptopul/consola la reparat prin curier?",
+      answer: "În acest moment, serviciile noastre de mentenanță și asamblare din piese proprii sunt disponibile EXCLUSIV pentru clienții din Oradea și județul Bihor. Ne dorim să menținem un control strict asupra calității și siguranței pe transport, așadar preluăm și predăm echipamentele personal."
+    },
+    {
       question: "Oferiți servicii de mentenanță pentru laptopuri și console?",
-      answer: "Desigur! Realizăm curățări profesionale și schimb de pastă termică pentru laptopuri de gaming și console (PlayStation 5, Xbox Series X/S). Recomandăm mentenanța anuală pentru a preveni supraîncălzirea și scăderea performanței."
+      answer: "Desigur (pentru clienții din Bihor)! Realizăm curățări profesionale și schimb de pastă termică pentru laptopuri de gaming și console (PlayStation 5, Xbox Series X/S). Recomandăm mentenanța anuală pentru a preveni supraîncălzirea și scăderea performanței."
     },
     {
       question: "Reparați controllere cu stick drift? Ce sunt senzorii Hall Effect?",
@@ -33,40 +52,28 @@ export default function Support() {
       answer: "Absolut. Analizăm sistemul tău actual și îți propunem cele mai eficiente soluții de upgrade (procesor, placă video, RAM sau SSD) pentru a-i reda viteza de care ai nevoie, fără a cumpăra un sistem complet nou."
     },
     {
-      question: "Cât durează o diagnosticare și ce presupune reparația?",
-      answer: "Diagnosticarea durează de regulă 24-48h și presupune verificarea hardware și software a fiecărei componente. După identificarea defectului, te contactăm cu un deviz de reparație și estimarea timpului necesar pentru remediere."
-    },
-    {
-      question: "Sistemele vin cu programe inutile (Bloatware)?",
-      answer: "Absolut NU. Instalăm o versiune curată de Windows 11 Pro, driverele esențiale și aplicațiile necesare pentru controlul iluminării RGB. Fără reclame, fără trial-uri inutile."
-    },
-    {
       question: "Ce teste de performanță faceți înainte de livrare?",
-      answer: "Fiecare PC trece prin ore de teste de stres pentru a ne asigura că temperaturile și stabilitatea sunt optime."
+      answer: "Fiecare PC trece prin teste riguroase de stres (CPU, GPU, RAM) și benchmark-uri sintetice pentru a ne asigura că temperaturile, voltajele și stabilitatea sunt optime înainte să ajungă la tine."
     },
     {
       question: "Cum mă ajutați să aleg componentele ideale pentru un PC custom?",
-      answer: "Dacă nu ești sigur ce să alegi în Configurator, echipa noastră îți oferă consultanță gratuită. Analizăm bugetul tău și jocurile/aplicațiile pe care le folosești pentru a echilibra perfect performanța procesorului cu cea a plăcii video. Ne poți contacta la secțiunea: Contact."
+      answer: "Dacă nu ești sigur ce să alegi, echipa noastră îți oferă consultanță gratuită. Analizăm bugetul tău și jocurile/aplicațiile pe care le folosești pentru a echilibra perfect performanța procesorului cu cea a plăcii video. Ne poți contacta la secțiunea: Contact."
     },
     {
       question: "Cum este protejat PC-ul pe durata transportului?",
-      answer: "Folosim folie cu bule la interior pentru a imobiliza placa video și cooler-ul, iar la exterior cutie dublă cu polistiren gros. PC-ul ajunge la tine intact, garantat."
+      answer: "Pentru expedierile naționale, folosim folie cu bule și/sau spumă expandabilă la interior pentru a imobiliza placa video și cooler-ul, iar la exterior cutie dublă cu protecție la șocuri. PC-ul ajunge la tine intact, garantat."
     },
     {
       question: "Acceptați plata în rate?",
-      answer: "Da, prin partenerii noștri (TBI Bank, Star BT), poți achiziționa orice sistem Karix în 6 până la 60 de rate egale, direct din checkout."
+      answer: "Da, plata sistemelor se poate efectua online cu cardul de credit/debit sau prin OP (Transfer Bancar). Momentan lucrăm la integrarea unui sistem de rate direct în checkout."
     },
     {
       question: "Cum pot urmări livrarea?",
-      answer: "Expediem exclusiv prin curierat rapid. Imediat ce PC-ul tău părăsește laboratorul nostru, vei primi prin email cu codul de AWB pentru a urmări traseul coletului în timp real până la ușa ta."
-    },
-    {
-      question: "Locuiesc în Oradea. Cum se procedează cu livrarea?",
-      answer: "Pentru clienții din Oradea, oferim serviciul de livrare și ridicare personală, direct la domiciliul tău. Sediul nostru nu este deschis publicului, însă ne deplasăm noi pentru a prelua sau livra sistemele în siguranță maximă. La livrare, te putem ajuta inclusiv cu mufarea corectă a setup-ului tău."
+      answer: "Expediem exclusiv prin curierat rapid. Imediat ce PC-ul tău părăsește laboratorul nostru, vei primi prin email codul de AWB pentru a urmări traseul coletului în timp real până la ușa ta."
     },
     {
       question: "Am nevoie de un sfat tehnic sau detalii despre comanda mea. Cine mă poate ajuta rapid?",
-      answer: "Pentru răspunsuri instantanee, poți apela la Karix AI, asistentul nostru virtual disponibil 24/7 (butonul din colțul dreapta-jos). Acesta este instruit să îți ofere detalii despre statusul comenzilor, recomandări de configurări în funcție de buget sau soluții pentru diverse probleme tehnice, asigurându-mă suportul necesar în timp real."
+      answer: "Pentru răspunsuri instantanee, poți apela la Karix AI, asistentul nostru virtual disponibil 24/7 (butonul din colțul dreapta-jos). Acesta este instruit să îți ofere detalii despre statusul comenzilor, recomandări de configurări în funcție de buget sau soluții pentru diverse probleme tehnice, asigurând suportul necesar în timp real."
     }
   ];
 
@@ -76,7 +83,6 @@ export default function Support() {
 
   return (
     <>
-      {/* SEO DINAMIC: Titlul se schimbă dacă userul caută ceva specific */}
       <SEO 
         title={searchTerm ? `Suport: ${searchTerm}` : "Centru Suport & FAQ"}
         description="Ai întrebări despre sistemele Karix, garanție sau service? Găsește răspunsuri rapide despre asamblare, livrare, mentenanță console și reparații stick drift în centrul nostru de suport."
@@ -84,7 +90,6 @@ export default function Support() {
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent">
         
-        {/* BACKGROUND ANIMATION */}
         <div className="absolute inset-0 pointer-events-none z-0">
           <div className="absolute top-1/4 -left-20 w-[600px] h-[600px] bg-indigo-500/10 blur-[120px] rounded-full animate-blob" />
           <div className="absolute bottom-1/4 -right-20 w-[600px] h-[600px] bg-pink-500/10 blur-[120px] rounded-full animate-blob animation-delay-2000" />
@@ -92,7 +97,6 @@ export default function Support() {
 
         <div className="max-w-5xl mx-auto relative z-10">
           
-          {/* HERO SECTION */}
           <div className="text-center mb-20">
               <h1 className="text-6xl md:text-7xl font-black text-white tracking-tighter mb-6 italic uppercase">
                   Karix <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500">Support</span>
@@ -115,7 +119,6 @@ export default function Support() {
               </div>
           </div>
 
-          {/* SECȚIUNE CHECKLIST */}
           <div className="mb-20 text-left">
               <h2 className="text-xl font-black text-white uppercase italic tracking-widest mb-8 ml-2 flex items-center gap-3">
                   <span className="h-2 w-2 bg-pink-500 rounded-full animate-ping"></span>
@@ -137,13 +140,12 @@ export default function Support() {
                   <div className="p-6 rounded-[28px] bg-emerald-500/5 border border-emerald-500/20 backdrop-blur-md hover:bg-emerald-500/10 transition-all">
                       <p className="text-emerald-400 font-black text-[9px] uppercase tracking-widest mb-2 italic">Packaging</p>
                       <p className="text-gray-300 text-xs leading-relaxed">
-                          Păstrează cutiile originale! Sunt cea mai bună variantă pentru transport în siguranță la mentenanță.
+                          Păstrează cutiile originale! Sunt cea mai bună variantă pentru transport în siguranță la eventualele mutări sau reparații.
                       </p>
                   </div>
               </div>
           </div>
 
-          {/* FAQ ACCORDION */}
           <div className="space-y-3 text-left">
             <div className="flex items-center justify-between mb-8 px-2">
               <h2 className="text-xl font-black text-white uppercase italic tracking-widest">Întrebări Frecvente</h2>
@@ -159,8 +161,8 @@ export default function Support() {
                   onClick={() => setActiveIndex(activeIndex === index ? null : index)}
                   className="w-full p-6 text-left flex items-center justify-between group"
                 >
-                  <span className="font-bold text-gray-300 group-hover:text-white transition-colors">{faq.question}</span>
-                  <span className={`h-8 w-8 rounded-full flex items-center justify-center bg-white/5 text-indigo-400 transition-all duration-300 ${activeIndex === index ? 'rotate-180 bg-indigo-500 text-white' : ''}`}>
+                  <span className="font-bold text-gray-300 group-hover:text-white transition-colors pr-4">{faq.question}</span>
+                  <span className={`h-8 w-8 rounded-full shrink-0 flex items-center justify-center bg-white/5 text-indigo-400 transition-all duration-300 ${activeIndex === index ? 'rotate-180 bg-indigo-500 text-white' : ''}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
                   </span>
                 </button>
@@ -178,7 +180,6 @@ export default function Support() {
             )}
           </div>
 
-          {/* CONTACT CARDS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-20 text-left">
               <div className="p-10 rounded-[40px] bg-white/[0.02] border border-white/5 group hover:border-indigo-500/20 transition-all">
                   <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform italic">⚡</div>
