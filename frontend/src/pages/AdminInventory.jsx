@@ -330,7 +330,7 @@ export default function AdminInventory() {
                                         />
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-bold text-white uppercase">{c.name}</span>
-                                            <span className="text-[9px] text-gray-400">+{formatRON(c.price * 100)}</span>
+                                            <span className="text-[9px] text-gray-400">+{formatRON(c.price)}</span>
                                         </div>
                                     </label>
                                 );

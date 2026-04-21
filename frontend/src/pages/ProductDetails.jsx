@@ -415,7 +415,7 @@ export default function ProductDetails() {
                                         </div>
                                         <span>{caseOpt.name}</span>
                                     </div>
-                                    {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price * 100)}</span>}
+                                    {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price)}</span>}
                                 </button>
                             );
                         })}
