@@ -67,6 +67,7 @@ model Product {
   benchmarks        Json? 
   isVisible         Boolean  @default(true)
   pcgarageWishlistId  String?  @unique
+  compatibleCases    String[]
 }
 
 model Review {

@@ -6,21 +6,12 @@ import { useCart } from "../context/CartContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import SEO from "../components/SEO";
 
-// --- PREȚURI UPGRADE (La fel ca în Shop) ---
-const UPGRADES = {
-  storage: [
-    { label: "512GB M.2", value: "512GB", price: 0 },
-    { label: "1TB M.2", value: "1TB", price: 25000 }, // +250 RON
-    { label: "2TB M.2", value: "2TB", price: 55000 }  // +550 RON
-  ]
-};
-
-// Funcție pentru a extrage numărul și a compara GB cu TB
-const extractNumber = (str) => {
+// Funcție pentru a extrage numărul din "512GB" sau "2TB" pentru a le compara
+const extractStorageCapacity = (str) => {
   if (!str) return 0;
   const num = parseInt(str.replace(/[^0-9]/g, ''));
-  if (str.toLowerCase().includes('tb')) return num * 1024;
-  return num;
+  if (str.toLowerCase().includes('tb')) return num * 1024; // Transformăm TB în GB (2TB = 2048)
+  return num; // GB rămân GB
 };
 
 export default function ProductDetails() {
@@ -34,8 +25,8 @@ export default function ProductDetails() {
   const [activeSection, setActiveSection] = useState("Detalii");
   
   // --- STATE-URI PENTRU CONFIGURATOR ---
-  const [selectedStorage, setSelectedStorage] = useState("");
-  const [selectedCase, setSelectedCase] = useState("");
+  const [selectedStorage, setSelectedStorage] = useState("1TB");
+  const [selectedCaseId, setSelectedCaseId] = useState(null);
   const [availableCases, setAvailableCases] = useState([]);
 
   // State pentru mesajul de confirmare coș
@@ -117,31 +108,33 @@ export default function ProductDetails() {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // --- PRELUARE DATE + CARCASE ---
+  // --- FETCH PC + CARCASE ---
   useEffect(() => {
     const fetchData = async () => {
       try {
         const cleanId = id.split(":")[0];
-        const res = await apiFetch(`/products/${cleanId}`);
-        if (res.ok) {
-          const pcData = await res.json();
-          setProduct(pcData);
-          // Setăm valorile de bază în configurator
-          setSelectedStorage(pcData.storageGb || "");
-          setSelectedCase(pcData.case || "");
+        
+        // 1. Aducem carcasele disponibile
+        const casesRes = await apiFetch("/adminconfigurator");
+        let fetchedCases = [];
+        if (casesRes.ok) {
+          const items = await casesRes.json();
+          // Preluăm DOAR carcasele
+          fetchedCases = items.filter(item => item.category === 'case');
+          setAvailableCases(fetchedCases);
         }
 
-        // Preluăm carcasele disponibile din DB
-        const casesRes = await apiFetch("/products?category=case");
-        if (casesRes.ok) {
-          const casesData = await casesRes.json();
-          if(casesData.length > 0) {
-            setAvailableCases(casesData.map(c => c.name));
-          } else {
-            setAvailableCases(["Carcasă Standard Karix", "AQIRYS Aquilla White", "Corsair 4000D Airflow", "NZXT H5 Flow"]);
-          }
-        } else {
-          setAvailableCases(["Carcasă Standard Karix", "AQIRYS Aquilla White", "Corsair 4000D Airflow", "NZXT H5 Flow"]);
+        // 2. Aducem detaliile PC-ului
+        const pcRes = await apiFetch(`/products/${cleanId}`);
+        if (pcRes.ok) {
+            const pcData = await pcRes.json();
+            setProduct(pcData);
+            
+            // Setăm stocarea de bază și prima carcasă (dacă există) ca fiind selectate
+            setSelectedStorage(pcData.storageGb || "1TB");
+            if (fetchedCases.length > 0) {
+                setSelectedCaseId(fetchedCases[0].id);
+            }
         }
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
@@ -149,30 +142,63 @@ export default function ProductDetails() {
     fetchData();
   }, [id]);
 
-  // --- FILTRARE SSD (Nu poți alege mai puțin decât baza) ---
-  const validStorageOptions = useMemo(() => {
-    if (!product) return [];
-    const baseVal = extractNumber(product.storageGb);
-    return UPGRADES.storage.filter(opt => extractNumber(opt.value) >= baseVal);
+  // --- LOGICĂ STOCARE (Limitare și Prețuri) ---
+  const storageOptions = useMemo(() => {
+      if (!product) return [];
+      
+      const baseCapacity = extractStorageCapacity(product.storageGb);
+      
+      const allOptions = [
+          { label: "1 TB NVMe M.2", value: "1TB", extraPrice: 0, capacity: 1024 },
+          { label: "2 TB NVMe M.2", value: "2TB", extraPrice: 50000, capacity: 2048 },
+          { label: "4 TB NVMe M.2", value: "4TB", extraPrice: 175000, capacity: 4096 }
+      ];
+
+      // Returnăm doar opțiunile care sunt mai mari sau egale cu ce are deja PC-ul
+      return allOptions.filter(opt => opt.capacity >= baseCapacity);
   }, [product]);
 
-  // --- CALCUL PREȚ DINAMIC ---
-  const currentUpgradePrice = useMemo(() => {
-    if (!product) return 0;
-    let extra = 0;
-    if (selectedStorage && selectedStorage !== product.storageGb) {
-      const opt = UPGRADES.storage.find(o => o.value === selectedStorage);
-      if (opt) extra += opt.price;
-    }
-    return extra;
+  // --- CALCUL PREȚ FINAL CU TOT CU UPGRADE-URI ---
+  const finalPriceCents = useMemo(() => {
+      if (!product) return 0;
+      
+      let storageAddedPrice = 0;
+      const selectedStorageOpt = storageOptions.find(o => o.value === selectedStorage);
+      if (selectedStorageOpt && selectedStorageOpt.value !== product.storageGb) {
+          storageAddedPrice = selectedStorageOpt.extraPrice;
+      }
+
+      let caseAddedPrice = 0;
+      if (selectedCaseId && availableCases.length > 0) {
+          const selectedCaseObj = availableCases.find(c => c.id === selectedCaseId) || availableCases[0];
+          caseAddedPrice = selectedCaseObj.price || 0;
+      }
+
+      return (product.priceCents || 0) + storageAddedPrice + caseAddedPrice;
+  }, [product, selectedStorage, selectedCaseId, availableCases, storageOptions]);
+
+  // Determinam textele finale pentru Cos
+  const finalStorageText = useMemo(() => {
+      if (!product) return "N/A";
+      if (selectedStorage === product.storageGb) return product.storageGb;
+      if (selectedStorage === "2TB") return "2TB NVMe M.2 (Upgrade)";
+      if (selectedStorage === "4TB") return "4TB NVMe M.2 (Upgrade)";
+      return selectedStorage;
   }, [selectedStorage, product]);
 
-  const finalPriceCents = product ? product.priceCents + currentUpgradePrice : 0;
+  const finalCaseText = useMemo(() => {
+      if (!product) return "N/A";
+      if (selectedCaseId && availableCases.length > 0) {
+          const selectedCaseObj = availableCases.find(c => c.id === selectedCaseId) || availableCases[0];
+          return selectedCaseObj.name;
+      }
+      return product.case || "N/A";
+  }, [selectedCaseId, availableCases, product]);
+
 
   const handleAddToCart = () => {
     if (!product) return;
     
-    // Adăugăm în coș produsul cu noul preț și cu specificațiile modificate
     addItem({
       ...product,
       priceCents: finalPriceCents,
@@ -181,9 +207,9 @@ export default function ProductDetails() {
         cpu: product.cpuBrand, 
         gpu: product.gpuBrand, 
         ram: product.ramGb,
-        storage: selectedStorage || product.storageGb, 
+        storage: finalStorageText, 
         motherboard: product.motherboard,
-        case: selectedCase || product.case, 
+        case: finalCaseText, 
         cooler: product.cooler, 
         psu: product.psu
       }
@@ -236,14 +262,13 @@ export default function ProductDetails() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-transparent"><div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div>;
   if (!product) return <div className="min-h-screen flex flex-col items-center justify-center text-white bg-transparent"><h1>Produs negăsit.</h1><Link to="/shop">Catalog</Link></div>;
 
-  // Actualizăm afișarea specificațiilor live cu ce e selectat
   const allSpecs = [
     { label: "CPU", val: product.cpuBrand, icon: "⚡" },
     { label: "GPU", val: product.gpuBrand, icon: "🎮" },
     { label: "RAM", val: product.ramGb, icon: "📟" },
-    { label: "STOCARE", val: selectedStorage || product.storageGb, icon: "💾" },
+    { label: "STOCARE", val: finalStorageText, icon: "💾" },
     { label: "PLACĂ DE BAZĂ", val: product.motherboard, icon: "🧩" },
-    { label: "CARCASĂ", val: selectedCase || product.case, icon: "📦" },
+    { label: "CARCASĂ", val: finalCaseText, icon: "📦" },
     { label: "COOLER", val: product.cooler, icon: "❄️" },
     { label: "SURSĂ", val: product.psu, icon: "🔌" }
   ];
@@ -272,13 +297,13 @@ export default function ProductDetails() {
 
       <div className="min-h-screen pt-32 pb-24 px-4 md:px-8 text-white relative bg-transparent overflow-hidden text-left font-sans">
         
+        {/* WRAPPER-UL NAVIGAȚIEI STICKY */}
         <div className={`w-full z-[100] transition-all duration-300 pointer-events-none px-4 flex justify-center ${
             isSticky 
               ? "fixed top-4 md:top-6 left-0" 
               : "absolute top-[75px] md:top-[120px] left-0"
           }`}
         >
-          {/* BARA 1: MOBIL */}
           <div 
             ref={mobileNavRef}
             className="lg:hidden pointer-events-auto flex gap-1 p-1.5 bg-[#0b1020]/90 backdrop-blur-3xl border border-white/10 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.5)] max-w-full overflow-x-auto no-scrollbar scroll-smooth"
@@ -297,7 +322,6 @@ export default function ProductDetails() {
               </div>
           </div>
 
-          {/* BARA 2: DESKTOP */}
           <div 
             ref={desktopNavRef}
             className="hidden lg:flex pointer-events-auto gap-1 p-1.5 bg-[#0b1020]/90 backdrop-blur-3xl border border-white/10 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.5)] max-w-full overflow-x-auto no-scrollbar scroll-smooth"
@@ -319,7 +343,6 @@ export default function ProductDetails() {
 
         <div className="max-w-7xl mx-auto relative z-10 mt-12 md:mt-24">
           
-          {/* SECȚIUNEA 1: DETALII */}
           <section ref={detailsRef} className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start mb-40 scroll-mt-64">
             
             <div className="flex flex-col gap-8">
@@ -360,59 +383,66 @@ export default function ProductDetails() {
                 </div>
               )}
 
-              {/* --- CONFIGURATOR OPȚIUNI AICI --- */}
+              {/* --- CONFIGURATOR ÎN PAGINA PRODUSULUI --- */}
               <div className="flex flex-col gap-6 pt-6 border-t border-white/5">
                 
-                {/* UPGRADE STOCARE */}
-                {validStorageOptions.length > 1 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-[10px] text-gray-400 font-black uppercase tracking-widest italic">Stocare (SSD)</h4>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {validStorageOptions.map((opt) => {
-                        const isSelected = selectedStorage === opt.value;
-                        const isBase = opt.value === product.storageGb;
-                        return (
-                          <button
-                            key={opt.value}
-                            onClick={() => setSelectedStorage(opt.value)}
-                            className={`flex flex-col p-3 rounded-2xl border transition-all ${
-                              isSelected
-                                ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' 
-                                : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-                            }`}
-                          >
-                            <span className="text-xs font-black uppercase tracking-widest italic text-center w-full">{opt.label}</span>
-                            <span className={`text-[9px] font-bold mt-1 text-center w-full ${isSelected ? 'text-indigo-400' : 'text-gray-500'}`}>
-                              {isBase ? 'Inclus' : `+${formatRON(opt.price)}`}
-                            </span>
-                          </button>
-                        );
-                      })}
+                {/* SELECTARE CARCASĂ (Doar dacă există opțiuni) */}
+                {availableCases.length > 0 && (
+                  <div className="p-4 rounded-[20px] bg-white/5 border border-white/10">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Schimbă Carcasa</span>
+                    <div className="flex flex-col gap-2">
+                        {availableCases.map(caseOpt => {
+                            const isSelected = selectedCaseId === caseOpt.id || (!selectedCaseId && caseOpt.id === availableCases[0].id);
+                            return (
+                                <button
+                                    key={caseOpt.id}
+                                    onClick={() => setSelectedCaseId(caseOpt.id)}
+                                    className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${isSelected ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
+                                            {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                        </div>
+                                        <span>{caseOpt.name}</span>
+                                    </div>
+                                    {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price * 100)}</span>}
+                                </button>
+                            );
+                        })}
                     </div>
                   </div>
                 )}
 
-                {/* SCHIMBARE CARCASĂ */}
-                {availableCases.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] text-gray-400 font-black uppercase tracking-widest italic">Schimbă Carcasa</h4>
-                    <select 
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white text-sm font-bold outline-none focus:border-indigo-500/50 transition-all appearance-none cursor-pointer"
-                      value={selectedCase}
-                      onChange={(e) => setSelectedCase(e.target.value)}
-                      style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}
-                    >
-                      {availableCases.map((c) => (
-                        <option key={c} value={c} className="bg-[#0b1020] text-white py-2">{c}</option>
-                      ))}
-                    </select>
+                {/* SELECTARE STOCARE (Limitat la capacitate mai mare sau egală) */}
+                {storageOptions.length > 1 && (
+                  <div className="p-4 rounded-[20px] bg-white/5 border border-white/10">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">💾 Upgrade Stocare</span>
+                    <div className="flex flex-col gap-2">
+                        {storageOptions.map(option => {
+                            const isSelected = selectedStorage === option.value;
+                            return (
+                                <button
+                                    key={option.value}
+                                    onClick={() => setSelectedStorage(option.value)}
+                                    className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${isSelected ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
+                                            {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                        </div>
+                                        <span>{option.label}</span>
+                                    </div>
+                                    {option.extraPrice !== 0 && <span className="text-indigo-300">+{formatRON(option.extraPrice)}</span>}
+                                </button>
+                            );
+                        })}
+                    </div>
                   </div>
                 )}
               </div>
+              {/* --- END CONFIGURATOR --- */}
 
-              <div className="flex flex-col items-center gap-4 mt-2">
+              <div className="flex flex-col items-center gap-4 mt-4">
                   <span className="text-4xl md:text-6xl font-black text-white italic tracking-tighter drop-shadow-2xl mb-2">
                       {formatRON(finalPriceCents)}
                   </span>
@@ -431,7 +461,6 @@ export default function ProductDetails() {
             </div>
           </section>
 
-          {/* SECȚIUNEA 2: BENCHMARK */}
           <section ref={benchmarkRef} className="mb-40 scroll-mt-72">
               <div className="flex items-center gap-6 mb-12">
                   <h2 className="text-4xl font-black italic uppercase tracking-tighter"><span className="text-indigo-400">Benchmark</span></h2>
@@ -477,7 +506,6 @@ export default function ProductDetails() {
               </div>
           </section>
 
-          {/* SECȚIUNEA REVIEWS */}
           <section ref={reviewsRef} className="scroll-mt-72">
               <div className="flex items-center gap-6 mb-12">
                   <h2 className="text-4xl font-black italic uppercase tracking-tighter"> 
@@ -518,7 +546,6 @@ export default function ProductDetails() {
                       </div>
                   </div>
                   
-                  {/* FORMULARUL DE REVIEW */}
                   <div className="lg:col-span-5">
                       <div className="p-10 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
                           <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-8 italic text-center">
@@ -591,7 +618,6 @@ export default function ProductDetails() {
           </section>
         </div>
 
-        {/* NOTIFICARE PREMIUM ADAUGARE IN COS */}
         {cartMessage.show && (
           <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-indigo-600/90 backdrop-blur-xl border border-white/20 px-8 py-4 rounded-3xl shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
              <p className="text-white font-black italic uppercase text-[11px] tracking-widest flex items-center gap-3">
@@ -600,7 +626,6 @@ export default function ProductDetails() {
           </div>
         )}
 
-        {/* MODAL FULLSCREEN POZE REVIEW */}
         {fullscreenImage && (
           <div 
             className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300"
