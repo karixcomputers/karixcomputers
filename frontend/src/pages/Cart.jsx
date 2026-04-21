@@ -14,12 +14,10 @@ export default function Cart() {
   const location = useLocation();
 
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   
-  const [singleDevice, setSingleDevice] = useState(false);
   const [discountCode, setDiscountCode] = useState(""); 
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState("");
@@ -35,26 +33,6 @@ export default function Cart() {
 
   const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
-  const isBaseDeviceService = (item) => {
-    const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (nameStr.includes("upgrade") || nameStr.includes("asamblare")) return false; 
-    
-    const baseKeywords = ['mentenanta', 'reparatie', 'curatare', 'diagnosticare', 'service', 'instalare', 'reinstalare', 'recuperare', 'windows'];
-    return item.category === 'service' || baseKeywords.some(kw => nameStr.includes(kw));
-  };
-
-  const countTotalDevicesInCart = (cartArray) => {
-    return cartArray.reduce((total, i) => {
-      if (isBaseDeviceService(i)) {
-        return total + (i.qty || 1);
-      }
-      return total;
-    }, 0);
-  };
-
-  const totalBaseDevices = countTotalDevicesInCart(items);
-  const hasMultipleDevices = totalBaseDevices > 1;
 
   const finalTotal = useMemo(() => {
     if (!appliedCoupon) return totalCents;
@@ -163,10 +141,6 @@ export default function Cart() {
   };
 
   const handleCheckoutClick = () => {
-    if (hasMultipleDevices && !singleDevice) {
-      setShowErrorModal(true);
-      return;
-    }
     if (user) {
       nav("/checkout", { state: { coupon: appliedCoupon } });
     } else {
@@ -279,31 +253,6 @@ export default function Cart() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               <div className="lg:col-span-8 space-y-4">
                 
-                {hasMultipleDevices && (
-                  <div className={`p-8 rounded-[35px] border backdrop-blur-md transition-all duration-500 ${singleDevice ? 'bg-indigo-500/10 border-indigo-500/40 shadow-indigo-500/10 shadow-2xl' : 'bg-pink-500/5 border-pink-500/20 shadow-2xl'}`}>
-                    <div className="flex items-start gap-5">
-                      <div className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-500 ${singleDevice ? "bg-indigo-500 text-white border-indigo-400" : "bg-pink-500/20 text-pink-400 border-pink-500/20"}`}>
-                        {singleDevice ? "✓" : "!"}
-                      </div>
-                      <div>
-                        <h4 className="text-white font-black text-lg mb-1 italic uppercase tracking-tight">Logistica Karix Service</h4>
-                        <p className="text-gray-300 text-xs leading-relaxed mb-6">
-                          Ai <span className="text-pink-400 font-black">{totalBaseDevices} dispozitive</span> în coș pentru service. Ridicăm un single colet per comandă (sau preluare multiplă Oradea).
-                        </p>
-                        <label className="flex items-center gap-4 cursor-pointer group w-fit">
-                          <input type="checkbox" checked={singleDevice} onChange={(e) => setSingleDevice(e.target.checked)} className="hidden" />
-                          <div className={`h-6 w-12 rounded-full relative transition-all duration-500 ${singleDevice ? 'bg-indigo-500 shadow-indigo-500/50 shadow-lg' : 'bg-white/10'}`}>
-                            <div className={`h-4 w-4 rounded-full bg-white absolute top-1 transition-all duration-500 ${singleDevice ? 'left-7' : 'left-1'}`} />
-                          </div>
-                          <span className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${singleDevice ? 'text-indigo-400' : 'text-gray-500 group-hover:text-gray-400'}`}>
-                            CONFIRM: PRELUARE DIN ORADEA
-                          </span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Listă Produse */}
                 {items.map((item) => {
                   const nameStr = (item.productName || item.name || "").toLowerCase();
@@ -348,7 +297,6 @@ export default function Cart() {
                               </h3>
                             </div>
                         </div>
-                        {/* 👉 NOU: Eticheta de avertizare sub imagine (Mobile & Desktop) */}
                         {isPC && (
                             <div className="mt-2 text-center w-full sm:w-24 px-1">
                                 <span className="inline-block text-[8px] leading-tight font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-1 shadow-sm">
@@ -507,7 +455,7 @@ export default function Cart() {
                   </div>
                   <button
                     onClick={handleCheckoutClick}
-                    className={`group relative w-full py-6 rounded-[25px] font-black text-white overflow-hidden transition-all active:scale-[0.98] shadow-2xl ${hasMultipleDevices && !singleDevice ? 'opacity-40 grayscale pointer-events-none' : ''}`}
+                    className="group relative w-full py-6 rounded-[25px] font-black text-white overflow-hidden transition-all active:scale-[0.98] shadow-2xl"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 group-hover:scale-110 transition-transform duration-500" />
                     <span className="relative z-10 text-lg uppercase tracking-widest italic">Finalizează →</span>
@@ -518,7 +466,7 @@ export default function Cart() {
           )}
         </div>
 
-        {/* MODALE (Ștergere, Eroare, Login) */}
+        {/* MODALE (Ștergere, Login) */}
         {deleteConfirm.show && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 backdrop-blur-md bg-black/60">
             <div className="relative w-full max-w-sm bg-[#161e31]/90 backdrop-blur-2xl border border-pink-500/20 p-10 rounded-[40px] text-center shadow-2xl animate-in zoom-in">
@@ -528,17 +476,6 @@ export default function Cart() {
                 <button onClick={() => setDeleteConfirm({ show: false, itemId: null, itemName: "" })} className="flex-1 py-4 rounded-2xl font-black text-gray-400 bg-white/5 hover:bg-white/10 uppercase tracking-widest text-[10px] transition-all">Anulează</button>
                 <button onClick={confirmDelete} className="flex-1 py-4 rounded-2xl font-black text-white bg-pink-600 hover:bg-pink-500 uppercase tracking-widest text-[10px] shadow-lg shadow-pink-600/20 transition-all">Șterge</button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {showErrorModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 backdrop-blur-md bg-black/60">
-            <div className="relative w-full max-w-md bg-[#161e31]/90 backdrop-blur-2xl border border-pink-500/20 p-10 rounded-[40px] text-center shadow-2xl">
-              <div className="text-5xl mb-6 text-pink-500 drop-shadow-[0_0_15px_rgba(236,72,153,0.3)]">⚠️</div>
-              <h2 className="text-2xl font-black text-white mb-4 italic uppercase">Conflict Logistic</h2>
-              <p className="text-gray-400 text-sm mb-10 leading-relaxed font-medium">Karix poate procesa un singur colet per comandă externă. Dacă ai mai multe dispozitive, trebuie să confirmi preluarea din Oradea.</p>
-              <button onClick={() => setShowErrorModal(false)} className="w-full py-5 rounded-2xl font-black text-white bg-pink-600 hover:bg-pink-500 uppercase tracking-widest text-xs shadow-lg shadow-pink-600/20 transition-all">Am înțeles</button>
             </div>
           </div>
         )}

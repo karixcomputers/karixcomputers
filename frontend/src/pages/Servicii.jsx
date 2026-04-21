@@ -1,21 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx"; 
-import { useAuth } from "../context/AuthContext.jsx"; // 👉 NOU: Pentru verificarea adminului
+import { useAuth } from "../context/AuthContext.jsx"; 
 import { formatRON } from "../utils/money"; 
 import { apiFetch } from "../api/client"; 
 import SEO from "../components/SEO";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"; // 👉 NOU
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"; 
 
 export default function Servicii() {
   const { addItem } = useCart(); 
-  const { user, accessToken } = useAuth(); // 👉 NOU
+  const { user, accessToken } = useAuth(); 
   
   const [services, setServices] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
-  // --- STATE-URI PENTRU REORDONARE DRAG & DROP (ADMIN) ---
   const [isReordering, setIsReordering] = useState(false);
   const [reorderList, setReorderList] = useState([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
@@ -58,10 +57,8 @@ export default function Servicii() {
       image: getImageUrl(service.images?.[0]), 
       category: 'service'
     });
-
   };
 
-  // 👉 NOU: Logica de Drag & Drop
   const handleDragEnd = (result) => {
     if (!result.destination) return;
     const items = Array.from(reorderList);
@@ -79,7 +76,6 @@ export default function Servicii() {
 
   const saveNewOrder = async () => {
     setIsSavingOrder(true);
-    // Pregătim payload-ul: [{ id: "123", sortOrder: 0 }, { id: "456", sortOrder: 1 }]
     const updatedItems = reorderList.map((item, index) => ({
       id: item.id,
       sortOrder: index
@@ -100,7 +96,7 @@ export default function Servicii() {
         setToasts((prev) => [...prev, { id: toastId, message: "Ordinea a fost salvată cu succes!" }]);
         setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toastId)), 3000);
         setIsReordering(false);
-        fetchServices(); // Reîncărcăm lista de pe server cu noua ordine
+        fetchServices(); 
       } else {
         const data = await res.json();
         throw new Error(data.error || "Eroare la salvare.");
@@ -122,7 +118,7 @@ export default function Servicii() {
     <>
       <SEO 
         title="Service & Mentenanță PC, Laptop, Console" 
-        description="Reparații profesionale în Oradea: Curățare praf și schimbare pastă termică PC/Laptop, asamblare calculatoare, reparații console și stick drift controllere. Ridicare și livrare la domiciliu!"
+        description="Reparații profesionale în Oradea: Curățare praf și schimbare pastă termică PC/Laptop, asamblare calculatoare, reparații console și stick drift controllere. Ridicare gratuită în Oradea!"
       />
 
       <div className="min-h-screen text-gray-200 relative pt-32 pb-24 px-4 overflow-hidden bg-transparent">
@@ -134,11 +130,10 @@ export default function Servicii() {
               Karix <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Services</span>
             </h1>
             <p className="text-base md:text-lg text-gray-300 max-w-2xl mx-auto italic font-medium px-4 drop-shadow-md text-center">
-              Sistemul tău merită tratament de top. Comandă un serviciu și <span className="text-indigo-400">venim noi să ridicăm echipamentul.</span>
+              Sistemul tău merită tratament de top. Venim noi la tine să-l luăm! <span className="text-indigo-400 block mt-1">(Serviciu valabil exclusiv în județul Bihor)</span>
             </p>
           </div>
 
-          {/* 👉 NOU: Buton Reordonare (Doar Admin) */}
           {user?.role === "admin" && (
             <div className="flex justify-center mb-12">
               <button 
@@ -150,9 +145,7 @@ export default function Servicii() {
             </div>
           )}
 
-          {/* --- CONȚINUT: LISTĂ DRAG&DROP SAU GRILĂ NORMALĂ --- */}
-{isReordering ? (
-            
+          {isReordering ? (
             <div className="bg-[#12192b] border border-white/10 p-8 rounded-[40px] shadow-2xl max-w-4xl mx-auto">
               <div className="flex justify-between items-center mb-8">
                 <div>
@@ -233,7 +226,7 @@ export default function Servicii() {
                     
                     <h3 className="text-2xl font-black text-white mb-3 tracking-tight italic uppercase drop-shadow-md">{service.name}</h3>
                     <p className="text-gray-300 text-[14px] leading-relaxed mb-6 font-medium">
-                      {service.description || "Echipamentul tău va fi preluat de curier și adus în laboratorul Karix pentru intervenție profesională."}
+                      {service.description || "Asigurăm mentenanță completă și profesională în laboratorul Karix."}
                     </p>
                     
                     <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between">
@@ -256,40 +249,23 @@ export default function Servicii() {
           )}
 
           <div className="mt-20 flex flex-col gap-6 max-w-4xl mx-auto">
-            
-            {/* Ridicare Oradea */}
             <div className="p-8 md:p-12 rounded-[40px] bg-gradient-to-br from-indigo-900/40 to-[#0b1020] border border-indigo-500/30 text-center md:text-left backdrop-blur-xl shadow-2xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[80px] rounded-full group-hover:bg-indigo-500/20 transition-all duration-700 pointer-events-none" />
               <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10 relative z-10">
-                <div className="text-6xl drop-shadow-xl animate-in zoom-in duration-500">🚗</div>
+                <div className="text-6xl drop-shadow-xl animate-in zoom-in duration-500">📍</div>
                 <div className="text-left">
                   <h3 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tighter">
-                    Ești din <span className="text-indigo-400">Oradea</span>? Venim noi la tine!
+                    Servicii disponibile exclusiv în <span className="text-indigo-400">Județul Bihor</span>
                   </h3>
                   <p className="text-gray-300 font-medium leading-relaxed text-sm md:text-base">
-                    Dacă ești din municipiul Oradea, nu mai trebuie să te complici cu firmele de curierat. Venim personal să ridicăm echipamentul de la domiciliul tău și ți-l aducem înapoi pentru doar <strong className="text-white">30 RON</strong>. Garantăm că în <strong className="text-indigo-400 font-black uppercase tracking-wider">maxim 24 de ore</strong> de la ridicare, device-ul se va întoarce la tine gata de acțiune.
+                    Pentru a asigura calitatea maximă și siguranța echipamentelor, serviciile noastre de mentenanță și asamblare sunt disponibile doar pe plan local. Venim personal să ridicăm echipamentul de la domiciliul tău (din Oradea sau împrejurimi) și ți-l aducem înapoi gata de acțiune.
                   </p>
                 </div>
               </div>
             </div>
-
-            {/* Door to Door Național */}
-            <div className="p-8 md:p-12 rounded-[40px] bg-white/5 border border-white/10 text-center md:text-left backdrop-blur-xl shadow-2xl">
-              <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10">
-                  <div className="text-5xl drop-shadow-lg opacity-80 hover:opacity-100 transition-opacity cursor-default">🚚</div>
-                  <div className="text-left">
-                    <h3 className="text-xl font-black text-gray-200 mb-2 uppercase italic tracking-tighter">Procesul Door-to-Door Național</h3>
-                    <p className="text-gray-400 font-medium leading-relaxed text-sm">
-                        Pentru restul țării, după plasarea comenzii vom trimite un curier la ușa ta în 24-48h. Tu doar ambalează produsul în siguranță, de transport ne ocupăm noi. Diagnosticarea și reparația se fac în laboratorul nostru specializat din Oradea.
-                    </p>
-                  </div>
-              </div>
-            </div>
-
           </div>
         </div>
 
-        {/* TOAST NOTIFICATION */}
         <div className="fixed bottom-10 right-4 md:right-10 flex flex-col gap-3 z-[100] pointer-events-none">
           {toasts.map((toast) => (
             <div key={toast.id} className="toast-card flex items-center gap-4 bg-[#1a2236]/90 border border-emerald-500/30 p-4 sm:p-5 rounded-3xl shadow-2xl backdrop-blur-2xl pointer-events-auto animate-in slide-in-from-right duration-300">
