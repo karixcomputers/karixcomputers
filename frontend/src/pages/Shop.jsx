@@ -17,28 +17,22 @@ export default function Shop() {
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
-  // 👉 NOU: Stocare Carcase din Configurator
   const [availableCases, setAvailableCases] = useState([]);
 
-  // Stocare selecții custom (stocare, carcasă) pentru fiecare PC în parte
   const [customSelections, setCustomSelections] = useState({});
 
-  // STATE-URI PENTRU FILTRARE ȘI SORTARE
   const [filterCpu, setFilterCpu] = useState("Toate"); 
   const [filterGpu, setFilterGpu] = useState("Toate"); 
   const [maxPrice, setMaxPrice] = useState(3000000); 
   const [sortOrder, setSortOrder] = useState("default"); 
 
-  // STATE-URI PENTRU UI MENIURI
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
 
-  // --- STATE-URI PENTRU REORDONARE DRAG & DROP (ADMIN) ---
   const [isReordering, setIsReordering] = useState(false);
   const [reorderList, setReorderList] = useState([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
 
-  // --- STATE-URI PENTRU TOOL DE COMPARARE ---
   const [compareList, setCompareList] = useState([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
   
@@ -77,7 +71,6 @@ export default function Shop() {
 
   const fetchCasesAndPcs = async () => {
     try {
-      // Pasul 1: Aducem carcasele întâi
       const casesRes = await apiFetch("/adminconfigurator");
       let fetchedCases = [];
       if (casesRes.ok) {
@@ -86,10 +79,6 @@ export default function Shop() {
         setAvailableCases(fetchedCases);
       }
 
-      // Setăm primul ID de carcasă găsit (dacă există) ca default pentru configurator
-      const initialCaseId = fetchedCases.length > 0 ? fetchedCases[0].id : null;
-
-      // Pasul 2: Aducem produsele
       const pcRes = await apiFetch("/products");
       if (pcRes.ok) {
         const data = await pcRes.json();
@@ -102,12 +91,19 @@ export default function Shop() {
         );
         setPcs(onlyPcs);
         
-        // Pasul 3: Inițializăm selecțiile (SSD=1TB, Case=primul id găsit din baza de date)
         const initialSelections = {};
         onlyPcs.forEach(pc => {
+            // SETĂM CARCASA DEFAULT PE BAZA CELOR COMPATIBILE (Sau null dacă nu are niciuna setată)
+            let defaultCaseId = null;
+            if (pc.compatibleCases && pc.compatibleCases.length > 0) {
+                // Verificăm dacă primul ID chiar există în lista de carcase generale din DB
+                const firstValidCase = fetchedCases.find(c => c.id === pc.compatibleCases[0]);
+                if(firstValidCase) defaultCaseId = firstValidCase.id;
+            }
+
             initialSelections[pc.id] = { 
                 storage: "1TB", 
-                caseId: initialCaseId // 👉 Setăm prima carcasă din listă automat
+                caseId: defaultCaseId
             };
         });
         setCustomSelections(initialSelections);
@@ -528,18 +524,21 @@ export default function Shop() {
                       storageAddedPrice = 1750 * 100;
                   }
 
-                  // LOGICĂ CARCASĂ CUSTOM DIN BAZA DE DATE (DOAR CE ESTE ÎN ADMIN CONFIGURATOR)
-                  const selectedCaseId = customSelections[pc.id]?.caseId || (availableCases.length > 0 ? availableCases[0].id : null);
+                  // 👉 FILTRARE: DOAR CARCASELE COMPATIBILE PENTRU ACEST PC
+                  const pcCompatibleCases = availableCases.filter(c => pc.compatibleCases?.includes(c.id));
+
+                  // Setăm ID-ul carcasei selectate (sau prima din lista celor compatibile)
+                  const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
                   let caseAddedPrice = 0;
                   let selectedCaseObj = null;
 
-                  if (selectedCaseId && availableCases.length > 0) {
-                      selectedCaseObj = availableCases.find(c => c.id === selectedCaseId);
+                  if (selectedCaseId && pcCompatibleCases.length > 0) {
+                      selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId);
                       if (selectedCaseObj) {
                           caseAddedPrice = selectedCaseObj.price || 0; 
                       } else {
-                          // Dacă dintr-un motiv anume ID-ul nu s-a găsit, selectăm default prima opțiune
-                          selectedCaseObj = availableCases[0];
+                          // Dacă dintr-un motiv anume ID-ul nu s-a găsit în cele compatibile, selectăm default prima opțiune validă
+                          selectedCaseObj = pcCompatibleCases[0];
                           caseAddedPrice = selectedCaseObj.price || 0;
                       }
                   }
@@ -666,14 +665,13 @@ export default function Shop() {
                         </div>
                       </div>
 
-                      {/* 👉 OPTIUNEA DE CARCASĂ (Dinamice din Configurator - FĂRĂ 'Standard' Default Hardcodat) */}
-                      {availableCases.length > 0 && (
+                      {/* 👉 OPTIUNEA DE CARCASĂ FILTRATĂ DOAR CU CELE COMPATIBILE */}
+                      {pcCompatibleCases.length > 0 && (
                           <div className="mt-2 mb-4 p-4 rounded-[20px] bg-white/5 border border-white/10">
                               <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Alege Carcasa</span>
                               <div className="flex flex-col gap-2">
-                                  {availableCases.map(caseOpt => {
-                                      // Pentru a ne asigura că prima opțiune este selectată by default dacă 'selectedCaseId' nu se potrivește cu nimic sau nu a fost schimbat încă.
-                                      const isSelected = selectedCaseId === caseOpt.id || (!selectedCaseId && caseOpt.id === availableCases[0].id);
+                                  {pcCompatibleCases.map(caseOpt => {
+                                      const isSelected = selectedCaseId === caseOpt.id || (!selectedCaseId && caseOpt.id === pcCompatibleCases[0].id);
 
                                       return (
                                           <button
@@ -687,7 +685,7 @@ export default function Shop() {
                                                   </div>
                                                   <span>{caseOpt.name}</span>
                                               </div>
-                                              {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price)}</span>}
+                                              {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price * 100)}</span>}
                                           </button>
                                       );
                                   })}
@@ -842,16 +840,17 @@ export default function Shop() {
                         if (selectedStorage === "2TB") storageAddedPrice = 500 * 100;
                         if (selectedStorage === "4TB") storageAddedPrice = 1750 * 100;
                         
-                        const selectedCaseId = customSelections[pc.id]?.caseId || (availableCases.length > 0 ? availableCases[0].id : null);
+                        const pcCompatibleCases = availableCases.filter(c => pc.compatibleCases?.includes(c.id));
+                        const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
                         let caseAddedPrice = 0;
                         let selectedCaseObj = null;
 
-                        if (selectedCaseId && availableCases.length > 0) {
-                            selectedCaseObj = availableCases.find(c => c.id === selectedCaseId);
+                        if (selectedCaseId && pcCompatibleCases.length > 0) {
+                            selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId);
                             if (selectedCaseObj) {
                                 caseAddedPrice = selectedCaseObj.price || 0; 
                             } else {
-                                selectedCaseObj = availableCases[0];
+                                selectedCaseObj = pcCompatibleCases[0];
                                 caseAddedPrice = selectedCaseObj.price || 0;
                             }
                         }

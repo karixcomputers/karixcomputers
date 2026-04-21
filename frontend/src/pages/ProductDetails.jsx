@@ -114,12 +114,11 @@ export default function ProductDetails() {
       try {
         const cleanId = id.split(":")[0];
         
-        // 1. Aducem carcasele disponibile
+        // 1. Aducem carcasele disponibile (toate)
         const casesRes = await apiFetch("/adminconfigurator");
         let fetchedCases = [];
         if (casesRes.ok) {
           const items = await casesRes.json();
-          // Preluăm DOAR carcasele
           fetchedCases = items.filter(item => item.category === 'case');
           setAvailableCases(fetchedCases);
         }
@@ -130,11 +129,16 @@ export default function ProductDetails() {
             const pcData = await pcRes.json();
             setProduct(pcData);
             
-            // Setăm stocarea de bază și prima carcasă (dacă există) ca fiind selectate
+            // Setăm stocarea de bază
             setSelectedStorage(pcData.storageGb || "1TB");
-            if (fetchedCases.length > 0) {
-                setSelectedCaseId(fetchedCases[0].id);
+            
+            // Setăm carcasa default DOAR din cele compatibile
+            let defaultCaseId = null;
+            if (pcData.compatibleCases && pcData.compatibleCases.length > 0) {
+                const firstValidCase = fetchedCases.find(c => c.id === pcData.compatibleCases[0]);
+                if (firstValidCase) defaultCaseId = firstValidCase.id;
             }
+            setSelectedCaseId(defaultCaseId);
         }
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
@@ -158,6 +162,12 @@ export default function ProductDetails() {
       return allOptions.filter(opt => opt.capacity >= baseCapacity);
   }, [product]);
 
+  // --- FILTRARE CARCASE COMPATIBILE ---
+  const pcCompatibleCases = useMemo(() => {
+      if (!product || !availableCases.length) return [];
+      return availableCases.filter(c => product.compatibleCases?.includes(c.id));
+  }, [product, availableCases]);
+
   // --- CALCUL PREȚ FINAL CU TOT CU UPGRADE-URI ---
   const finalPriceCents = useMemo(() => {
       if (!product) return 0;
@@ -169,13 +179,13 @@ export default function ProductDetails() {
       }
 
       let caseAddedPrice = 0;
-      if (selectedCaseId && availableCases.length > 0) {
-          const selectedCaseObj = availableCases.find(c => c.id === selectedCaseId) || availableCases[0];
+      if (selectedCaseId && pcCompatibleCases.length > 0) {
+          const selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId) || pcCompatibleCases[0];
           caseAddedPrice = selectedCaseObj.price || 0;
       }
 
       return (product.priceCents || 0) + storageAddedPrice + caseAddedPrice;
-  }, [product, selectedStorage, selectedCaseId, availableCases, storageOptions]);
+  }, [product, selectedStorage, selectedCaseId, pcCompatibleCases, storageOptions]);
 
   // Determinam textele finale pentru Cos
   const finalStorageText = useMemo(() => {
@@ -188,12 +198,12 @@ export default function ProductDetails() {
 
   const finalCaseText = useMemo(() => {
       if (!product) return "N/A";
-      if (selectedCaseId && availableCases.length > 0) {
-          const selectedCaseObj = availableCases.find(c => c.id === selectedCaseId) || availableCases[0];
+      if (selectedCaseId && pcCompatibleCases.length > 0) {
+          const selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId) || pcCompatibleCases[0];
           return selectedCaseObj.name;
       }
       return product.case || "N/A";
-  }, [selectedCaseId, availableCases, product]);
+  }, [selectedCaseId, pcCompatibleCases, product]);
 
 
   const handleAddToCart = () => {
@@ -386,13 +396,13 @@ export default function ProductDetails() {
               {/* --- CONFIGURATOR ÎN PAGINA PRODUSULUI --- */}
               <div className="flex flex-col gap-6 pt-6 border-t border-white/5">
                 
-                {/* SELECTARE CARCASĂ (Doar dacă există opțiuni) */}
-                {availableCases.length > 0 && (
+                {/* SELECTARE CARCASĂ (Filtrată după compatibilitate) */}
+                {pcCompatibleCases.length > 0 && (
                   <div className="p-4 rounded-[20px] bg-white/5 border border-white/10">
                     <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Schimbă Carcasa</span>
                     <div className="flex flex-col gap-2">
-                        {availableCases.map(caseOpt => {
-                            const isSelected = selectedCaseId === caseOpt.id || (!selectedCaseId && caseOpt.id === availableCases[0].id);
+                        {pcCompatibleCases.map(caseOpt => {
+                            const isSelected = selectedCaseId === caseOpt.id || (!selectedCaseId && caseOpt.id === pcCompatibleCases[0].id);
                             return (
                                 <button
                                     key={caseOpt.id}
@@ -461,6 +471,7 @@ export default function ProductDetails() {
             </div>
           </section>
 
+          {/* SECȚIUNEA 2: BENCHMARK */}
           <section ref={benchmarkRef} className="mb-40 scroll-mt-72">
               <div className="flex items-center gap-6 mb-12">
                   <h2 className="text-4xl font-black italic uppercase tracking-tighter"><span className="text-indigo-400">Benchmark</span></h2>
@@ -506,6 +517,7 @@ export default function ProductDetails() {
               </div>
           </section>
 
+          {/* SECȚIUNEA REVIEWS */}
           <section ref={reviewsRef} className="scroll-mt-72">
               <div className="flex items-center gap-6 mb-12">
                   <h2 className="text-4xl font-black italic uppercase tracking-tighter"> 
@@ -546,6 +558,7 @@ export default function ProductDetails() {
                       </div>
                   </div>
                   
+                  {/* FORMULARUL DE REVIEW */}
                   <div className="lg:col-span-5">
                       <div className="p-10 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
                           <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-8 italic text-center">
@@ -618,6 +631,7 @@ export default function ProductDetails() {
           </section>
         </div>
 
+        {/* NOTIFICARE PREMIUM ADAUGARE IN COS */}
         {cartMessage.show && (
           <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-indigo-600/90 backdrop-blur-xl border border-white/20 px-8 py-4 rounded-3xl shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
              <p className="text-white font-black italic uppercase text-[11px] tracking-widest flex items-center gap-3">
@@ -626,6 +640,7 @@ export default function ProductDetails() {
           </div>
         )}
 
+        {/* MODAL FULLSCREEN POZE REVIEW */}
         {fullscreenImage && (
           <div 
             className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300"
