@@ -220,7 +220,7 @@ export default function Home() {
           className="max-w-6xl mx-auto px-4 py-24 border-t border-white/5 relative z-10"
         >
           <motion.div variants={fadeInVariant} className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-white tracking-tight mb-4 uppercase italic">De ce să alegi Karix?</h2>
+            <h2 className="text-3xl font-bold text-white tracking-tight mb-4 uppercase italic">De ce să alegi Karix Computers?</h2>
             <p className="text-gray-400 font-medium">Calitatea nu este o opțiune, este standardul nostru.</p>
           </motion.div>
 

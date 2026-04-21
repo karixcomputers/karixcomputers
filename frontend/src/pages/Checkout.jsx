@@ -82,7 +82,7 @@ const notifyDiscord = async (orderData, coupon) => {
           { name: "👤 Identitate", value: clientInfo, inline: true },
           { name: "📞 Telefon", value: orderData.client.phone, inline: true },
           { name: "📍 Locație", value: `${orderData.client.city}, ${orderData.client.county}`, inline: true },
-          { name: "📦 Livrare", value: orderData.pickupType === "KarixPersonal" ? "⚡ Personală (Oradea)" : "🚚 Curier", inline: true },
+          { name: "📦 Livrare", value: orderData.pickupType === "KarixPersonal" ? "⚡ Locală (Oradea)" : "🚚 Curier", inline: true },
           { name: "💳 Metodă Plată", value: paymentMethodInfo, inline: true },
           { name: "💰 Total Final", value: `**${(orderData.total / 100).toFixed(2)} RON**`, inline: true },
           { name: "🎟️ Cupon", value: coupon ? `**${coupon.code}**` : "Niciunul", inline: true },
@@ -134,60 +134,16 @@ export default function Checkout() {
     assemblyNotes: "" 
   });
 
-  const [pickupByKarix, setPickupByKarix] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("online"); 
-  
-  const [serviceDeliveryMethod, setServiceDeliveryMethod] = useState("courier"); 
-  const [selectedFanbox, setSelectedFanbox] = useState(null);
-  const [returnToSameFanbox, setReturnToSameFanbox] = useState(true);
-
   const [termsAccepted, setTermsAccepted] = useState(false);
   const appliedCoupon = location.state?.coupon || null;
 
-  useEffect(() => {
-    if (!document.getElementById("fanbox-script")) {
-      const script = document.createElement("script");
-      script.id = "fanbox-script";
-      script.src = "https://unpkg.com/map-fanbox-points@latest/umd/map-fanbox-points.js";
-      script.crossOrigin = "anonymous";
-      script.defer = true;
-      document.body.appendChild(script);
-    }
-
-    const handleSelectPoint = (e) => {
-      setSelectedFanbox(e.detail.item);
-    };
-
-    window.addEventListener("map:select-point", handleSelectPoint);
-    return () => {
-      window.removeEventListener("map:select-point", handleSelectPoint);
-    };
-  }, []);
-
-  const openFanboxMap = () => {
-    if (window.LoadMapFanBox) {
-      window.LoadMapFanBox({
-        rootId: "fanbox-map-root", 
-      });
-    } else {
-      triggerError("Harta FAN Courier se încarcă. Te rugăm să aștepți 2 secunde și să încerci din nou.");
-    }
-  };
-
-  const isAssemblyOrder = useMemo(() => {
-    return items.some(i => {
-      const n = (i.name || i.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      return n.includes("asamblare");
-    });
-  }, [items]);
-
-  // 👉 AICI ESTE LOGICA REPARATĂ: folosim forEach în loc de some, astfel numărăm corect absolut tot!
+  // --- ANALIZA COȘULUI ---
   const cartAnalysis = useMemo(() => {
-    const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick', 'upgrade', 'instalare', 'reinstalare', 'windows', 'software', 'bios', 'recuperare'];
+    const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick', 'upgrade', 'instalare', 'reinstalare', 'windows', 'software', 'bios', 'recuperare', 'asamblare'];
     
     let hardwareSubtotal = 0;
     let totalServicesInCart = 0;
-    let disableFanbox = false; 
     let hasPC = false;
     let hasService = false;
     
@@ -197,17 +153,7 @@ export default function Checkout() {
       
       if (isSrv) {
         hasService = true;
-        const addonKeywords = ['upgrade', 'asamblare', 'instalare', 'reinstalare', 'windows', 'software', 'recuperare', 'devirusare', 'bios'];
-        const isAddon = addonKeywords.some(kw => nameStr.includes(kw));
-        
-        if (!isAddon) {
-            // Calculăm cantitatea corect 
-            totalServicesInCart += parseInt(item.qty || item.quantity || 1, 10);
-        }
-
-        if (nameStr.includes("pc") || nameStr.includes("sistem") || nameStr.includes("desktop") || nameStr.includes("unitate")) {
-            disableFanbox = true;
-        }
+        totalServicesInCart += parseInt(item.qty || item.quantity || 1, 10);
       } else {
         hasPC = true;
         const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
@@ -219,41 +165,15 @@ export default function Checkout() {
       }
     });
 
-    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart, disableFanbox };
+    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart };
   }, [items]);
 
+  // 👉 LOGICĂ NOUĂ: Dacă avem service în coș, forțăm Bihor / Oradea
   useEffect(() => {
-    if (cartAnalysis.disableFanbox && serviceDeliveryMethod === "fanbox") {
-        setServiceDeliveryMethod("courier");
-    }
-  }, [cartAnalysis.disableFanbox, serviceDeliveryMethod]);
-
-  useEffect(() => {
-      // Acum condiția asta se va declanșa corect dacă ai 2 sau mai multe PC-uri/Servicii!
-      if (cartAnalysis.totalServicesInCart > 1) {
-          setPickupByKarix(true);
-      }
-  }, [cartAnalysis.totalServicesInCart]);
-
-  const pickupLabel = useMemo(() => {
-    if (cartAnalysis.hasPC && cartAnalysis.hasService) return "Livrare & Ridicare Personală (Doar Oradea)";
-    if (cartAnalysis.hasPC) return "Livrare Personală (Doar Oradea)";
-    if (cartAnalysis.totalServicesInCart > 1) return "Preluare Multiplă (Doar Oradea)";
-    return "Ridicare Personală (Doar Oradea)";
-  }, [cartAnalysis]);
-
-  const pickupDescription = useMemo(() => {
-    if (cartAnalysis.hasPC && cartAnalysis.hasService) return "Voi veni personal să ridic echipamentul pentru service și să livrez PC-ul nou.";
-    if (cartAnalysis.hasPC) return "Vom livra personal noul PC în Oradea pentru siguranță maximă.";
-    if (cartAnalysis.totalServicesInCart > 1) return "Ai mai multe dispozitive. Venim noi la tine să le ridicăm.";
-    return "Vom veni noi să ridicăm pachetul de la adresa ta din Oradea.";
-  }, [cartAnalysis]);
-
-  useEffect(() => {
-    if (pickupByKarix) {
+    if (cartAnalysis.hasService) {
       setShipping(prev => ({ ...prev, county: "Bihor", city: "Oradea" }));
     }
-  }, [pickupByKarix]);
+  }, [cartAnalysis.hasService]);
 
   const triggerError = (message) => {
     setErrorToastMsg(message);
@@ -296,21 +216,13 @@ export default function Checkout() {
   }, [appliedCoupon, totalCents]);
 
   const shippingCents = useMemo(() => {
-    if (pickupByKarix) return 0; 
-
     let cost = 0;
     if (cartAnalysis.hasPC && cartAnalysis.hardwareSubtotal < 1000 * 100) {
-        cost += 2500; 
+        cost += 2500; // Taxă curier pentru PC ieftin
     }
-    if (cartAnalysis.hasService && !isAssemblyOrder) {
-        if (serviceDeliveryMethod === "courier") {
-            cost += 3000; 
-        } else if (serviceDeliveryMethod === "fanbox") {
-            cost += 1500; 
-        }
-    }
+    // Transportul local pentru service este gratuit (0)
     return cost;
-  }, [pickupByKarix, cartAnalysis, isAssemblyOrder, serviceDeliveryMethod]);
+  }, [cartAnalysis]);
 
   const finalTotalCents = Math.max(0, totalCents - discountCents + shippingCents);
 
@@ -337,26 +249,19 @@ export default function Checkout() {
 
       if (data && data.found && data.found.length > 0) {
         const companyData = data.found[0].date_generale || data.found[0];
-        const numeFirma = companyData.denumire || "";
-        const registruComertului = companyData.nrRegCom || "";
-        const telefonFirma = companyData.telefon || "";
         const parsedAddress = parseAnafAddress(companyData.adresa || "", JUDETE);
 
-        const isBihor = parsedAddress.county?.toLowerCase() === "bihor";
-        const isOradea = parsedAddress.city?.toLowerCase() === "oradea";
-        const shouldAutoPickup = isBihor && isOradea;
-
-        if (shouldAutoPickup && !isAssemblyOrder) {
-          setPickupByKarix(true);
-        }
+        // Menținem forțarea pe Bihor/Oradea dacă e comandă de service, indiferent de adresa firmei
+        const finalCounty = cartAnalysis.hasService ? "Bihor" : (parsedAddress.county || shipping.county);
+        const finalCity = cartAnalysis.hasService ? "Oradea" : (parsedAddress.city || shipping.city);
 
         setShipping(s => ({
           ...s,
-          companyName: numeFirma || s.companyName,
-          regCom: registruComertului || s.regCom,
-          phone: telefonFirma || s.phone,
-          county: shouldAutoPickup || pickupByKarix ? "Bihor" : (parsedAddress.county || s.county),
-          city: shouldAutoPickup || pickupByKarix ? "Oradea" : (parsedAddress.city || s.city),
+          companyName: companyData.denumire || s.companyName,
+          regCom: companyData.nrRegCom || s.regCom,
+          phone: companyData.telefon || s.phone,
+          county: finalCounty,
+          city: finalCity,
           addressDetails: parsedAddress.cleanAddress || s.addressDetails
         }));
       } else {
@@ -373,26 +278,9 @@ export default function Checkout() {
       return;
     }
 
-    const isFanboxSelected = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && serviceDeliveryMethod === "fanbox";
-    const hideStandardAddress = isFanboxSelected && returnToSameFanbox;
-
-    if (isFanboxSelected && !selectedFanbox) {
-        triggerError("Te rugăm să selectezi un FANbox de pe hartă pentru predarea dispozitivului.");
-        return;
-    }
-
-    if (!hideStandardAddress) {
-      if (!isAssemblyOrder) {
-        if (!shipping.addressDetails || !shipping.city || !shipping.county) {
-          triggerError("Te rugăm să completezi datele complete de livrare.");
-          return;
-        }
-      } else {
-        if (!pickupByKarix && (!shipping.addressDetails || !shipping.city || !shipping.county)) {
-           triggerError("Te rugăm să completezi adresa ta pentru a ști unde să livrăm PC-ul asamblat.");
-           return;
-        }
-      }
+    if (!shipping.addressDetails || !shipping.city || !shipping.county) {
+      triggerError("Te rugăm să completezi datele complete de preluare/livrare.");
+      return;
     }
 
     if (shipping.isCompany) {
@@ -422,7 +310,7 @@ export default function Checkout() {
     const enrichedItems = items.map(item => {
       const nameStr = (item.productName || item.name || "").toLowerCase();
       const isService = item.category === 'service' || 
-                        ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => nameStr.includes(kw));
+                        ['mentenanta', 'service', 'curatare', 'reparatie', 'asamblare'].some(kw => nameStr.includes(kw));
       
       const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
 
@@ -440,11 +328,7 @@ export default function Checkout() {
 
       let safeSpecsString = null;
       if (item.specs) {
-          if (typeof item.specs === 'object') {
-              safeSpecsString = JSON.stringify(item.specs);
-          } else if (typeof item.specs === 'string') {
-              safeSpecsString = item.specs; 
-          }
+          safeSpecsString = typeof item.specs === 'object' ? JSON.stringify(item.specs) : item.specs;
       }
 
       return {
@@ -459,39 +343,20 @@ export default function Checkout() {
       };
     });
 
-    let finalAddressDetails = shipping.addressDetails;
-    let finalCity = shipping.city;
-    let finalCounty = shipping.county;
-
-    if (hideStandardAddress && selectedFanbox) {
-        finalAddressDetails = `Locker FANbox: ${selectedFanbox.name} (${selectedFanbox.id}) - ${selectedFanbox.address}`;
-        finalCity = "FANbox";
-        finalCounty = "FANbox";
-    } else if (isAssemblyOrder && shipping.assemblyNotes) {
-       finalAddressDetails = `${shipping.addressDetails || "Fără adresă de livrare prestabilită"} | Note client: ${shipping.assemblyNotes}`;
-    }
-
-    const serviceOpts = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix ? {
-        serviceDeliveryMethod,
-        fanboxLocationId: serviceDeliveryMethod === "fanbox" && selectedFanbox ? selectedFanbox.id : null,
-        fanboxAddressText: serviceDeliveryMethod === "fanbox" && selectedFanbox && !returnToSameFanbox
-            ? `Locker FANbox: ${selectedFanbox.name} - ${selectedFanbox.address}` 
-            : null
-    } : {};
+    const finalAddressDetails = shipping.assemblyNotes 
+        ? `${shipping.addressDetails} | Note: ${shipping.assemblyNotes}` 
+        : shipping.addressDetails;
 
     const orderData = { 
       client: { 
         ...shipping, 
-        addressDetails: finalAddressDetails, 
-        city: finalCity,
-        county: finalCounty,
-        ...serviceOpts 
+        addressDetails: finalAddressDetails
       }, 
       cartItems: enrichedItems,
       total: finalTotalCents, 
       shippingCents: shippingCents,
       userEmail: user?.email, 
-      pickupType: pickupByKarix ? "KarixPersonal" : "Courier",
+      pickupType: cartAnalysis.hasService ? "KarixPersonal" : "Courier",
       paymentMethod: paymentMethod, 
       couponCode: appliedCoupon?.code || null 
     };
@@ -549,16 +414,12 @@ export default function Checkout() {
     }
   };
 
-  const hideStandardAddressFields = cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && serviceDeliveryMethod === "fanbox" && returnToSameFanbox;
-
   return (
     <>
       <SEO 
         title="Finalizare Comandă"
-        description="Ești la un pas de a deține un sistem Karix sau de a-ți repara echipamentul. Finalizează comanda acum pentru livrare rapidă și suport tehnic de elită."
+        description="Finalizează comanda acum pentru livrare rapidă și suport tehnic de elită."
       />
-
-      <div id="fanbox-map-root"></div>
 
       <div className="min-h-screen pt-32 pb-24 px-4 sm:px-6 relative overflow-hidden bg-transparent text-left font-sans">
         <div className="max-w-6xl mx-auto relative z-10">
@@ -577,6 +438,7 @@ export default function Checkout() {
             
             <div className="lg:col-span-7 space-y-6">
               
+              {/* 1. DATE FACTURARE */}
               <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                   <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">1. Date Facturare</h2>
@@ -657,17 +519,17 @@ export default function Checkout() {
                           className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
                           value={shipping.regCom} 
                           onChange={e => setShipping(s => ({ ...s, regCom: e.target.value }))} 
-                          placeholder="Nr. Reg. Comerțului (ex: J05/123/2026)" 
+                          placeholder="Nr. Reg. Comerțului" 
                         />
                       </div>
                       
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Număr de Telefon (Firmă)</label>
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Telefon (Firmă)</label>
                         <input 
                           className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all placeholder-gray-600 font-medium" 
                           value={shipping.phone} 
                           onChange={e => setShipping(s => ({ ...s, phone: e.target.value }))} 
-                          placeholder="Număr de Telefon contact" 
+                          placeholder="Număr de Telefon" 
                         />
                       </div>
                     </>
@@ -675,246 +537,122 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* 2. Detalii Livrare / ASAMBLARE / PRELUARE */}
+              {/* 2. DETALII PREDARE / LIVRARE */}
               <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
                 <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
-                  {isAssemblyOrder ? "2. Detalii Predare Componente" : "2. Detalii Livrare / Ridicare"}
+                  2. {cartAnalysis.hasService ? "Locație Preluare / Predare" : "Adresă Livrare"}
                 </h2>
-                
-                {/* BANNER AVERTIZARE MAI MULTE DISPOZITIVE */}
-                {cartAnalysis.totalServicesInCart > 1 && (
-                  <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
-                    <span className="text-amber-400 mt-0.5">⚠️</span>
-                    <div>
-                      <p className="text-xs text-amber-400 font-medium leading-relaxed">
-                        Ai în coș <strong>{cartAnalysis.totalServicesInCart} dispozitive</strong> pentru service.
+
+                {cartAnalysis.hasService ? (
+                  // --- UI PENTRU COMENZI DE SERVICE (FORȚAT BIHOR / ORADEA) ---
+                  <div className="space-y-6">
+                    <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-start gap-3">
+                      <span className="text-indigo-400 mt-0.5">📍</span>
+                      <p className="text-xs text-indigo-300 font-medium leading-relaxed">
+                        Serviciile Karix sunt disponibile <strong>exclusiv în Oradea (Bihor)</strong>. Câmpurile de oraș sunt completate automat. Vom asigura preluarea/predarea echipamentului gratuit.
                       </p>
-                      <p className="text-[11px] text-amber-500/80 mt-1 leading-snug">
-                        Din motive logistice (generare AWB per colet), preluarea comună este disponibilă <strong>exclusiv în Oradea</strong>. Dacă dorești trimitere prin Curier din alt județ, te rugăm să plasezi comenzi separate pentru fiecare dispozitiv.
-                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
+                        <input 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-gray-400 outline-none cursor-not-allowed opacity-70 font-bold" 
+                          value="Bihor" 
+                          readOnly 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș</label>
+                        <input 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-gray-400 outline-none cursor-not-allowed opacity-70 font-bold" 
+                          value="Oradea" 
+                          readOnly 
+                        />
+                      </div>
+                      
+                      <div className="md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă Exactă (Unde ne vedem?)</label>
+                        <textarea 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" 
+                          value={shipping.addressDetails} 
+                          onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} 
+                          placeholder="Strada, Număr, Bloc, Apartament..." 
+                        />
+                      </div>
+
+                      <div className="md:col-span-2 space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Note Suplimentare (Opțional)</label>
+                        <textarea 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[60px] resize-none placeholder-gray-600 text-sm" 
+                          value={shipping.assemblyNotes} 
+                          onChange={e => setShipping(s => ({ ...s, assemblyNotes: e.target.value }))} 
+                          placeholder="Ex: Ne vedem la Nufărul / Sunați-mă când ajungeți..." 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // --- UI PENTRU COMENZI STANDARD DE PC (LIVRARE NAȚIONALĂ) ---
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2 relative" ref={dropdownRef}>
+                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
+                      <input 
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all" 
+                        placeholder="Scrie județul..." 
+                        value={shipping.county} 
+                        onFocus={() => setShowJudete(true)} 
+                        onChange={e => setShipping(s => ({ ...s, county: e.target.value }))} 
+                      />
+                      {showJudete && filteredJudete.length > 0 && (
+                        <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
+                          {filteredJudete.map(j => (
+                            <button 
+                              key={j} 
+                              className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" 
+                              onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}
+                            >
+                              {j}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș</label>
+                      <input 
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all" 
+                        value={shipping.city} 
+                        onChange={e => setShipping(s => ({ ...s, city: e.target.value }))} 
+                        placeholder="Orașul tău" 
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
+                      <textarea 
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" 
+                        value={shipping.addressDetails} 
+                        onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} 
+                        placeholder="Strada, Număr, Bloc, Apartament..." 
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Note Comandă (Opțional)</label>
+                      <textarea 
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[60px] resize-none placeholder-gray-600 text-sm" 
+                        value={shipping.assemblyNotes} 
+                        onChange={e => setShipping(s => ({ ...s, assemblyNotes: e.target.value }))} 
+                        placeholder="Detalii suplimentare pentru curier..." 
+                      />
                     </div>
                   </div>
                 )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {isAssemblyOrder ? (
-                    <>
-                      <div className="md:col-span-2 mb-4 flex flex-col gap-4">
-                        <button type="button" onClick={() => { setPickupByKarix(true); setShipping(prev => ({ ...prev, county: "Bihor", city: "Oradea" })); }} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
-                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${pickupByKarix ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>📍</div>
-                          <div className="flex-1">
-                            <h4 className="text-white font-black text-xs uppercase tracking-wider">Predare Personală Oradea</h4>
-                            <p className="text-gray-400 text-[10px]">Ne vedem în Oradea (F2F) ca să ne predai componentele tale.</p>
-                          </div>
-                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${pickupByKarix ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
-                            {pickupByKarix && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
-                          </div>
-                        </button>
-
-                        <button type="button" onClick={() => setPickupByKarix(false)} className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md ${!pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5 hover:border-white/10"}`}>
-                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${!pickupByKarix ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>🚚</div>
-                          <div className="flex-1">
-                            <h4 className="text-white font-black text-xs uppercase tracking-wider">Trimit Piesele (Din toată țara)</h4>
-                            <p className="text-gray-400 text-[10px]">Comanzi piesele direct la noi la adresă sau le pui tu la curier.</p>
-                          </div>
-                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${!pickupByKarix ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
-                            {!pickupByKarix && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
-                          </div>
-                        </button>
-                      </div>
-
-                      {pickupByKarix ? (
-                         <div className="md:col-span-2 space-y-2 pt-2">
-                           <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Detalii Preluare Oradea (Opțional)</label>
-                           <textarea 
-                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[60px] resize-none placeholder-gray-600 text-sm" 
-                             value={shipping.assemblyNotes} 
-                             onChange={e => setShipping(s => ({ ...s, assemblyNotes: e.target.value }))} 
-                             placeholder="Ex: Ne vedem la Nufărul / Am și o carcasă foarte mare..." 
-                           />
-                         </div>
-                      ) : (
-                        <div className="md:col-span-2 space-y-4 p-5 rounded-2xl bg-indigo-500/5 border border-indigo-500/20">
-                           <div>
-                              <h4 className="text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-1">Unde trimiți componentele?</h4>
-                              <p className="text-white text-sm font-medium leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5">
-                                Str. Sovata, Nr. 52, Bl. C6, Ap. 51, Oradea, Bihor<br/>
-                                <span className="text-gray-400 text-xs">Telefon destinatar: 0770619935</span>
-                              </p>
-                           </div>
-
-                           <div className="h-px bg-indigo-500/20 w-full my-4" />
-
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2 relative" ref={dropdownRef}>
-                                <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ Retur PC</label>
-                                <input className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all" placeholder="Scrie județul..." value={shipping.county} onFocus={() => setShowJudete(true)} onChange={e => setShipping(s => ({ ...s, county: e.target.value }))} />
-                                {showJudete && filteredJudete.length > 0 && (
-                                  <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
-                                    {filteredJudete.map(j => (
-                                      <button key={j} className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}>{j}</button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș Retur PC</label>
-                                <input className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all" value={shipping.city} onChange={e => setShipping(s => ({ ...s, city: e.target.value }))} placeholder="Orașul tău" />
-                              </div>
-                              <div className="md:col-span-2 space-y-2">
-                                <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresa ta (pentru retur PC)</label>
-                                <textarea className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[60px] resize-none placeholder-gray-600 text-sm" value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc... Unde îți trimitem PC-ul gata asamblat?" />
-                              </div>
-                           </div>
-
-                           <div className="space-y-2 pt-4">
-                            <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Alte Detalii (Opțional, dar ajută)</label>
-                            <textarea 
-                              className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[60px] resize-none placeholder-gray-600 text-sm" 
-                              value={shipping.assemblyNotes} 
-                              onChange={e => setShipping(s => ({ ...s, assemblyNotes: e.target.value }))} 
-                              placeholder="Ex: Am comandat de la eMAG / Trimit azi pachet cu Fan Courier..." 
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="md:col-span-2 mb-4">
-                        <button 
-                          type="button" 
-                          onClick={() => { if (cartAnalysis.totalServicesInCart <= 1) setPickupByKarix(!pickupByKarix); }} 
-                          className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left backdrop-blur-md 
-                            ${pickupByKarix ? "bg-indigo-500/10 border-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/5"}
-                            ${cartAnalysis.totalServicesInCart > 1 ? "cursor-not-allowed opacity-80 border-indigo-500/50 bg-indigo-500/10" : "hover:border-white/10"}
-                          `}
-                        >
-                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl ${pickupByKarix ? "bg-indigo-500 text-white" : "bg-white/5 text-gray-500"}`}>
-                            {cartAnalysis.hasPC ? "🚀" : "📍"}
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="text-white font-black text-xs uppercase tracking-wider">{pickupLabel}</h4>
-                            <p className="text-gray-400 text-[10px]">{pickupDescription}</p>
-                          </div>
-                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${pickupByKarix ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
-                            {pickupByKarix && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
-                          </div>
-                        </button>
-                      </div>
-
-                      {/* DACĂ E SERVICE ȘI NU A ALES ORADEA (ȘI E PERMIS) */}
-                      {cartAnalysis.hasService && !isAssemblyOrder && !pickupByKarix && cartAnalysis.totalServicesInCart <= 1 && (
-                        <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4 transition-all">
-                           <h4 className="text-white font-black text-xs uppercase tracking-wider mb-4 flex items-center gap-2">
-                              <span>📦</span> Cum ne trimiți dispozitivul defect?
-                           </h4>
-                           
-                           {/* 👉 AICI ESTE LOGICA PENTRU ASCUNDEREA FANBOX-ULUI DACĂ E PC */}
-                           <div className={`grid grid-cols-1 ${!cartAnalysis.disableFanbox ? 'sm:grid-cols-2' : ''} gap-4`}>
-                              <button 
-                                type="button" 
-                                onClick={() => setServiceDeliveryMethod("courier")} 
-                                className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "courier" ? "bg-indigo-500 text-white border-indigo-400 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
-                              >
-                                <div className="font-bold text-sm">Curier la Ușă</div>
-                                <div className="text-xs opacity-70 mt-1">Curierul vine la adresa ta (+30 RON)</div>
-                              </button>
-                              
-                              {!cartAnalysis.disableFanbox && (
-                                  <button 
-                                    type="button" 
-                                    onClick={() => setServiceDeliveryMethod("fanbox")} 
-                                    className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "fanbox" ? "bg-cyan-500 text-black border-cyan-400 shadow-lg shadow-cyan-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
-                                  >
-                                    <div className="font-bold text-sm">Predare la FANbox</div>
-                                    <div className="text-xs opacity-70 mt-1">Îl lași la locker (+15 RON)</div>
-                                  </button>
-                              )}
-                           </div>
-
-                           {serviceDeliveryMethod === "fanbox" && !cartAnalysis.disableFanbox && (
-                              <div className="mt-6 p-4 rounded-xl bg-black/40 border border-cyan-500/20 animate-in fade-in zoom-in duration-300">
-                                {!selectedFanbox ? (
-                                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                                    <div className="text-left">
-                                      <p className="text-cyan-400 font-bold text-sm">Niciun Locker Selectat</p>
-                                      <p className="text-gray-400 text-[10px]">Apasă butonul pentru a alege un locker de pe hartă.</p>
-                                    </div>
-                                    <button type="button" onClick={openFanboxMap} className="bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-widest text-[10px] px-4 py-3 rounded-lg transition-colors w-full sm:w-auto">
-                                      🗺️ Deschide Harta
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="flex flex-col gap-3">
-                                    <div className="flex justify-between items-start gap-4">
-                                      <div>
-                                        <p className="text-cyan-400 font-black text-xs uppercase tracking-widest mb-1">Locker Selectat ✓</p>
-                                        <p className="text-white font-bold text-sm">{selectedFanbox.name}</p>
-                                        <p className="text-gray-400 text-xs mt-1">{selectedFanbox.address}</p>
-                                      </div>
-                                      <button type="button" onClick={openFanboxMap} className="text-cyan-400 hover:text-white text-xs underline font-bold whitespace-nowrap">Modifică</button>
-                                    </div>
-
-                                    <div className="h-px bg-white/10 w-full my-2" />
-                                    
-                                    <label className="flex items-center gap-3 cursor-pointer group">
-                                      <div className="relative flex items-center justify-center">
-                                        <input 
-                                          type="checkbox" 
-                                          checked={returnToSameFanbox} 
-                                          onChange={(e) => setReturnToSameFanbox(e.target.checked)} 
-                                          className="sr-only" 
-                                        />
-                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${returnToSameFanbox ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-gray-500 group-hover:border-cyan-400'}`}>
-                                          {returnToSameFanbox && <svg width="12" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 5L4.5 8.5L13 1" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                                        </div>
-                                      </div>
-                                      <span className="text-gray-300 font-bold text-xs italic">
-                                        Vreau ca echipamentul reparat să-mi fie livrat înapoi la acest locker.
-                                      </span>
-                                    </label>
-
-                                  </div>
-                                )}
-                                <p className="text-gray-400 text-[10px] mt-4 border-t border-cyan-500/10 pt-3">⚠️ <strong className="text-white">Atenție:</strong> Doar pentru Laptopuri sau Console. Dimensiunea maximă admisă este 45 x 44 x 40 cm.</p>
-                              </div>
-                           )}
-                        </div>
-                      )}
-
-                      {!hideStandardAddressFields && (
-                        <>
-                          <div className="space-y-2 relative" ref={dropdownRef}>
-                            <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
-                            <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} placeholder="Scrie județul..." value={shipping.county} onFocus={() => !pickupByKarix && setShowJudete(true)} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, county: e.target.value }))} readOnly={pickupByKarix} />
-                            {showJudete && !pickupByKarix && filteredJudete.length > 0 && (
-                              <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
-                                {filteredJudete.map(j => (
-                                  <button key={j} className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}>{j}</button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș</label>
-                            <input className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all ${pickupByKarix ? 'opacity-30 cursor-not-allowed' : ''}`} value={shipping.city} onChange={e => !pickupByKarix && setShipping(s => ({ ...s, city: e.target.value }))} placeholder="Orașul tău" readOnly={pickupByKarix} />
-                          </div>
-
-                          <div className="md:col-span-2 space-y-2">
-                            <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
-                            <textarea className={`w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600`} value={shipping.addressDetails} onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} placeholder="Strada, Număr, Bloc, Apartament unde venim noi sau livrăm..." />
-                          </div>
-                        </>
-                      )}
-                    </>
-                  )}
-                </div>
               </div>
 
-              {/* 3. Metodă de Plată */}
+              {/* 3. METODĂ DE PLATĂ */}
               <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
                 <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">3. Metodă de Plată</h2>
                 <div className="flex flex-col gap-4">
@@ -946,7 +684,7 @@ export default function Checkout() {
                     </div>
                     <div className="flex-1">
                       <h4 className="text-white font-black text-xs uppercase tracking-wider">Transfer Bancar (OP)</h4>
-                      <p className="text-gray-400 text-[10px]">Ideal pentru firme. Procesarea începe la confirmarea plății.</p>
+                      <p className="text-gray-400 text-[10px]">Procesarea începe la confirmarea plății.</p>
                     </div>
                     <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === "transfer_bancar" ? "border-indigo-400 bg-indigo-500" : "border-gray-600"}`}>
                       {paymentMethod === "transfer_bancar" && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
@@ -958,7 +696,7 @@ export default function Checkout() {
 
             </div>
 
-            {/* Sumar Comandă Final */}
+            {/* SUMAR COMANDĂ FINAL */}
             <div className="lg:col-span-5">
               <div className="p-8 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-2xl sticky top-32 shadow-2xl">
                 <h2 className="text-xl font-bold text-white mb-8 tracking-tight italic drop-shadow-md text-left uppercase">Sumar Final</h2>
@@ -977,7 +715,7 @@ export default function Checkout() {
                   )}
 
                   <div className="flex justify-between text-gray-400 font-medium text-sm items-center">
-                    <span>{isAssemblyOrder ? "Transport Asamblare" : (cartAnalysis.hasService ? "Transport Retur Service" : "Logistică Hardware")}</span>
+                    <span>{cartAnalysis.hasService ? "Deplasare / Preluare Locală" : "Transport Curier"}</span>
                     <span className={`font-black text-[10px] uppercase tracking-widest ${shippingCents === 0 ? "text-emerald-400" : "text-white"}`}>
                       {shippingCents === 0 ? "Gratuit" : `+ ${formatRON(shippingCents)}`}
                     </span>
@@ -999,7 +737,7 @@ export default function Checkout() {
                       <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
                           <span className="text-amber-400 mt-0.5">⚠️</span>
                           <p className="text-xs text-amber-400 font-medium leading-relaxed italic">
-                              Acest sistem este asamblat la comandă pe baza alegerilor tale (custom-build) și <strong>nu beneficiază de drept de retur de 14 zile</strong>, conform OUG 34/2014, art. 16.
+                              Acest sistem este asamblat la comandă (custom-build) și <strong>nu beneficiază de drept de retur de 14 zile</strong>, conform OUG 34/2014, art. 16.
                           </p>
                       </div>
                   )}
@@ -1023,7 +761,7 @@ export default function Checkout() {
 
                 <button 
                   onClick={handlePlaceOrder} 
-                  disabled={loading || items.length === 0 || (cartAnalysis.totalServicesInCart > 1 && !pickupByKarix)} 
+                  disabled={loading || items.length === 0} 
                   className="group relative w-full py-6 rounded-[25px] font-black text-white overflow-hidden transition-all active:scale-[0.98] shadow-2xl disabled:opacity-50"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 group-hover:scale-105 transition-transform duration-500" />
