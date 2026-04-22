@@ -29,7 +29,6 @@ export const CartProvider = ({ children }) => {
     setItems([]); 
   };
 
-  // 👉 AICI: Recalculăm Totalul coșului incluzând și valoarea garanției extinse
   const totalCents = useMemo(() => {
     return items.reduce((acc, item) => {
       const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
@@ -63,28 +62,10 @@ export const CartProvider = ({ children }) => {
     return nameStr.includes("asamblare");
   };
 
-  const isBaseDeviceService = (product) => {
-    const nameStr = (product.name || product.productName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (nameStr.includes("upgrade")) return false; 
-    
-    const baseKeywords = ['mentenanta', 'reparatie', 'curatare', 'diagnosticare', 'service', 'instalare', 'reinstalare', 'recuperare', 'windows'];
-    return baseKeywords.some(kw => nameStr.includes(kw));
-  };
-
-  const countTotalDevicesInCart = (cartArray) => {
-    return cartArray.reduce((total, i) => {
-      if (isBaseDeviceService(i) && !isProductAssembly(i)) {
-        return total + (i.qty || 1);
-      }
-      return total;
-    }, 0);
-  };
-
   const performAdd = (product, clearPrevious = false) => {
     setItems((prev) => {
       const currentCart = clearPrevious ? [] : prev;
-      // La căutarea dublurilor, acum luăm în calcul și ID-ul (pentru a putea adăuga același PC de 2 ori cu garanții diferite dacă e nevoie)
-      // Dar pentru simplitate și comportamentul actual de coș, doar îi creștem cantitatea
+      
       const exists = currentCart.find((i) => i.id === product.id);
       
       const actualPrice = product.priceCents || product.price || product.totalCents || 0;
@@ -110,25 +91,21 @@ export const CartProvider = ({ children }) => {
           productName: product.name || product.productName, 
           name: product.name || product.productName,
           category: product.category || (isSrv ? "service" : "pc"),
-          basePriceCents: actualPrice, // 👉 Salvăm prețul de bază separat
-          priceCents: actualPrice, // Păstrăm fallback pentru restul aplicației
+          basePriceCents: actualPrice,
+          priceCents: actualPrice, 
           priceCentsAtBuy: actualPrice,
           images: finalImages, 
           imageUrl: finalImageUrl, 
           specs: product.specs || {},
           warrantyMonths: product.warrantyMonths || (isSrv ? 0 : 24), 
-          extendedWarranty: 0, // 👉 Setăm valoarea implicită pentru Garanția Extinsă
-          qty: qtyToAdd 
+          extendedWarranty: 0, 
+          qty: qtyToAdd,
+          // 👉 NOU: Preia informația despre serviciul național (Dacă nu e furnizată, consideră local = fals)
+          isNationalService: product.isNationalService || false 
         }];
       }
-
-      const totalDevicesNow = countTotalDevicesInCart(newCart);
       
-      if (totalDevicesNow > 1) {
-        triggerToast("ℹ️ Ai mai multe dispozitive în coș. Atenție: preluarea multiplă pe aceeași comandă este posibilă DOAR în Oradea.", true);
-      } else {
-        triggerToast(`Ai adăugat "${product.name || product.productName}" în coș!`, false);
-      }
+      triggerToast(`Ai adăugat "${product.name || product.productName}" în coș!`, false);
 
       return newCart;
     });
@@ -172,20 +149,12 @@ export const CartProvider = ({ children }) => {
 
   const updateQty = (id, delta) => {
     setItems((prev) => {
-      const newCart = prev.map((i) =>
+      return prev.map((i) =>
         i.id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i
       );
-
-      const totalDevicesNow = countTotalDevicesInCart(newCart);
-      if (delta > 0 && totalDevicesNow > 1) {
-         triggerToast("ℹ️ Ai selectat mai multe dispozitive. Preluarea comună este disponibilă DOAR în Oradea.", true);
-      }
-
-      return newCart;
     });
   };
 
-  // 👉 NOU: Funcția care actualizează garanția pe un anume item din coș
   const updateItemWarranty = (id, warrantyLevel) => {
     setItems((prev) => 
       prev.map((i) => 
@@ -217,7 +186,7 @@ export const CartProvider = ({ children }) => {
       addToCart: addItem, 
       removeFromCart, 
       updateQty, 
-      updateItemWarranty, // Oferim acces la funcția nouă
+      updateItemWarranty,
       totalCents, 
       clearCart 
     }}>
@@ -262,7 +231,7 @@ export const CartProvider = ({ children }) => {
             {conflictModal.type === 'WANTS_SERVICE_OVER_HARDWARE' && (
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
-                  Serviciile de reparație sau mentenanță <strong className="text-white">nu pot fi combinate</strong> cu produsele hardware pe aceeași comandă, deoarece folosesc un sistem diferit de curierat (dus-întors). <br /><br />
+                  Serviciile de reparație sau mentenanță <strong className="text-white">nu pot fi combinate</strong> cu produsele hardware pe aceeași comandă. <br /><br />
                   Dorești să golești coșul pentru a programa serviciul?
                 </p>
                 <div className="flex flex-col gap-3">
@@ -277,7 +246,7 @@ export const CartProvider = ({ children }) => {
               <>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed">
                   Ai deja o <strong className="text-white">Reparație / Serviciu</strong> în coș. <br /><br />
-                  Din motive de logistică și transport, produsele hardware (PC-uri) trebuie comandate separat. Golești coșul pentru a adăuga noul produs?
+                  Din motive de logistică, produsele hardware (PC-uri) trebuie comandate separat. Golești coșul pentru a adăuga noul produs?
                 </p>
                 <div className="flex flex-col gap-3">
                   <button onClick={confirmReplaceCart} className="w-full py-4 rounded-xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-rose-600/20 hover:bg-rose-500 transition-all">Golește coșul și adaugă</button>
