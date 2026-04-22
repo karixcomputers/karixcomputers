@@ -138,12 +138,18 @@ export default function Checkout() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const appliedCoupon = location.state?.coupon || null;
 
-  // 👉 NOU: State pentru FANbox
-  const [serviceDeliveryMethod, setServiceDeliveryMethod] = useState("courier"); 
-  const [selectedFanbox, setSelectedFanbox] = useState(null);
-  const [returnToSameFanbox, setReturnToSameFanbox] = useState(true);
+  // --- STATE-URI NOI PENTRU FANBOX & CURIER SERVICE NAȚIONAL ---
+  const [sendMethod, setSendMethod] = useState("courier"); // "courier" sau "fanbox" (cum ne trimite clientul)
+  const [returnMethod, setReturnMethod] = useState("courier"); // "courier" sau "fanbox" (cum i-l trimitem înapoi)
+  
+  const [selectedSendFanbox, setSelectedSendFanbox] = useState(null);
+  const [selectedReturnFanbox, setSelectedReturnFanbox] = useState(null);
 
-  // --- ÎNCĂRCARE SCRIPT FANBOX ---
+  const [returnToSameFanbox, setReturnToSameFanbox] = useState(true); // Dacă ambele sunt fanbox, dorește retur la același?
+
+  // PENTRU A DESCHIDE HARTA FANBOX
+  const [mapTarget, setMapTarget] = useState(null); // 'send' sau 'return'
+
   useEffect(() => {
     if (!document.getElementById("fanbox-script")) {
       const script = document.createElement("script");
@@ -155,24 +161,35 @@ export default function Checkout() {
     }
 
     const handleSelectPoint = (e) => {
-      setSelectedFanbox(e.detail.item);
+      // Știm care hartă a fost deschisă în funcție de mapTarget
+      if (mapTarget === 'send') {
+          setSelectedSendFanbox(e.detail.item);
+          // Dacă bifat "retur la același", îl actualizăm automat și pe celălalt
+          if (returnMethod === "fanbox" && returnToSameFanbox) {
+             setSelectedReturnFanbox(e.detail.item);
+          }
+      } else if (mapTarget === 'return') {
+          setSelectedReturnFanbox(e.detail.item);
+      }
     };
 
     window.addEventListener("map:select-point", handleSelectPoint);
     return () => {
       window.removeEventListener("map:select-point", handleSelectPoint);
     };
-  }, []);
+  }, [mapTarget, returnMethod, returnToSameFanbox]);
 
-  const openFanboxMap = () => {
-    if (window.LoadMapFanBox) {
-      window.LoadMapFanBox({
-        rootId: "fanbox-map-root", 
-      });
-    } else {
-      triggerError("Harta FAN Courier se încarcă. Te rugăm să aștepți 2 secunde și să încerci din nou.");
-    }
+  const openFanboxMap = (target) => {
+    setMapTarget(target);
+    setTimeout(() => {
+        if (window.LoadMapFanBox) {
+          window.LoadMapFanBox({ rootId: "fanbox-map-root" });
+        } else {
+          triggerError("Harta FAN Courier se încarcă. Te rugăm să aștepți 2 secunde și să încerci din nou.");
+        }
+    }, 100);
   };
+
 
   // --- ANALIZA COȘULUI NOUĂ ---
   const cartAnalysis = useMemo(() => {
@@ -183,7 +200,8 @@ export default function Checkout() {
     let hasPC = false;
     let hasService = false;
     let requiresLocalPickup = false; 
-    let hasNationalService = false; // 👉 NOU: Flag pentru a detecta dacă avem servicii naționale
+    let hasNationalService = false; 
+    let serviceMainCategory = "other"; // "console" sau "controller" (Pentru a determina greutatea/asigurarea)
     
     items.forEach(item => {
       const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -198,6 +216,13 @@ export default function Checkout() {
         } else {
             hasNationalService = true;
         }
+
+        if (nameStr.includes('consola') || nameStr.includes('playstation') || nameStr.includes('xbox')) {
+            serviceMainCategory = "console";
+        } else if (nameStr.includes('stick') || nameStr.includes('drift') || nameStr.includes('controller') || nameStr.includes('maneta')) {
+            if (serviceMainCategory !== "console") serviceMainCategory = "controller"; // Consola primeaza
+        }
+
       } else {
         hasPC = true;
         const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
@@ -209,8 +234,9 @@ export default function Checkout() {
       }
     });
 
-    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart, requiresLocalPickup, hasNationalService };
+    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart, requiresLocalPickup, hasNationalService, serviceMainCategory };
   }, [items]);
+
 
   useEffect(() => {
     if (cartAnalysis.requiresLocalPickup) {
@@ -258,26 +284,42 @@ export default function Checkout() {
     return appliedCoupon.discountValue; 
   }, [appliedCoupon, totalCents]);
 
-  const shippingCents = useMemo(() => {
-    let cost = 0;
+  const shippingBreakdown = useMemo(() => {
+    let baseShippingCost = 0;
+    let insuranceCost = 0;
+    let sendCost = 0;
+    let returnCost = 0;
     
+    // Taxă curier pentru PC ieftin (< 1000 RON)
     if (cartAnalysis.hasPC && cartAnalysis.hardwareSubtotal < 1000 * 100) {
-        cost += 2500; 
+        baseShippingCost += 2500; 
     }
     
-    // 👉 NOU: Logistică Service Național
+    // 👉 Logistică complexă Service Național (Tur-Retur)
     if (cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup) {
-        if (serviceDeliveryMethod === "courier") {
-            cost += 2000; // 20 RON pentru curier tur-retur
-        } else if (serviceDeliveryMethod === "fanbox") {
-            cost += 1500; // 15 RON pentru preluare/predare din FANbox
+        
+        // 1. CALCUL TRANSPORT TUR (De la client la Karix)
+        if (sendMethod === "courier") sendCost = 2000;
+        else if (sendMethod === "fanbox") sendCost = 1500;
+
+        // 2. CALCUL TRANSPORT RETUR (De la Karix la client)
+        if (returnMethod === "courier") returnCost = 2000;
+        else if (returnMethod === "fanbox") returnCost = 1500;
+        
+        // 3. CALCUL ASIGURARE (Se aplică doar dacă circulă prin curier/fanbox)
+        if (cartAnalysis.serviceMainCategory === "console") {
+            insuranceCost = 2000; // Asigurare de 20 RON pentru valoare declarată de ~2000 RON
+        } else if (cartAnalysis.serviceMainCategory === "controller") {
+            insuranceCost = 500; // Asigurare de 5 RON pentru controller
         }
     }
     
-    return cost;
-  }, [cartAnalysis, serviceDeliveryMethod]);
+    const finalShippingCost = baseShippingCost + sendCost + returnCost + insuranceCost;
 
-  const finalTotalCents = Math.max(0, totalCents - discountCents + shippingCents);
+    return { finalShippingCost, sendCost, returnCost, insuranceCost };
+  }, [cartAnalysis, sendMethod, returnMethod]);
+
+  const finalTotalCents = Math.max(0, totalCents - discountCents + shippingBreakdown.finalShippingCost);
 
   const handleSwitchToCompany = () => {
     setShipping(s => ({ ...s, isCompany: true, phone: "" }));
@@ -330,20 +372,30 @@ export default function Checkout() {
       return;
     }
 
-    // 👉 NOU: Validare pentru FANbox
-    const isFanboxSelected = cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && serviceDeliveryMethod === "fanbox";
-    const hideStandardAddress = isFanboxSelected && returnToSameFanbox;
-
-    if (isFanboxSelected && !selectedFanbox) {
-        triggerError("Te rugăm să selectezi un FANbox de pe hartă pentru predarea dispozitivului.");
-        return;
-    }
-
-    if (!hideStandardAddress) {
-      if (!shipping.addressDetails || !shipping.city || !shipping.county) {
-        triggerError("Te rugăm să completezi datele complete de preluare/livrare.");
-        return;
-      }
+    // 👉 VALIDĂRI PENTRU SERVICII NAȚIONALE (FANbox vs Curier)
+    const isNationalService = cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup;
+    
+    if (isNationalService) {
+        if (sendMethod === "fanbox" && !selectedSendFanbox) {
+            triggerError("Te rugăm să selectezi un FANbox de predare de pe hartă.");
+            return;
+        }
+        if (returnMethod === "fanbox" && !selectedReturnFanbox) {
+             triggerError("Te rugăm să selectezi un FANbox de retur de pe hartă.");
+             return;
+        }
+        if (sendMethod === "courier" || returnMethod === "courier") {
+            if (!shipping.addressDetails || !shipping.city || !shipping.county) {
+                triggerError("Ai ales o metodă care implică curierul. Te rugăm să completezi județul, orașul și adresa exactă.");
+                return;
+            }
+        }
+    } else {
+        // Validare normală (pentru PC sau Service Local)
+        if (!shipping.addressDetails || !shipping.city || !shipping.county) {
+            triggerError("Te rugăm să completezi datele complete de preluare/livrare.");
+            return;
+        }
     }
 
     if (shipping.isCompany) {
@@ -406,13 +458,19 @@ export default function Checkout() {
       };
     });
 
-    let finalAddressDetails = shipping.assemblyNotes 
-        ? `${shipping.addressDetails} | Note: ${shipping.assemblyNotes}` 
-        : shipping.addressDetails;
+    let finalAddressDetails = shipping.addressDetails;
+    
+    // 👉 Construim stringul de adresă să conțină logică complexă de curier/fanbox
+    if (isNationalService) {
+        finalAddressDetails = ""; // Rescriem de la zero ca să fie clar pe factură
+        
+        finalAddressDetails += `[DUS spre Karix]: ${sendMethod === "fanbox" ? `Locker FANbox: ${selectedSendFanbox?.name} (${selectedSendFanbox?.id}) - ${selectedSendFanbox?.address}` : `Curier preia de la adresa: ${shipping.addressDetails}`}`;
+        
+        finalAddressDetails += ` | [RETUR spre Client]: ${returnMethod === "fanbox" ? `Locker FANbox: ${selectedReturnFanbox?.name} (${selectedReturnFanbox?.id}) - ${selectedReturnFanbox?.address}` : `Curier livrează la adresa: ${shipping.addressDetails}`}`;
+    }
 
-    // 👉 NOU: Dacă vrea retur la același FANbox, punem adresa FANbox-ului ca destinație finală
-    if (hideStandardAddress && selectedFanbox) {
-        finalAddressDetails = `Locker FANbox: ${selectedFanbox.name} (${selectedFanbox.id}) - ${selectedFanbox.address} | Note: ${shipping.assemblyNotes}`;
+    if (shipping.assemblyNotes) {
+        finalAddressDetails += ` | Note: ${shipping.assemblyNotes}`;
     }
 
     const orderData = { 
@@ -422,7 +480,7 @@ export default function Checkout() {
       }, 
       cartItems: enrichedItems,
       total: finalTotalCents, 
-      shippingCents: shippingCents,
+      shippingCents: shippingBreakdown.finalShippingCost,
       userEmail: user?.email, 
       pickupType: cartAnalysis.requiresLocalPickup ? "KarixPersonal" : "Courier",
       paymentMethod: paymentMethod, 
@@ -482,8 +540,9 @@ export default function Checkout() {
     }
   };
 
-  // Flag care ne zice dacă ascundem input-urile standard de adresă (Județ/Oraș)
-  const hideStandardAddressFields = cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && serviceDeliveryMethod === "fanbox" && returnToSameFanbox;
+  // Flag care ne zice dacă ascundem input-urile standard de adresă (Județ/Oraș/Strada)
+  // Le ascundem DOAR DACĂ pe tot traseul (send și return) se folosește strict FANbox.
+  const hideStandardAddressFields = cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && sendMethod === "fanbox" && returnMethod === "fanbox";
 
   return (
     <>
@@ -492,6 +551,7 @@ export default function Checkout() {
         description="Finalizează comanda acum pentru livrare rapidă și suport tehnic de elită."
       />
 
+      {/* DIV PENTRU INITIALIZARE HARTA FANBOX */}
       <div id="fanbox-map-root"></div>
 
       <div className="min-h-screen pt-32 pb-24 px-4 sm:px-6 relative overflow-hidden bg-transparent text-left font-sans">
@@ -613,7 +673,7 @@ export default function Checkout() {
               {/* 2. DETALII PREDARE / LIVRARE */}
               <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
                 <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
-                  2. {cartAnalysis.requiresLocalPickup ? "Locație Preluare Locală" : "Detalii Predare / Livrare"}
+                  2. {cartAnalysis.requiresLocalPickup ? "Locație Preluare Locală" : "Logistică / Livrare"}
                 </h2>
 
                 {cartAnalysis.requiresLocalPickup ? (
@@ -622,7 +682,7 @@ export default function Checkout() {
                     <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-start gap-3">
                       <span className="text-indigo-400 mt-0.5">📍</span>
                       <p className="text-xs text-indigo-300 font-medium leading-relaxed">
-                        Ai selectat un serviciu disponibil <strong>exclusiv în Oradea (Bihor)</strong>. Câmpurile de oraș sunt blocate automat. Vom asigura preluarea/predarea echipamentului personal.
+                        Ai selectat un serviciu disponibil <strong>exclusiv în Oradea (Bihor)</strong>. Câmpurile de oraș sunt blocate automat. Vom asigura preluarea/predarea echipamentului personal, fără costuri suplimentare.
                       </p>
                     </div>
 
@@ -668,83 +728,157 @@ export default function Checkout() {
                 ) : (
                   // --- UI PENTRU COMENZI STANDARD SAU SERVICE NAȚIONAL ---
                   <>
-                    {/* 👉 NOU: Dacă avem service național, arătăm opțiunile de FANbox vs Curier */}
+                    {/* 👉 NOU: Dacă avem service național, arătăm opțiunile TUR - RETUR de FANbox vs Curier */}
                     {cartAnalysis.hasService && cartAnalysis.hasNationalService && (
-                      <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-6 transition-all">
-                          <h4 className="text-white font-black text-xs uppercase tracking-wider mb-4 flex items-center gap-2">
-                              <span>📦</span> Cum ne trimiți dispozitivul defect?
-                          </h4>
+                      <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-6 transition-all space-y-6">
                           
-                          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4`}>
-                              <button 
-                                type="button" 
-                                onClick={() => setServiceDeliveryMethod("courier")} 
-                                className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "courier" ? "bg-indigo-500 text-white border-indigo-400 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
-                              >
-                                <div className="font-bold text-sm">Curier la Ușă</div>
-                                <div className="text-xs opacity-70 mt-1">Curierul vine la adresa ta (+20 RON)</div>
-                              </button>
-                              
-                              <button 
-                                type="button" 
-                                onClick={() => setServiceDeliveryMethod("fanbox")} 
-                                className={`p-4 rounded-xl border transition-all text-left ${serviceDeliveryMethod === "fanbox" ? "bg-cyan-500 text-black border-cyan-400 shadow-lg shadow-cyan-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
-                              >
-                                <div className="font-bold text-sm">Predare la FANbox</div>
-                                <div className="text-xs opacity-70 mt-1">Îl lași la locker (+15 RON)</div>
-                              </button>
+                          {/* SECTIUNE DUS (De la client la Karix) */}
+                          <div className="space-y-4">
+                              <h4 className="text-white font-black text-[11px] uppercase tracking-widest flex items-center gap-2">
+                                  <span>📦</span> PAS 1: Cum ne trimiți dispozitivul defect?
+                              </h4>
+                              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4`}>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setSendMethod("courier")} 
+                                    className={`p-4 rounded-xl border transition-all text-left ${sendMethod === "courier" ? "bg-indigo-500 text-white border-indigo-400 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
+                                  >
+                                    <div className="font-bold text-sm">Curier la Ușa Ta</div>
+                                    <div className="text-[10px] opacity-70 mt-1 uppercase tracking-widest">Preia de la tine acasă (+20 RON)</div>
+                                  </button>
+                                  
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setSendMethod("fanbox")} 
+                                    className={`p-4 rounded-xl border transition-all text-left ${sendMethod === "fanbox" ? "bg-cyan-500 text-black border-cyan-400 shadow-lg shadow-cyan-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
+                                  >
+                                    <div className="font-bold text-sm">Locker FANbox</div>
+                                    <div className="text-[10px] opacity-70 mt-1 uppercase tracking-widest">Îl lași la un easybox FAN (+15 RON)</div>
+                                  </button>
+                              </div>
+
+                              {sendMethod === "fanbox" && (
+                                  <div className="p-4 rounded-xl bg-black/40 border border-cyan-500/20 animate-in fade-in zoom-in duration-300">
+                                    {!selectedSendFanbox ? (
+                                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                        <div className="text-left">
+                                          <p className="text-cyan-400 font-bold text-sm">Niciun Locker Selectat</p>
+                                          <p className="text-gray-400 text-[10px]">Apasă butonul pentru a alege un locker de pe hartă.</p>
+                                        </div>
+                                        <button type="button" onClick={() => openFanboxMap('send')} className="bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-widest text-[10px] px-4 py-3 rounded-lg transition-colors w-full sm:w-auto">
+                                          🗺️ Deschide Harta
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex justify-between items-start gap-4">
+                                          <div>
+                                            <p className="text-cyan-400 font-black text-xs uppercase tracking-widest mb-1">Locker Predare ✓</p>
+                                            <p className="text-white font-bold text-sm">{selectedSendFanbox.name}</p>
+                                            <p className="text-gray-400 text-xs mt-1">{selectedSendFanbox.address}</p>
+                                          </div>
+                                          <button type="button" onClick={() => openFanboxMap('send')} className="text-cyan-400 hover:text-white text-xs underline font-bold whitespace-nowrap">Modifică</button>
+                                      </div>
+                                    )}
+                                  </div>
+                              )}
                           </div>
 
-                          {serviceDeliveryMethod === "fanbox" && (
-                              <div className="mt-6 p-4 rounded-xl bg-black/40 border border-cyan-500/20 animate-in fade-in zoom-in duration-300">
-                                {!selectedFanbox ? (
-                                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                                    <div className="text-left">
-                                      <p className="text-cyan-400 font-bold text-sm">Niciun Locker Selectat</p>
-                                      <p className="text-gray-400 text-[10px]">Apasă butonul pentru a alege un locker de pe hartă.</p>
-                                    </div>
-                                    <button type="button" onClick={openFanboxMap} className="bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-widest text-[10px] px-4 py-3 rounded-lg transition-colors w-full sm:w-auto">
-                                      🗺️ Deschide Harta
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="flex flex-col gap-3">
-                                    <div className="flex justify-between items-start gap-4">
-                                      <div>
-                                        <p className="text-cyan-400 font-black text-xs uppercase tracking-widest mb-1">Locker Selectat ✓</p>
-                                        <p className="text-white font-bold text-sm">{selectedFanbox.name}</p>
-                                        <p className="text-gray-400 text-xs mt-1">{selectedFanbox.address}</p>
-                                      </div>
-                                      <button type="button" onClick={openFanboxMap} className="text-cyan-400 hover:text-white text-xs underline font-bold whitespace-nowrap">Modifică</button>
-                                    </div>
+                          <div className="h-px bg-white/10 w-full" />
 
-                                    <div className="h-px bg-white/10 w-full my-2" />
-                                    
-                                    <label className="flex items-center gap-3 cursor-pointer group">
-                                      <div className="relative flex items-center justify-center">
-                                        <input 
-                                          type="checkbox" 
-                                          checked={returnToSameFanbox} 
-                                          onChange={(e) => setReturnToSameFanbox(e.target.checked)} 
-                                          className="sr-only" 
-                                        />
-                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${returnToSameFanbox ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-gray-500 group-hover:border-cyan-400'}`}>
-                                          {returnToSameFanbox && <svg width="12" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 5L4.5 8.5L13 1" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                                        </div>
-                                      </div>
-                                      <span className="text-gray-300 font-bold text-xs italic">
-                                        Vreau ca echipamentul reparat să-mi fie livrat înapoi la acest locker.
-                                      </span>
-                                    </label>
-                                  </div>
-                                )}
-                                <p className="text-gray-400 text-[10px] mt-4 border-t border-cyan-500/10 pt-3">⚠️ <strong className="text-white">Atenție:</strong> Doar pentru Laptopuri sau Console. Dimensiunea maximă admisă este 45 x 44 x 40 cm.</p>
+                          {/* SECTIUNE INTORS (De la Karix la client) */}
+                          <div className="space-y-4">
+                              <h4 className="text-white font-black text-[11px] uppercase tracking-widest flex items-center gap-2">
+                                  <span>🚚</span> PAS 2: Cum vrei să-ți trimitem dispozitivul reparat?
+                              </h4>
+                              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4`}>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setReturnMethod("courier")} 
+                                    className={`p-4 rounded-xl border transition-all text-left ${returnMethod === "courier" ? "bg-indigo-500 text-white border-indigo-400 shadow-lg shadow-indigo-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
+                                  >
+                                    <div className="font-bold text-sm">Curier la Ușa Ta</div>
+                                    <div className="text-[10px] opacity-70 mt-1 uppercase tracking-widest">Livrăm la tine acasă (+20 RON)</div>
+                                  </button>
+                                  
+                                  <button 
+                                    type="button" 
+                                    onClick={() => {
+                                        setReturnMethod("fanbox");
+                                        // Dacă dă click pe FANbox și deja a selectat unul la DUS, asumăm că îl vrea pe același
+                                        if (sendMethod === "fanbox" && selectedSendFanbox) {
+                                            setReturnToSameFanbox(true);
+                                            setSelectedReturnFanbox(selectedSendFanbox);
+                                        }
+                                    }} 
+                                    className={`p-4 rounded-xl border transition-all text-left ${returnMethod === "fanbox" ? "bg-cyan-500 text-black border-cyan-400 shadow-lg shadow-cyan-500/20" : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"}`}
+                                  >
+                                    <div className="font-bold text-sm">Locker FANbox</div>
+                                    <div className="text-[10px] opacity-70 mt-1 uppercase tracking-widest">Îl ridici de la easybox (+15 RON)</div>
+                                  </button>
                               </div>
-                          )}
+
+                              {returnMethod === "fanbox" && (
+                                  <div className="p-4 rounded-xl bg-black/40 border border-cyan-500/20 animate-in fade-in zoom-in duration-300">
+                                    
+                                    {/* Dacă alege FANbox la dus, îl întrebăm dacă vrea înapoi în același loc */}
+                                    {sendMethod === "fanbox" && selectedSendFanbox && (
+                                        <label className="flex items-center gap-3 cursor-pointer group mb-4 pb-4 border-b border-white/10">
+                                            <div className="relative flex items-center justify-center">
+                                                <input 
+                                                type="checkbox" 
+                                                checked={returnToSameFanbox} 
+                                                onChange={(e) => {
+                                                    setReturnToSameFanbox(e.target.checked);
+                                                    if (e.target.checked) setSelectedReturnFanbox(selectedSendFanbox);
+                                                    else setSelectedReturnFanbox(null);
+                                                }} 
+                                                className="sr-only" 
+                                                />
+                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${returnToSameFanbox ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-gray-500 group-hover:border-cyan-400'}`}>
+                                                {returnToSameFanbox && <svg width="12" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 5L4.5 8.5L13 1" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                                                </div>
+                                            </div>
+                                            <span className="text-gray-300 font-bold text-xs italic">
+                                                Vreau ca echipamentul reparat să-mi fie livrat la același locker.
+                                            </span>
+                                        </label>
+                                    )}
+
+                                    {/* Dacă NU a ales să-l trimită în același FANbox, sau nu are FANbox la dus, arată selecția */}
+                                    {(!returnToSameFanbox || sendMethod !== "fanbox") && (
+                                        !selectedReturnFanbox ? (
+                                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                            <div className="text-left">
+                                              <p className="text-cyan-400 font-bold text-sm">Niciun Locker de Retur Selectat</p>
+                                              <p className="text-gray-400 text-[10px]">Apasă butonul pentru a alege un locker de pe hartă.</p>
+                                            </div>
+                                            <button type="button" onClick={() => openFanboxMap('return')} className="bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-widest text-[10px] px-4 py-3 rounded-lg transition-colors w-full sm:w-auto">
+                                              🗺️ Deschide Harta
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <div className="flex justify-between items-start gap-4">
+                                              <div>
+                                                <p className="text-cyan-400 font-black text-xs uppercase tracking-widest mb-1">Locker Livrare (RETUR) ✓</p>
+                                                <p className="text-white font-bold text-sm">{selectedReturnFanbox.name}</p>
+                                                <p className="text-gray-400 text-xs mt-1">{selectedReturnFanbox.address}</p>
+                                              </div>
+                                              <button type="button" onClick={() => openFanboxMap('return')} className="text-cyan-400 hover:text-white text-xs underline font-bold whitespace-nowrap">Modifică</button>
+                                          </div>
+                                        )
+                                    )}
+
+                                  </div>
+                              )}
+                          </div>
+                          
+                          <p className="text-gray-400 text-[10px] mt-4 border-t border-indigo-500/10 pt-3">
+                              🛡️ <strong className="text-white">Siguranță:</strong> Dispozitivul va fi asigurat pe parcursul ambelor transporturi (Coletul tău spre Karix și înapoi spre tine).
+                          </p>
                       </div>
                     )}
 
-                    {/* 👉 Câmpurile standard de adresă sunt ascunse DACĂ se returnează la același FANbox */}
+                    {/* 👉 Câmpurile standard de adresă sunt ascunse DACĂ se returnează și trimite strict prin FANbox */}
                     {!hideStandardAddressFields && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
                         <div className="space-y-2 relative" ref={dropdownRef}>
@@ -782,12 +916,14 @@ export default function Checkout() {
                         </div>
 
                         <div className="md:col-span-2 space-y-2">
-                          <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Adresă exactă</label>
+                          <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">
+                              {cartAnalysis.hasService && cartAnalysis.hasNationalService ? "Adresă Exactă (Pentru metoda Curier)" : "Adresă Exactă"}
+                          </label>
                           <textarea 
                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" 
                             value={shipping.addressDetails} 
                             onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} 
-                            placeholder={serviceDeliveryMethod === "fanbox" && selectedFanbox && !returnToSameFanbox ? "Unde vrei să-ți livrăm echipamentul înapoi?" : "Strada, Număr, Bloc, Apartament..."}
+                            placeholder="Strada, Număr, Bloc, Apartament..." 
                           />
                         </div>
                       </div>
@@ -799,7 +935,7 @@ export default function Checkout() {
                         className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[60px] resize-none placeholder-gray-600 text-sm" 
                         value={shipping.assemblyNotes} 
                         onChange={e => setShipping(s => ({ ...s, assemblyNotes: e.target.value }))} 
-                        placeholder="Detalii suplimentare pentru curier..." 
+                        placeholder="Detalii suplimentare pentru noi / curier..." 
                       />
                     </div>
                   </>
@@ -870,10 +1006,28 @@ export default function Checkout() {
 
                   <div className="flex justify-between text-gray-400 font-medium text-sm items-center">
                     <span>{cartAnalysis.requiresLocalPickup ? "Deplasare Locală" : "Transport Logistică"}</span>
-                    <span className={`font-black text-[10px] uppercase tracking-widest ${shippingCents === 0 ? "text-emerald-400" : "text-white"}`}>
-                      {shippingCents === 0 ? "Gratuit" : `+ ${formatRON(shippingCents)}`}
+                    <span className={`font-black text-[10px] uppercase tracking-widest ${shippingBreakdown.finalShippingCost === 0 ? "text-emerald-400" : "text-white"}`}>
+                      {shippingBreakdown.finalShippingCost === 0 ? "Gratuit" : `+ ${formatRON(shippingBreakdown.finalShippingCost)}`}
                     </span>
                   </div>
+
+                  {/* Arătăm detaliat costurile doar dacă e comandă de service național */}
+                  {cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && (
+                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2 mt-2">
+                         <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
+                            <span>Tur (Către Karix)</span>
+                            <span>{formatRON(shippingBreakdown.sendCost)}</span>
+                         </div>
+                         <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
+                            <span>Retur (Către Tine)</span>
+                            <span>{formatRON(shippingBreakdown.returnCost)}</span>
+                         </div>
+                         <div className="flex justify-between text-indigo-400/70 text-[10px] uppercase font-bold tracking-widest pt-2 border-t border-white/5">
+                            <span>Asigurare Colete ({cartAnalysis.serviceMainCategory === 'console' ? 'Val: 2000 RON' : 'Val: Standard'})</span>
+                            <span>{formatRON(shippingBreakdown.insuranceCost)}</span>
+                         </div>
+                      </div>
+                  )}
 
                   <div className="h-px bg-white/10 w-full my-6" />
                   
