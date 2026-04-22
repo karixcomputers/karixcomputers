@@ -612,4 +612,22 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
   }
 });
 
+// GET: Verificare status comandă (pentru pagina de Success a clienților)
+router.get("/:id/status", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const order = await prisma.order.findUnique({
+      where: { id },
+      select: { status: true, paymentMethod: true } // Extragem strictul necesar din motive de securitate
+    });
+
+    if (!order) return res.status(404).json({ error: "Comanda nu a fost găsită." });
+    
+    res.json(order);
+  } catch (error) {
+    console.error("Eroare fetch status comandă:", error);
+    res.status(500).json({ error: "Eroare internă." });
+  }
+});
+
 export default router;

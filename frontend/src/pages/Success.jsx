@@ -23,7 +23,7 @@ export default function Success() {
 
     const checkPaymentStatus = async () => {
       try {
-        const res = await apiFetch(`/orders/${orderId}`);
+        const res = await apiFetch(`/orders/${orderId}/status`);
         if (!res.ok) {
             setStatus("failed");
             return;
