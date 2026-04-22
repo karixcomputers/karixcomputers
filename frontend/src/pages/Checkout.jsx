@@ -13,6 +13,13 @@ const JUDETE = [
   "Tulcea", "Vaslui", "Vâlcea", "Vrancea"
 ];
 
+const normalizeCounty = (c) => {
+    if(!c) return null;
+    const noDiacritics = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
+    const search = noDiacritics(c);
+    return JUDETE.find(j => noDiacritics(j) === search) || c;
+};
+
 const parseAnafAddress = (rawAddress, judeteList) => {
   if (!rawAddress) return { county: "", city: "", cleanAddress: "" };
   
@@ -139,7 +146,7 @@ export default function Checkout() {
   const appliedCoupon = location.state?.coupon || null;
 
   // 👉 STATE-URI PENTRU FANBOX & CURIER & LOCAL
-  const [isOradeaLocal, setIsOradeaLocal] = useState(false); // Dacă clientul alege varianta F2F deși e serviciu național
+  const [isOradeaLocal, setIsOradeaLocal] = useState(false);
   const [sendMethod, setSendMethod] = useState("courier"); 
   const [returnMethod, setReturnMethod] = useState("courier"); 
   const [selectedSendFanbox, setSelectedSendFanbox] = useState(null);
@@ -158,13 +165,26 @@ export default function Checkout() {
     }
 
     const handleSelectPoint = (e) => {
+      const item = e.detail.item;
       if (mapTarget === 'send') {
-          setSelectedSendFanbox(e.detail.item);
+          setSelectedSendFanbox(item);
           if (returnMethod === "fanbox" && returnToSameFanbox) {
-             setSelectedReturnFanbox(e.detail.item);
+             setSelectedReturnFanbox(item);
           }
       } else if (mapTarget === 'return') {
-          setSelectedReturnFanbox(e.detail.item);
+          setSelectedReturnFanbox(item);
+      }
+
+      // 👉 AUTO-FILL: Setăm automat Județul și Orașul din datele furnizate de hartă
+      const fCounty = item.county || item.county_name || item.countyName || item.judet;
+      const fCity = item.locality || item.locality_name || item.localityName || item.city || item.localitate;
+
+      if (fCounty || fCity) {
+          setShipping(prev => ({
+              ...prev,
+              county: normalizeCounty(fCounty) || prev.county,
+              city: fCity || prev.city
+          }));
       }
     };
 
@@ -232,6 +252,9 @@ export default function Checkout() {
 
   // FLAG PENTRU A DETERMINA DACĂ ARĂTĂM UI-UL DE ORADEA BLOCAT
   const showLocalUI = cartAnalysis.requiresLocalPickup || isOradeaLocal;
+
+  // ASCUNDEM ADRESA EXACTĂ DOAR DACĂ E PREDAT ȘI PRIMIT PRIN FANBOX
+  const hideExactAddress = !showLocalUI && cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && sendMethod === "fanbox" && returnMethod === "fanbox";
 
   useEffect(() => {
     if (showLocalUI) {
@@ -363,7 +386,6 @@ export default function Checkout() {
       return;
     }
 
-    // 👉 VALIDĂRI 
     const isNationalLogisticActive = cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && !isOradeaLocal;
     
     if (isNationalLogisticActive) {
@@ -375,16 +397,19 @@ export default function Checkout() {
              triggerError("Te rugăm să selectezi un FANbox de retur de pe hartă.");
              return;
         }
-        if (sendMethod === "courier" || returnMethod === "courier") {
-            if (!shipping.addressDetails || !shipping.city || !shipping.county) {
-                triggerError("Ai ales o metodă care implică curierul. Te rugăm să completezi județul, orașul și adresa exactă.");
-                return;
-            }
+        
+        if (!shipping.county || !shipping.city) {
+            triggerError("Te rugăm să completezi Județul și Orașul.");
+            return;
+        }
+
+        if (!hideExactAddress && !shipping.addressDetails) {
+            triggerError("Te rugăm să completezi Adresa Exactă pentru curier.");
+            return;
         }
     } else {
-        // Validare pentru PC sau Service F2F
         if (!shipping.addressDetails || !shipping.city || !shipping.county) {
-            triggerError("Te rugăm să completezi adresa completă (Unde ne vedem?).");
+            triggerError("Te rugăm să completezi adresa completă.");
             return;
         }
     }
@@ -449,11 +474,9 @@ export default function Checkout() {
       };
     });
 
-let finalAddressDetails = shipping.addressDetails;
-    let finalCounty = shipping.county;
-    let finalCity = shipping.city;
+    let finalAddressDetails = shipping.addressDetails || "";
     
-    // 👉 Formatare adresă factură & Extragere automată Județ/Oraș din FANbox
+    // 👉 Formatare adresă finală (FĂRĂ să mai stricăm Județul sau Orașul)
     if (cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup) {
         if (isOradeaLocal) {
             finalAddressDetails = `[Preluare/Predare Personală Oradea] - Adresa de contact: ${shipping.addressDetails}`;
@@ -461,12 +484,6 @@ let finalAddressDetails = shipping.addressDetails;
             finalAddressDetails = ""; 
             finalAddressDetails += `[DUS spre Karix]: ${sendMethod === "fanbox" ? `Locker FANbox: ${selectedSendFanbox?.name} (${selectedSendFanbox?.id}) - ${selectedSendFanbox?.address}` : `Curier preia de la adresa: ${shipping.addressDetails}`}`;
             finalAddressDetails += ` | [RETUR spre Client]: ${returnMethod === "fanbox" ? `Locker FANbox: ${selectedReturnFanbox?.name} (${selectedReturnFanbox?.id}) - ${selectedReturnFanbox?.address}` : `Curier livrează la adresa: ${shipping.addressDetails}`}`;
-
-            // 👉 SECRETUL AICI: Dacă am ascuns inputurile de județ, le completăm automat din datele lockerului!
-            if (hideStandardAddressFields && selectedReturnFanbox) {
-                finalCounty = selectedReturnFanbox.county || "București"; 
-                finalCity = selectedReturnFanbox.locality || selectedReturnFanbox.city || "București";
-            }
         }
     }
 
@@ -476,9 +493,7 @@ let finalAddressDetails = shipping.addressDetails;
 
     const orderData = { 
       client: { 
-        ...shipping,
-        county: finalCounty, // Trimitem județul forțat
-        city: finalCity,     // Trimitem orașul forțat
+        ...shipping, 
         addressDetails: finalAddressDetails
       }, 
       cartItems: enrichedItems,
@@ -540,8 +555,6 @@ let finalAddressDetails = shipping.addressDetails;
       setLoading(false);
     }
   };
-
-  const hideStandardAddressFields = !showLocalUI && cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && sendMethod === "fanbox" && returnMethod === "fanbox";
 
   return (
     <>
@@ -674,7 +687,6 @@ let finalAddressDetails = shipping.addressDetails;
                   2. {showLocalUI ? "Locație Preluare Locală" : "Logistică / Livrare"}
                 </h2>
 
-                {/* 👉 OPȚIUNI PENTRU SERVICII NAȚIONALE (ALEGERE LOCAL VS NAȚIONAL) */}
                 {cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && (
                   <div className="flex flex-col sm:flex-row gap-4 mb-8">
                      <button 
@@ -698,7 +710,6 @@ let finalAddressDetails = shipping.addressDetails;
                 )}
 
                 {showLocalUI ? (
-                  // --- UI PENTRU PRELUARE IN ORADEA ---
                   <div className="space-y-6 animate-in fade-in zoom-in duration-300">
                     <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-start gap-3">
                       <span className="text-indigo-400 mt-0.5">📍</span>
@@ -747,12 +758,11 @@ let finalAddressDetails = shipping.addressDetails;
                     </div>
                   </div>
                 ) : (
-                  // --- UI PENTRU CURIER / FANBOX ---
                   <div className="animate-in fade-in zoom-in duration-300">
                     {cartAnalysis.hasService && cartAnalysis.hasNationalService && (
                       <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 mb-6 transition-all space-y-6">
                           
-                          {/* SECTIUNE DUS (De la client la Karix) */}
+                          {/* SECTIUNE DUS */}
                           <div className="space-y-4">
                               <h4 className="text-white font-black text-[11px] uppercase tracking-widest flex items-center gap-2">
                                   <span>📦</span> PAS 1: Cum ne trimiți dispozitivul defect?
@@ -805,7 +815,7 @@ let finalAddressDetails = shipping.addressDetails;
 
                           <div className="h-px bg-white/10 w-full" />
 
-                          {/* SECTIUNE INTORS (De la Karix la client) */}
+                          {/* SECTIUNE INTORS */}
                           <div className="space-y-4">
                               <h4 className="text-white font-black text-[11px] uppercase tracking-widest flex items-center gap-2">
                                   <span>🚚</span> PAS 2: Cum vrei să-ți trimitem dispozitivul reparat?
@@ -895,55 +905,55 @@ let finalAddressDetails = shipping.addressDetails;
                       </div>
                     )}
 
-                    {!hideStandardAddressFields && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-                        <div className="space-y-2 relative" ref={dropdownRef}>
-                          <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
-                          <input 
-                            className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all" 
-                            placeholder="Scrie județul..." 
-                            value={shipping.county} 
-                            onFocus={() => setShowJudete(true)} 
-                            onChange={e => setShipping(s => ({ ...s, county: e.target.value }))} 
-                          />
-                          {showJudete && filteredJudete.length > 0 && (
-                            <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
-                              {filteredJudete.map(j => (
-                                <button 
-                                  key={j} 
-                                  className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" 
-                                  onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}
-                                >
-                                  {j}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                      <div className="space-y-2 relative" ref={dropdownRef}>
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județul Tău (Verifică)</label>
+                        <input 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all" 
+                          placeholder="Scrie județul..." 
+                          value={shipping.county} 
+                          onFocus={() => setShowJudete(true)} 
+                          onChange={e => setShipping(s => ({ ...s, county: e.target.value }))} 
+                        />
+                        {showJudete && filteredJudete.length > 0 && (
+                          <div className="absolute z-50 w-full mt-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl max-h-60 overflow-y-auto custom-scrollbar">
+                            {filteredJudete.map(j => (
+                              <button 
+                                key={j} 
+                                className="w-full text-left px-5 py-4 text-sm text-gray-300 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0" 
+                                onClick={() => { setShipping(s => ({ ...s, county: j })); setShowJudete(false); }}
+                              >
+                                {j}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Oraș</label>
-                          <input 
-                            className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all" 
-                            value={shipping.city} 
-                            onChange={e => setShipping(s => ({ ...s, city: e.target.value }))} 
-                            placeholder="Orașul tău" 
-                          />
-                        </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Orașul Tău (Verifică)</label>
+                        <input 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all" 
+                          value={shipping.city} 
+                          onChange={e => setShipping(s => ({ ...s, city: e.target.value }))} 
+                          placeholder="Orașul tău" 
+                        />
+                      </div>
 
+                      {!hideExactAddress && (
                         <div className="md:col-span-2 space-y-2">
                           <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">
-                              {cartAnalysis.hasService && cartAnalysis.hasNationalService ? "Adresă Exactă (Pentru metoda Curier)" : "Adresă Exactă"}
+                              Adresa Exactă
                           </label>
                           <textarea 
                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" 
                             value={shipping.addressDetails} 
                             onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} 
-                            placeholder={sendMethod === "fanbox" && returnMethod === "fanbox" ? "Unde vrei să ajungă coletele?" : "Strada, Număr, Bloc, Apartament..."}
+                            placeholder="Strada, Număr, Bloc, Apartament..." 
                           />
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     <div className="md:col-span-2 space-y-2 w-full mt-6">
                       <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Note Comandă (Opțional)</label>
@@ -1027,6 +1037,22 @@ let finalAddressDetails = shipping.addressDetails;
                     </span>
                   </div>
 
+                  {cartAnalysis.hasService && cartAnalysis.hasNationalService && !showLocalUI && (
+                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2 mt-2">
+                         <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
+                            <span>Tur (Către Karix)</span>
+                            <span>{formatRON(shippingBreakdown.sendCost)}</span>
+                         </div>
+                         <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
+                            <span>Retur (Către Tine)</span>
+                            <span>{formatRON(shippingBreakdown.returnCost)}</span>
+                         </div>
+                         <div className="flex justify-between text-indigo-400/70 text-[10px] uppercase font-bold tracking-widest pt-2 border-t border-white/5">
+                            <span>Asigurare Colete ({cartAnalysis.serviceMainCategory === 'console' ? 'Val: 2000 RON' : 'Val: Standard'})</span>
+                            <span>{formatRON(shippingBreakdown.insuranceCost)}</span>
+                         </div>
+                      </div>
+                  )}
 
                   <div className="h-px bg-white/10 w-full my-6" />
                   
