@@ -60,7 +60,7 @@ export default function Success() {
     };
 
     checkPaymentStatus();
-  }, [orderId, clearCart]);
+}, [orderId]);
 
   // ECRAN DE ÎNCĂRCARE INTERMEDIAR (Cât comunicăm cu banca)
   if (status === "verifying") {
