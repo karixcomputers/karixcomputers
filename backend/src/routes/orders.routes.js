@@ -309,7 +309,7 @@ router.post("/", requireAuth, async (req, res, next) => {
         return isSrvCategory || hasSrvKeyword;
     });
 
-    const initialStatus = paymentMethod === 'transfer_bancar' ? 'in_asteptare_plata' : 'in_asteptare';
+    const initialStatus = (paymentMethod === 'transfer_bancar' || paymentMethod === 'online') ? 'in_asteptare_plata' : 'in_asteptare';
 
     let fullShippingAddress = [client.addressDetails, client.city, client.county].filter(Boolean).join(", ");
     

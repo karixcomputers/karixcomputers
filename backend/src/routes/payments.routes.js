@@ -83,8 +83,8 @@ const createPayment = async (req, res) => {
         const xml = `<?xml version="1.0" encoding="utf-8"?>
 <order type="card" id="${order.id}" timestamp="${ts}">
     <signature>${process.env.NETOPIA_SIGNATURE}</signature>
-    <url>
-        <return>${escapeXml(process.env.NETOPIA_RETURN_URL)}</return>
+<url>
+        <return>${escapeXml(process.env.NETOPIA_RETURN_URL + "?orderId=" + order.id)}</return>
         <confirm>${escapeXml(process.env.NETOPIA_CONFIRM_URL)}</confirm>
     </url>
     <invoice currency="RON" amount="${amount}">

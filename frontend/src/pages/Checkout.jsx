@@ -526,11 +526,10 @@ export default function Checkout() {
         document.body.appendChild(form);
         form.submit(); 
         return; 
-      } else {
+        } else {
         await notifyDiscord(orderData, appliedCoupon);
         if (clearCart) clearCart();
-        sessionStorage.setItem("orderJustPlaced", "true");
-        nav("/success"); 
+        nav("/success?orderId=" + data.orderId); 
       }
       
     } catch (error) {
