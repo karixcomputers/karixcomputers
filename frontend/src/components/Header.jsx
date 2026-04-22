@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useWishlist } from "../context/WishlistContext.jsx";
+import { formatRON } from "../utils/money"; // Folosim funcția ta de formatare a banilor
 
 /**
  * Componentă pentru elementele de navigare (Desktop și Mobil).
@@ -32,7 +33,7 @@ function Item({ to, children, onClick }) {
  */
 export default function Header() {
   const nav = useNavigate();
-  const { items } = useCart();
+  const { items, totalCents } = useCart();
   const { user, logout } = useAuth();
   const { wishlist } = useWishlist();
 
@@ -43,7 +44,12 @@ export default function Header() {
   const [open, setOpen] = useState(false); // Pentru dropdown-ul "Cont" pe Desktop
   const [mobileOpen, setMobileOpen] = useState(false); // Pentru Drawer-ul (sertarul) de mobil
 
+  // 👉 STATE-URI NOI PENTRU MINI-CART
+  const [miniCartOpen, setMiniCartOpen] = useState(false);
+  const hoverTimerRef = useRef(null);
+
   const menuRef = useRef(null);
+  const cartRef = useRef(null); // Ref pentru containerul coșului
 
   /**
    * Închide toate meniurile deschise (folosit la navigare sau click pe overlay).
@@ -51,6 +57,21 @@ export default function Header() {
   const closeMenus = () => {
     setOpen(false);
     setMobileOpen(false);
+    setMiniCartOpen(false); // Închidem și mini-cart-ul la click
+  };
+
+  // 👉 LOGICĂ PENTRU HOVER-UL COȘULUI (1 Secundă Delay)
+  const handleCartMouseEnter = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    // Setăm un timer de 1 secundă (1000ms)
+    hoverTimerRef.current = setTimeout(() => {
+      setMiniCartOpen(true);
+    }, 1000);
+  };
+
+  const handleCartMouseLeave = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    setMiniCartOpen(false);
   };
 
   /**
@@ -151,15 +172,77 @@ export default function Header() {
                 <span className="text-lg leading-none">❤️</span>
               </Link>
 
-              {/* Coș de cumpărături (Desktop) */}
-              <Link to="/cart" className="relative px-3 py-2 rounded-xl text-[15px] font-medium text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 flex items-center">
-                Coș
-                {count > 0 && (
-                  <span className="ml-2 inline-flex items-center justify-center text-[10px] font-bold h-5 w-5 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500 text-white border border-[#0b1020]">
-                    {count}
-                  </span>
+              {/* 👉 NOU: Container pentru Coș (Desktop) cu evenimente de hover */}
+              <div 
+                className="relative flex" 
+                ref={cartRef}
+                onMouseEnter={handleCartMouseEnter}
+                onMouseLeave={handleCartMouseLeave}
+              >
+                <Link to="/cart" onClick={closeMenus} className="relative px-3 py-2 rounded-xl text-[15px] font-medium text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 flex items-center">
+                  Coș
+                  {count > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center text-[10px] font-bold h-5 w-5 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500 text-white border border-[#0b1020]">
+                      {count}
+                    </span>
+                  )}
+                </Link>
+
+                {/* 👉 NOU: Dropdown MINI-CART */}
+                {miniCartOpen && (
+                  <div className="absolute top-full right-0 mt-4 w-80 rounded-2xl overflow-hidden border border-white/10 bg-[#0b1020]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95 duration-200">
+                    <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
+                       <h3 className="text-white font-black text-xs uppercase tracking-widest">Coșul tău</h3>
+                       <span className="text-gray-400 text-[10px] font-bold">{count} {count === 1 ? 'produs' : 'produse'}</span>
+                    </div>
+                    
+                    {items.length === 0 ? (
+                      <div className="p-8 text-center text-gray-500 text-xs font-bold uppercase tracking-widest italic">
+                        Coșul este gol.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="max-h-64 overflow-y-auto px-4 py-2 custom-scrollbar">
+                           {/* Afișăm primele 3 produse ca să nu facem meniul prea uriaș */}
+                           {items.slice(0, 3).map((item, idx) => (
+                             <div key={idx} className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0">
+                               <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 overflow-hidden flex-shrink-0">
+                                  {item.imageUrl ? (
+                                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-[10px]">📦</div>
+                                  )}
+                               </div>
+                               <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-white truncate" title={item.name}>{item.name}</p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">{item.qty} buc. × {formatRON(item.priceCents)}</p>
+                               </div>
+                             </div>
+                           ))}
+                           {items.length > 3 && (
+                             <p className="text-center text-[10px] text-gray-500 italic mt-2 font-bold">
+                               ... și încă {items.length - 3} {items.length - 3 === 1 ? 'produs' : 'produse'}
+                             </p>
+                           )}
+                        </div>
+                        <div className="p-4 border-t border-white/10 bg-white/5">
+                           <div className="flex justify-between items-end mb-4">
+                             <span className="text-gray-400 text-xs font-bold">Subtotal:</span>
+                             <span className="text-indigo-400 text-lg font-black">{formatRON(totalCents)}</span>
+                           </div>
+                           <Link 
+                             to="/checkout" 
+                             onClick={closeMenus}
+                             className="block w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-center font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-indigo-500/20"
+                           >
+                             Finalizează Comanda
+                           </Link>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
-              </Link>
+              </div>
             </nav>
           </div>
 
@@ -177,7 +260,7 @@ export default function Header() {
                     Cont
                   </button>
                   {open && (
-                    <div className="absolute top-full right-0 mt-3 w-64 rounded-2xl overflow-hidden border border-white/10 bg-[#0b1020]/95 backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                    <div className="absolute top-full right-0 mt-3 w-64 rounded-2xl overflow-hidden border border-white/10 bg-[#0b1020]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95 duration-200">
                       {isAdmin && (
                         <div className="bg-indigo-500/5 border-b border-white/5">
                           <Link to="/admin" onClick={closeMenus} className="block px-5 py-4 text-[13px] font-black uppercase tracking-widest text-indigo-400 hover:bg-indigo-500/10 transition-colors">⚡ Admin Dashboard</Link>
@@ -274,7 +357,6 @@ export default function Header() {
 
               <div className="h-px bg-white/5 my-4" />
 
-              {/* Produse Favorite folosește acum componenta Item pentru un design uniform */}
               <Item to="/wishlist" onClick={closeMenus}>Produse Favorite</Item>
             </nav>
 
@@ -315,6 +397,13 @@ export default function Header() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+      `}</style>
     </>
   );
 }
