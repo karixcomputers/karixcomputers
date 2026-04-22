@@ -34,15 +34,60 @@ export default function Cart() {
   const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  const finalTotal = useMemo(() => {
-    if (!appliedCoupon) return totalCents;
+  // --- ANALIZĂ COȘ PENTRU A DETERMINA TIPUL DE TRANSPORT ---
+  const cartAnalysis = useMemo(() => {
+    const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick', 'upgrade', 'instalare', 'reinstalare', 'windows', 'software', 'bios', 'recuperare', 'asamblare'];
+    
+    let hardwareSubtotal = 0;
+    let hasPC = false;
+    let hasService = false;
+    let requiresLocalPickup = false;
+    
+    items.forEach(item => {
+      const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const isSrv = item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => nameStr.includes(kw)));
+      
+      if (isSrv) {
+        hasService = true;
+        // Dacă e un serviciu care NU are flag-ul de național, forțăm Oradea
+        if (!item.isNationalService) {
+            requiresLocalPickup = true;
+        }
+      } else {
+        hasPC = true;
+        const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
+        let extraWarrantyPrice = 0;
+        if (item.extendedWarranty === 1) extraWarrantyPrice = Math.round(basePrice * 0.09);
+        if (item.extendedWarranty === 2) extraWarrantyPrice = Math.round(basePrice * 0.16);
+        
+        hardwareSubtotal += ((basePrice + extraWarrantyPrice) * parseInt(item.qty || item.quantity || 1, 10));
+      }
+    });
+
+    return { hasPC, hasService, hardwareSubtotal, requiresLocalPickup };
+  }, [items]);
+
+  const discountCents = useMemo(() => {
+    if (!appliedCoupon) return 0;
     if (appliedCoupon.discountType === "percentage") {
-      const discount = totalCents * (appliedCoupon.discountValue / 100);
-      return Math.max(0, totalCents - discount);
-    } else {
-      return Math.max(0, totalCents - appliedCoupon.discountValue);
+      return Math.round(totalCents * (appliedCoupon.discountValue / 100));
     }
-  }, [totalCents, appliedCoupon]);
+    return appliedCoupon.discountValue; 
+  }, [appliedCoupon, totalCents]);
+
+  const shippingCents = useMemo(() => {
+    let cost = 0;
+    if (cartAnalysis.hasPC && cartAnalysis.hardwareSubtotal < 1000 * 100) {
+        cost += 2500; 
+    }
+    // Dacă are serviciu NAȚIONAL (fără necesitate de local), adăugăm taxa de curier
+    if (cartAnalysis.hasService && !cartAnalysis.requiresLocalPickup) {
+        cost += 3000; 
+    }
+    return cost;
+  }, [cartAnalysis]);
+
+  const finalTotalCents = Math.max(0, totalCents - discountCents + shippingCents);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -288,15 +333,26 @@ export default function Cart() {
                                  <span className="text-2xl sm:text-3xl">{isPC ? "🖥️" : "🛠️"}</span>
                               )}
                             </div>
+                            
+                            {/* TEXT MOBIL */}
                             <div className="flex-1 sm:hidden">
-                              <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border mb-1.5 inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
-                                {isPC ? 'Hardware' : 'Service'}
-                              </span>
+                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                  <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
+                                    {isPC ? 'Hardware' : 'Service'}
+                                  </span>
+                                  {/* BADGE LOCAȚIE PE MOBIL */}
+                                  {isService && (
+                                    <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border inline-block ${item.isNationalService ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
+                                      {item.isNationalService ? '🚚 Național' : '📍 Oradea'}
+                                    </span>
+                                  )}
+                              </div>
                               <h3 className="text-sm font-bold text-white tracking-tight italic uppercase leading-tight drop-shadow-md line-clamp-2">
                                 {item.productName || item.name}
                               </h3>
                             </div>
                         </div>
+
                         {isPC && (
                             <div className="mt-2 text-center w-full sm:w-24 px-1">
                                 <span className="inline-block text-[8px] leading-tight font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-1 shadow-sm">
@@ -307,10 +363,20 @@ export default function Cart() {
                       </div>
                       
                       <div className="flex-1 w-full pt-1 overflow-hidden">
+                        {/* TEXT DESKTOP */}
                         <div className="hidden sm:block pr-8">
-                          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border mb-2 inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
-                            {isPC ? 'Hardware' : 'Service'}
-                          </span>
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
+                                {isPC ? 'Hardware' : 'Service'}
+                              </span>
+                              {/* BADGE LOCAȚIE PE DESKTOP */}
+                              {isService && (
+                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border inline-block ${item.isNationalService ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
+                                  {item.isNationalService ? '🚚 Național' : '📍 Doar Oradea'}
+                                </span>
+                              )}
+                          </div>
+                          
                           <h3 className="text-xl font-bold text-white tracking-tight italic uppercase leading-tight drop-shadow-md truncate">
                             {item.productName || item.name}
                           </h3>
@@ -411,6 +477,7 @@ export default function Cart() {
                       <span className="text-gray-400 font-medium italic">Subtotal</span>
                       <span className="font-black italic">{formatRON(totalCents || 0)}</span>
                     </div>
+
                     {appliedCoupon && (
                       <div className="flex justify-between text-sm text-emerald-400 italic">
                         <span>Reducere ({appliedCoupon.code})</span>
@@ -421,6 +488,14 @@ export default function Cart() {
                         </span>
                       </div>
                     )}
+
+                    <div className="flex justify-between text-gray-400 font-medium text-sm items-center">
+                      <span>{cartAnalysis.requiresLocalPickup ? "Preluare Locală (Oradea)" : "Transport Curier"}</span>
+                      <span className={`font-black text-[10px] uppercase tracking-widest ${shippingCents === 0 ? "text-emerald-400" : "text-white"}`}>
+                        {shippingCents === 0 ? "Gratuit" : `+ ${formatRON(shippingCents)}`}
+                      </span>
+                    </div>
+
                     <div className="pt-6 border-t border-white/5">
                       <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3 italic">Cod Reducere / Voucher</p>
                       <div className="flex gap-2">
@@ -450,7 +525,7 @@ export default function Cart() {
                     <div className="h-px bg-white/10 w-full my-6" />
                     <div className="flex justify-between items-baseline gap-2 italic">
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none shrink-0">Total Final</span>
-                      <span className="text-2xl font-black text-white drop-shadow-lg leading-none break-all text-right">{formatRON(finalTotal)}</span>
+                      <span className="text-2xl font-black text-white drop-shadow-lg leading-none break-all text-right">{formatRON(finalTotalCents)}</span>
                     </div>
                   </div>
                   <button
