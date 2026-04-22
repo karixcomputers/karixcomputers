@@ -3,12 +3,8 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useWishlist } from "../context/WishlistContext.jsx";
-import { formatRON } from "../utils/money"; // Folosim funcția ta de formatare a banilor
+import { formatRON } from "../utils/money"; 
 
-/**
- * Componentă pentru elementele de navigare (Desktop și Mobil).
- * Aceasta gestionează starea de "activ" și stilizarea hover.
- */
 function Item({ to, children, onClick }) {
   return (
     <NavLink
@@ -27,57 +23,49 @@ function Item({ to, children, onClick }) {
   );
 }
 
-/**
- * Componenta principală Header a platformei Karix Computers.
- * Include logica de Admin, Cart, Auth, Wishlist și Meniu Mobil cu Slide-in.
- */
 export default function Header() {
   const nav = useNavigate();
   const { items, totalCents } = useCart();
   const { user, logout } = useAuth();
   const { wishlist } = useWishlist();
 
-  // Calculăm numărul total de unități din coș folosind useMemo pentru performanță
   const count = useMemo(() => items.reduce((s, x) => s + x.qty, 0), [items]);
 
-  // State-uri pentru gestionarea vizibilității elementelor de interfață
-  const [open, setOpen] = useState(false); // Pentru dropdown-ul "Cont" pe Desktop
-  const [mobileOpen, setMobileOpen] = useState(false); // Pentru Drawer-ul (sertarul) de mobil
+  const [open, setOpen] = useState(false); 
+  const [mobileOpen, setMobileOpen] = useState(false); 
 
-  // 👉 STATE-URI NOI PENTRU MINI-CART
+  // 👉 STATE-URI ȘI TIMERE PENTRU MINI-CART
   const [miniCartOpen, setMiniCartOpen] = useState(false);
-  const hoverTimerRef = useRef(null);
+  const openTimerRef = useRef(null);
+  const closeTimerRef = useRef(null);
 
   const menuRef = useRef(null);
-  const cartRef = useRef(null); // Ref pentru containerul coșului
 
-  /**
-   * Închide toate meniurile deschise (folosit la navigare sau click pe overlay).
-   */
   const closeMenus = () => {
     setOpen(false);
     setMobileOpen(false);
-    setMiniCartOpen(false); // Închidem și mini-cart-ul la click
-  };
-
-  // 👉 LOGICĂ PENTRU HOVER-UL COȘULUI (1 Secundă Delay)
-  const handleCartMouseEnter = () => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    // Setăm un timer de 1 secundă (1000ms)
-    hoverTimerRef.current = setTimeout(() => {
-      setMiniCartOpen(true);
-    }, 1000);
-  };
-
-  const handleCartMouseLeave = () => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     setMiniCartOpen(false);
   };
 
-  /**
-   * Hook pentru a gestiona închiderea meniului de cont atunci când se dă click
-   * în afara acestuia (util pentru Desktop).
-   */
+  // 👉 LOGICĂ PENTRU HOVER-UL COȘULUI (Pod invizibil + Delay)
+  const handleCartMouseEnter = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current); // Anulăm închiderea dacă ne întoarcem repede
+    if (openTimerRef.current) clearTimeout(openTimerRef.current);
+
+    openTimerRef.current = setTimeout(() => {
+      setMiniCartOpen(true);
+    }, 600); // Se deschide după jumătate de secundă (mai rapid, UX mai bun)
+  };
+
+  const handleCartMouseLeave = () => {
+    if (openTimerRef.current) clearTimeout(openTimerRef.current); 
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+
+    closeTimerRef.current = setTimeout(() => {
+      setMiniCartOpen(false);
+    }, 400); // Așteaptă 400ms înainte să se închidă ca să poți muta mouse-ul pe el
+  };
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (open && menuRef.current && !menuRef.current.contains(event.target)) {
@@ -90,10 +78,6 @@ export default function Header() {
     };
   }, [open]);
 
-  /**
-   * Hook pentru blocarea scroll-ului paginii principale atunci când meniul 
-   * mobil (Slide Drawer) este activ. Previne "leak-ul" de scroll.
-   */
   useEffect(() => {
     if (mobileOpen) {
       document.body.style.overflow = "hidden";
@@ -106,12 +90,8 @@ export default function Header() {
 
   return (
     <>
-      {/* BARA DE NAVIGARE PRINCIPALĂ (Sticky)
-          Are un efect de blur pe fundal (backdrop-blur) pentru aspect premium.
-      */}
       <header className="sticky top-0 z-50 border-b border-white/5 bg-[#0b1020]/80 backdrop-blur-md">
         
-        {/* MOD ADMIN: Afișează scurtături către gestionare dacă userul are permisiuni */}
         {isAdmin && (
           <div className="bg-indigo-600/90 text-white py-1.5 px-6 flex items-center justify-between border-b border-indigo-500/30">
             <div className="flex items-center gap-6 overflow-x-auto no-scrollbar">
@@ -137,7 +117,6 @@ export default function Header() {
 
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           
-          {/* LOGO KARIX COMPUTERS */}
           <div className="flex-1 flex justify-start">
             <Link 
               to="/" 
@@ -156,7 +135,6 @@ export default function Header() {
             </Link>
           </div>
 
-          {/* NAVIGARE DESKTOP: Ascunsă sub pragul de 768px (md) */}
           <div className="flex-[5] hidden md:flex justify-center">
             <nav className="flex items-center gap-0.5 bg-white/5 p-1 rounded-2xl border border-white/5 whitespace-nowrap">
               <Item to="/shop">Sisteme PC</Item>
@@ -167,15 +145,13 @@ export default function Header() {
               
               <div className="w-px h-6 bg-white/10 mx-1" />
 
-              {/* Iconiță Favorite (Desktop) */}
               <Link to="/wishlist" className="px-2.5 py-2 rounded-xl text-[15px] font-medium text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 flex items-center">
                 <span className="text-lg leading-none">❤️</span>
               </Link>
 
-              {/* 👉 NOU: Container pentru Coș (Desktop) cu evenimente de hover */}
+              {/* CONTAINER COȘ CU HOVER */}
               <div 
                 className="relative flex" 
-                ref={cartRef}
                 onMouseEnter={handleCartMouseEnter}
                 onMouseLeave={handleCartMouseLeave}
               >
@@ -188,68 +164,68 @@ export default function Header() {
                   )}
                 </Link>
 
-                {/* 👉 NOU: Dropdown MINI-CART */}
+                {/* DROPDOWN MINI-CART */}
                 {miniCartOpen && (
-                  <div className="absolute top-full right-0 mt-4 w-80 rounded-2xl overflow-hidden border border-white/10 bg-[#0b1020]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95 duration-200">
-                    <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
-                       <h3 className="text-white font-black text-xs uppercase tracking-widest">Coșul tău</h3>
-                       <span className="text-gray-400 text-[10px] font-bold">{count} {count === 1 ? 'produs' : 'produse'}</span>
-                    </div>
-                    
-                    {items.length === 0 ? (
-                      <div className="p-8 text-center text-gray-500 text-xs font-bold uppercase tracking-widest italic">
-                        Coșul este gol.
+                  // Am schimbat mt-4 cu pt-4 (padding) ca să creăm un pod invizibil
+                  <div className="absolute top-full right-0 pt-4 w-80 z-[100]">
+                    <div className="rounded-2xl overflow-hidden border border-white/10 bg-[#0b1020]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95 duration-200">
+                      <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
+                         <h3 className="text-white font-black text-xs uppercase tracking-widest">Coșul tău</h3>
+                         <span className="text-gray-400 text-[10px] font-bold">{count} {count === 1 ? 'produs' : 'produse'}</span>
                       </div>
-                    ) : (
-                      <>
-                        <div className="max-h-64 overflow-y-auto px-4 py-2 custom-scrollbar">
-                           {/* Afișăm primele 3 produse ca să nu facem meniul prea uriaș */}
-                           {items.slice(0, 3).map((item, idx) => (
-                             <div key={idx} className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0">
-                               <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 overflow-hidden flex-shrink-0">
-                                  {item.imageUrl ? (
-                                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-[10px]">📦</div>
-                                  )}
+                      
+                      {items.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500 text-xs font-bold uppercase tracking-widest italic">
+                          Coșul este gol.
+                        </div>
+                      ) : (
+                        <>
+                          <div className="max-h-64 overflow-y-auto px-4 py-2 custom-scrollbar">
+                             {items.slice(0, 3).map((item, idx) => (
+                               <div key={idx} className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0">
+                                 <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 overflow-hidden flex-shrink-0">
+                                    {item.imageUrl ? (
+                                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-[10px]">📦</div>
+                                    )}
+                                 </div>
+                                 <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-white truncate" title={item.name}>{item.name}</p>
+                                    <p className="text-[10px] text-gray-400 mt-0.5">{item.qty} buc. × {formatRON(item.priceCents)}</p>
+                                 </div>
                                </div>
-                               <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-bold text-white truncate" title={item.name}>{item.name}</p>
-                                  <p className="text-[10px] text-gray-400 mt-0.5">{item.qty} buc. × {formatRON(item.priceCents)}</p>
-                               </div>
+                             ))}
+                             {items.length > 3 && (
+                               <p className="text-center text-[10px] text-gray-500 italic mt-2 font-bold">
+                                 ... și încă {items.length - 3} {items.length - 3 === 1 ? 'produs' : 'produse'}
+                               </p>
+                             )}
+                          </div>
+                          <div className="p-4 border-t border-white/10 bg-white/5">
+                             <div className="flex justify-between items-end mb-4">
+                               <span className="text-gray-400 text-xs font-bold">Subtotal:</span>
+                               <span className="text-indigo-400 text-lg font-black">{formatRON(totalCents)}</span>
                              </div>
-                           ))}
-                           {items.length > 3 && (
-                             <p className="text-center text-[10px] text-gray-500 italic mt-2 font-bold">
-                               ... și încă {items.length - 3} {items.length - 3 === 1 ? 'produs' : 'produse'}
-                             </p>
-                           )}
-                        </div>
-                        <div className="p-4 border-t border-white/10 bg-white/5">
-                           <div className="flex justify-between items-end mb-4">
-                             <span className="text-gray-400 text-xs font-bold">Subtotal:</span>
-                             <span className="text-indigo-400 text-lg font-black">{formatRON(totalCents)}</span>
-                           </div>
-                           <Link 
-                             to="/checkout" 
-                             onClick={closeMenus}
-                             className="block w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-center font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-indigo-500/20"
-                           >
-                             Finalizează Comanda
-                           </Link>
-                        </div>
-                      </>
-                    )}
+                             <Link 
+                               to="/checkout" 
+                               onClick={closeMenus}
+                               className="block w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-center font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-indigo-500/20"
+                             >
+                               Finalizează Comanda
+                             </Link>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             </nav>
           </div>
 
-          {/* ACȚIUNI UTILIZATOR ȘI TRIGGER MOBIL */}
           <div className="flex-1 flex justify-end items-center gap-3">
             
-            {/* Buton Cont (Desktop) */}
             <div className="hidden md:block relative" ref={menuRef}>
               {user ? (
                 <>
@@ -280,7 +256,6 @@ export default function Header() {
               )}
             </div>
 
-            {/* COȘ DE CUMPĂRĂTURI (Mobil) - VIZIBIL MEREU LÂNGĂ BURGER */}
             <Link 
               to="/cart"
               onClick={closeMenus}
@@ -294,7 +269,6 @@ export default function Header() {
               )}
             </Link>
 
-            {/* BUTON BURGER (Mobil) - Deschide Slide Drawer-ul */}
             <button 
               onClick={() => setMobileOpen(true)}
               className="md:hidden p-3 rounded-xl bg-white/5 border border-white/10 text-white active:scale-95 transition-all shadow-lg"
@@ -305,7 +279,6 @@ export default function Header() {
         </div>
       </header>
 
-      {/* MENIU MOBIL CU EFECT SLIDE (Sertar lateral) */}
       <div 
         className={`fixed inset-0 z-[100] md:hidden transition-all duration-500 ${
           mobileOpen ? "visible pointer-events-auto" : "invisible pointer-events-none"
