@@ -5,7 +5,7 @@ import { formatRON } from "../utils/money";
 
 export default function AdminInventory() {
   const [products, setProducts] = useState([]);
-  const [availableCases, setAvailableCases] = useState([]); // State pentru toate carcasele din DB
+  const [availableCases, setAvailableCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   
@@ -20,23 +20,20 @@ export default function AdminInventory() {
     benchmarks: [],
     isVisible: true,
     pcgarageWishlistId: "",
-    compatibleCases: [] // <-- NOU: Array pentru a salva ID-urile carcaselor selectate
+    compatibleCases: [],
+    isNationalService: false // <-- NOU: Câmp pentru serviciu național
   });
 
   const [isUploading, setIsUploading] = useState(false);
 
-  // PRELUARE PRODUSE ȘI CARCASE
   const fetchData = async () => {
     try {
-      // Preluăm toate produsele (PC-uri)
       const res = await apiFetch("/products/admin-all");
       if (res.ok) setProducts(await res.json());
 
-      // Preluăm toate carcasele din configurator
       const casesRes = await apiFetch("/adminconfigurator");
       if (casesRes.ok) {
           const items = await casesRes.json();
-          // Păstrăm doar elementele din categoria 'case'
           setAvailableCases(items.filter(item => item.category === 'case'));
       }
     } catch (err) { console.error(err); }
@@ -112,7 +109,6 @@ export default function AdminInventory() {
     setForm({ ...form, benchmarks: newBenches });
   };
 
-  // NOU: Funcție pentru a bifa/debifa o carcasă compatibilă
   const toggleCaseCompatibility = (caseId) => {
       setForm(prev => {
           const isCurrentlySelected = prev.compatibleCases.includes(caseId);
@@ -139,14 +135,15 @@ export default function AdminInventory() {
         ramGb: form.ramGb || null,
         storageGb: form.storageGb || null,
         motherboard: form.motherboard || null,
-        case: form.case || null, // Încă păstrăm numele carcasei default pentru specificații
+        case: form.case || null, 
         cooler: form.cooler || null, 
         psu: form.psu || null,      
         warrantyMonths: form.category === "pc" ? parseInt(form.warrantyMonths, 10) : 0,
         benchmarks: form.benchmarks,
         isVisible: form.isVisible,
         pcgarageWishlistId: (form.category === "pc" && form.pcgarageWishlistId) ? form.pcgarageWishlistId : null,
-        compatibleCases: form.category === "pc" ? form.compatibleCases : [] // Trimitem array-ul
+        compatibleCases: form.category === "pc" ? form.compatibleCases : [],
+        isNationalService: form.category === "service" ? form.isNationalService : false // <-- Trimitem doar dacă e serviciu
       };
 
       const method = editingId ? "PUT" : "POST";
@@ -156,7 +153,7 @@ export default function AdminInventory() {
       if (!res.ok) throw new Error("Eroare la procesare.");
       
       resetForm();
-      fetchData(); // Refresh la tot
+      fetchData(); 
       setStatusModal({ show: true, message: "Inventar actualizat!", type: "success" });
     } catch (err) { 
       setStatusModal({ show: true, message: err.message, type: "error" });
@@ -171,7 +168,8 @@ export default function AdminInventory() {
       benchmarks: [],
       isVisible: true,
       pcgarageWishlistId: "",
-      compatibleCases: []
+      compatibleCases: [],
+      isNationalService: false
     });
     setEditingId(null);
   };
@@ -197,7 +195,8 @@ export default function AdminInventory() {
       benchmarks: p.benchmarks || [],
       isVisible: p.isVisible !== undefined ? p.isVisible : true,
       pcgarageWishlistId: p.pcgarageWishlistId || "",
-      compatibleCases: p.compatibleCases || [] // Preluăm carcasele compatibile din DB
+      compatibleCases: p.compatibleCases || [],
+      isNationalService: p.isNationalService || false // <-- Preluăm starea existentă
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -246,6 +245,22 @@ export default function AdminInventory() {
 
             <input type="number" step="0.01" placeholder="Preț curent (RON)" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500" value={form.priceRon} onChange={e => setForm({...form, priceRon: e.target.value})} required />
             
+            {/* 👉 NOU: OPȚIUNE SERVICIU NAȚIONAL (Apare doar dacă e selectat 'service') */}
+            {form.category === "service" && (
+                <label className="md:col-span-3 flex items-center gap-3 px-4 py-3 cursor-pointer group bg-pink-500/5 rounded-2xl border border-pink-500/20 hover:border-pink-500/40 transition-all">
+                  <input 
+                    type="checkbox" 
+                    checked={form.isNationalService} 
+                    onChange={e => setForm({...form, isNationalService: e.target.checked})}
+                    className="w-5 h-5 rounded border-white/10 bg-white/5 accent-pink-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-pink-400 italic">Disponibil Național (Toată Țara)</span>
+                    <span className="text-[8px] text-gray-400 uppercase font-bold mt-1">Dacă e debifat, acest serviciu va putea fi comandat DOAR din județul Bihor (Oradea).</span>
+                  </div>
+                </label>
+            )}
+
             {form.category === "pc" && (
               <div className="md:col-span-3 bg-indigo-500/5 border border-indigo-500/20 p-4 rounded-2xl flex flex-col md:flex-row items-center gap-4">
                  <div className="flex-1 w-full">
@@ -311,7 +326,6 @@ export default function AdminInventory() {
                 <input type="text" placeholder="Cooler" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.cooler} onChange={e => setForm({...form, cooler: e.target.value})} />
                 <input type="text" placeholder="Sursă (PSU)" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.psu} onChange={e => setForm({...form, psu: e.target.value})} />
 
-                {/* NOU: SELECȚIE CARCASE COMPATIBILE */}
                 <div className="md:col-span-3 mt-4 p-6 rounded-[25px] bg-white/5 border border-white/10">
                     <h4 className="text-white font-black uppercase text-[10px] tracking-widest mb-4">📦 Alege Carcasele Compatibile cu acest PC</h4>
                     {availableCases.length === 0 ? (
@@ -379,12 +393,15 @@ export default function AdminInventory() {
                   {!p.isVisible && (
                     <span className="bg-pink-500/20 text-pink-500 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-pink-500/30">Privat</span>
                   )}
+                  {/* Badge pentru servicii nationale */}
+                  {p.category === 'service' && p.isNationalService && (
+                    <span className="bg-indigo-500/20 text-indigo-400 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-indigo-500/30">Național</span>
+                  )}
                 </div>
                 <p className="text-[11px] text-indigo-400 font-black">{(p.priceCents/100).toFixed(2)} RON <span className="text-gray-600 font-normal ml-2">#{p.id}</span></p>
                 {p.pcgarageWishlistId && (
                   <p className="text-[9px] text-gray-500 font-mono mt-1">🔄 Sync: {p.pcgarageWishlistId}</p>
                 )}
-                {/* Arătăm câte carcase sunt setate pentru produs */}
                 {p.compatibleCases && p.compatibleCases.length > 0 && (
                   <p className="text-[8px] text-indigo-500 font-bold uppercase mt-1">📦 {p.compatibleCases.length} Carcase Compatibile</p>
                 )}

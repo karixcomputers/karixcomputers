@@ -15,6 +15,9 @@ export default function Servicii() {
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
+  // 👉 NOU: State pentru filtru de locație
+  const [locationFilter, setLocationFilter] = useState("all"); // 'all', 'oradea', 'national'
+
   const [isReordering, setIsReordering] = useState(false);
   const [reorderList, setReorderList] = useState([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
@@ -49,13 +52,22 @@ export default function Servicii() {
     fetchServices();
   }, []);
 
+  // 👉 NOU: Filtrarea serviciilor pe baza selecției (pentru modul normal, nu drag&drop)
+  const filteredServices = services.filter(service => {
+      if (locationFilter === 'all') return true;
+      if (locationFilter === 'national') return service.isNationalService === true;
+      if (locationFilter === 'oradea') return !service.isNationalService; // false sau undefined
+      return true;
+  });
+
   const handleAddToCart = (service) => {
     const success = addItem({
       id: service.id,
       productName: service.name, 
       priceCents: service.priceCents, 
       image: getImageUrl(service.images?.[0]), 
-      category: 'service'
+      category: 'service',
+      isNationalService: service.isNationalService // Transmitem asta și în coș, poate va fi util mai târziu
     });
   };
 
@@ -69,6 +81,7 @@ export default function Servicii() {
 
   const toggleReorderMode = () => {
     if (!isReordering) {
+      setLocationFilter("all"); // Resetăm filtrul când intrăm în reorder ca să le vedem pe toate
       setReorderList([...services]); 
     }
     setIsReordering(!isReordering);
@@ -118,7 +131,7 @@ export default function Servicii() {
     <>
       <SEO 
         title="Service & Mentenanță PC, Laptop, Console" 
-        description="Reparații profesionale în Oradea: Curățare praf și schimbare pastă termică PC/Laptop, asamblare calculatoare, reparații console și stick drift controllere. Ridicare gratuită în Oradea!"
+        description="Reparații profesionale în Oradea și național. Curățare praf, asamblare calculatoare, diagnosticare și optimizare. Servicii premium cu acoperire selectivă."
       />
 
       <div className="min-h-screen text-gray-200 relative pt-32 pb-24 px-4 overflow-hidden bg-transparent">
@@ -129,9 +142,33 @@ export default function Servicii() {
             <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-4 drop-shadow-2xl uppercase italic text-center">
               Karix <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">Services</span>
             </h1>
-            <p className="text-base md:text-lg text-gray-300 max-w-2xl mx-auto italic font-medium px-4 drop-shadow-md text-center">
-              Sistemul tău merită tratament de top. Venim noi la tine să-l luăm! <span className="text-indigo-400 block mt-1">(Serviciu valabil exclusiv în județul Bihor)</span>
+            <p className="text-base md:text-lg text-gray-300 max-w-2xl mx-auto italic font-medium px-4 drop-shadow-md text-center mb-10">
+              Sistemul tău merită tratament de top. Alege serviciul dorit.
             </p>
+
+            {/* 👉 NOU: BUTOANE FILTRARE LOCAȚIE */}
+            {!isReordering && services.length > 0 && (
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                    <button 
+                        onClick={() => setLocationFilter('all')} 
+                        className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg border ${locationFilter === 'all' ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                    >
+                        Toate Serviciile
+                    </button>
+                    <button 
+                        onClick={() => setLocationFilter('oradea')} 
+                        className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg border flex items-center gap-2 ${locationFilter === 'oradea' ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-600/20' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                    >
+                        📍 Doar Oradea
+                    </button>
+                    <button 
+                        onClick={() => setLocationFilter('national')} 
+                        className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg border flex items-center gap-2 ${locationFilter === 'national' ? 'bg-pink-600 text-white border-pink-500 shadow-pink-600/20' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                    >
+                        🚚 Toată Țara
+                    </button>
+                </div>
+            )}
           </div>
 
           {user?.role === "admin" && (
@@ -185,8 +222,15 @@ export default function Servicii() {
                                 )}
                               </div>
                               <div className="flex-1">
-                                <h3 className="font-bold text-white uppercase italic tracking-tight">{service.name}</h3>
-                                <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">{formatRON(service.priceCents)}</p>
+                                <div className="flex items-center gap-3">
+                                    <h3 className="font-bold text-white uppercase italic tracking-tight">{service.name}</h3>
+                                    {service.isNationalService ? (
+                                        <span className="text-[8px] bg-pink-500/20 text-pink-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest border border-pink-500/30">Național</span>
+                                    ) : (
+                                        <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest border border-indigo-500/30">Oradea</span>
+                                    )}
+                                </div>
+                                <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest mt-1">{formatRON(service.priceCents)}</p>
                               </div>
                             </div>
                           )}
@@ -201,18 +245,31 @@ export default function Servicii() {
 
           ) : (
             
-            services.length === 0 ? (
+            filteredServices.length === 0 ? (
               <div className="text-center py-20 opacity-50 bg-white/5 backdrop-blur-md rounded-[40px] border border-white/5">
-                <p className="italic">Momentan nu sunt servicii disponibile în catalog.</p>
+                <p className="italic">Nu am găsit servicii pentru acest filtru.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-                {services.map((service) => (
+                {filteredServices.map((service) => (
                   <div 
                     key={service.id}
                     className="flex flex-col p-8 rounded-[32px] bg-white/5 border border-white/10 hover:border-indigo-500/40 transition-all duration-500 group backdrop-blur-md relative overflow-hidden text-center shadow-2xl"
                   >
-                    <div className="h-32 w-32 rounded-2xl flex items-center justify-center mb-6 border bg-white/5 border-white/10 overflow-hidden transition-transform duration-300 group-hover:scale-110 mx-auto shadow-inner">
+                    {/* 👉 NOU: BADGE LOCAȚIE */}
+                    <div className="absolute top-4 left-4 z-20">
+                        {service.isNationalService ? (
+                            <span className="px-3 py-1.5 rounded-xl bg-pink-500/20 backdrop-blur-md text-pink-400 text-[8px] font-black uppercase tracking-widest border border-pink-500/30 flex items-center gap-1 shadow-lg">
+                                🚚 Toată Țara
+                            </span>
+                        ) : (
+                            <span className="px-3 py-1.5 rounded-xl bg-indigo-500/20 backdrop-blur-md text-indigo-300 text-[8px] font-black uppercase tracking-widest border border-indigo-500/30 flex items-center gap-1 shadow-lg">
+                                📍 Doar Oradea
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="h-32 w-32 rounded-2xl flex items-center justify-center mb-6 border bg-white/5 border-white/10 overflow-hidden transition-transform duration-300 group-hover:scale-110 mx-auto shadow-inner mt-4">
                       {service.images && service.images[0] ? (
                         <img 
                           src={getImageUrl(service.images[0])} 
@@ -226,7 +283,7 @@ export default function Servicii() {
                     
                     <h3 className="text-2xl font-black text-white mb-3 tracking-tight italic uppercase drop-shadow-md">{service.name}</h3>
                     <p className="text-gray-300 text-[14px] leading-relaxed mb-6 font-medium">
-                      {service.description || "Asigurăm mentenanță completă și profesională în laboratorul Karix."}
+                      {service.description || "Asigurăm asistență și reparații profesionale la standarde înalte."}
                     </p>
                     
                     <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between">
@@ -255,10 +312,10 @@ export default function Servicii() {
                 <div className="text-6xl drop-shadow-xl animate-in zoom-in duration-500">📍</div>
                 <div className="text-left">
                   <h3 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tighter">
-                    Servicii disponibile exclusiv în <span className="text-indigo-400">Județul Bihor</span>
+                    Asistență locală sau <span className="text-pink-400">Națională</span>
                   </h3>
                   <p className="text-gray-300 font-medium leading-relaxed text-sm md:text-base">
-                    Pentru a asigura calitatea maximă și siguranța echipamentelor, serviciile noastre de mentenanță și asamblare sunt disponibile doar pe plan local. Venim personal să ridicăm echipamentul de la domiciliul tău (din Oradea sau împrejurimi) și ți-l aducem înapoi gata de acțiune.
+                    Anumite servicii (precum mentenanța hardware complexă și asamblarea) sunt disponibile <strong>exclusiv în Oradea / Județul Bihor</strong> pentru a garanta calitatea preluării și a predării. Pentru restul serviciilor (precum consultanța, diagnosticarea remote sau anumite intervenții software), suntem disponibili <strong>pentru toată țara</strong>.
                   </p>
                 </div>
               </div>

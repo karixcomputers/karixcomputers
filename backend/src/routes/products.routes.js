@@ -186,7 +186,8 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
       case: caseBrand, cooler, psu, stock, category, 
       warrantyMonths, benchmarks, isVisible,
       pcgarageWishlistId, sortOrder,
-      compatibleCases // <-- NOU: Array-ul cu carcasele compatibile
+      compatibleCases,
+      isNationalService // <-- NOU: Extragem starea de serviciu national din request
     } = req.body;
 
     const randomId = await generateUniqueProductId();
@@ -214,7 +215,8 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
         isVisible: isVisible !== undefined ? isVisible : true,
         pcgarageWishlistId: pcgarageWishlistId || null,
         sortOrder: sortOrder ? parseInt(sortOrder) : 0,
-        compatibleCases: compatibleCases || [] // <-- Salvăm în DB
+        compatibleCases: compatibleCases || [],
+        isNationalService: isNationalService !== undefined ? isNationalService : false // <-- Salvăm în DB
       },
     });
 
@@ -240,7 +242,8 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
       case: caseBrand, cooler, psu, stock, category, 
       warrantyMonths, benchmarks, isVisible,
       pcgarageWishlistId, sortOrder,
-      compatibleCases // <-- NOU: Array-ul cu carcasele compatibile
+      compatibleCases,
+      isNationalService // <-- NOU: Extragem starea de serviciu national din request
     } = req.body;
 
     const existing = await prisma.product.findUnique({ where: { id } });
@@ -269,7 +272,8 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
         isVisible: isVisible !== undefined ? isVisible : undefined,
         pcgarageWishlistId: pcgarageWishlistId === "" ? null : pcgarageWishlistId,
         sortOrder: sortOrder !== undefined ? parseInt(sortOrder) : undefined,
-        compatibleCases: compatibleCases !== undefined ? compatibleCases : undefined // <-- Actualizăm în DB
+        compatibleCases: compatibleCases !== undefined ? compatibleCases : undefined,
+        isNationalService: isNationalService !== undefined ? isNationalService : undefined // <-- Actualizăm în DB
       },
     });
 
