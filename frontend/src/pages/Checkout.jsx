@@ -138,17 +138,14 @@ export default function Checkout() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const appliedCoupon = location.state?.coupon || null;
 
-  // --- STATE-URI NOI PENTRU FANBOX & CURIER SERVICE NAȚIONAL ---
-  const [sendMethod, setSendMethod] = useState("courier"); // "courier" sau "fanbox" (cum ne trimite clientul)
-  const [returnMethod, setReturnMethod] = useState("courier"); // "courier" sau "fanbox" (cum i-l trimitem înapoi)
-  
+  // 👉 STATE-URI PENTRU FANBOX & CURIER & LOCAL
+  const [isOradeaLocal, setIsOradeaLocal] = useState(false); // Dacă clientul alege varianta F2F deși e serviciu național
+  const [sendMethod, setSendMethod] = useState("courier"); 
+  const [returnMethod, setReturnMethod] = useState("courier"); 
   const [selectedSendFanbox, setSelectedSendFanbox] = useState(null);
   const [selectedReturnFanbox, setSelectedReturnFanbox] = useState(null);
-
-  const [returnToSameFanbox, setReturnToSameFanbox] = useState(true); // Dacă ambele sunt fanbox, dorește retur la același?
-
-  // PENTRU A DESCHIDE HARTA FANBOX
-  const [mapTarget, setMapTarget] = useState(null); // 'send' sau 'return'
+  const [returnToSameFanbox, setReturnToSameFanbox] = useState(true);
+  const [mapTarget, setMapTarget] = useState(null);
 
   useEffect(() => {
     if (!document.getElementById("fanbox-script")) {
@@ -161,10 +158,8 @@ export default function Checkout() {
     }
 
     const handleSelectPoint = (e) => {
-      // Știm care hartă a fost deschisă în funcție de mapTarget
       if (mapTarget === 'send') {
           setSelectedSendFanbox(e.detail.item);
-          // Dacă bifat "retur la același", îl actualizăm automat și pe celălalt
           if (returnMethod === "fanbox" && returnToSameFanbox) {
              setSelectedReturnFanbox(e.detail.item);
           }
@@ -190,7 +185,6 @@ export default function Checkout() {
     }, 100);
   };
 
-
   // --- ANALIZA COȘULUI NOUĂ ---
   const cartAnalysis = useMemo(() => {
     const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick', 'upgrade', 'instalare', 'reinstalare', 'windows', 'software', 'bios', 'recuperare', 'asamblare'];
@@ -201,7 +195,7 @@ export default function Checkout() {
     let hasService = false;
     let requiresLocalPickup = false; 
     let hasNationalService = false; 
-    let serviceMainCategory = "other"; // "console" sau "controller" (Pentru a determina greutatea/asigurarea)
+    let serviceMainCategory = "other";
     
     items.forEach(item => {
       const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -220,9 +214,8 @@ export default function Checkout() {
         if (nameStr.includes('consola') || nameStr.includes('playstation') || nameStr.includes('xbox')) {
             serviceMainCategory = "console";
         } else if (nameStr.includes('stick') || nameStr.includes('drift') || nameStr.includes('controller') || nameStr.includes('maneta')) {
-            if (serviceMainCategory !== "console") serviceMainCategory = "controller"; // Consola primeaza
+            if (serviceMainCategory !== "console") serviceMainCategory = "controller"; 
         }
-
       } else {
         hasPC = true;
         const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
@@ -237,12 +230,14 @@ export default function Checkout() {
     return { hasPC, hasService, hardwareSubtotal, totalServicesInCart, requiresLocalPickup, hasNationalService, serviceMainCategory };
   }, [items]);
 
+  // FLAG PENTRU A DETERMINA DACĂ ARĂTĂM UI-UL DE ORADEA BLOCAT
+  const showLocalUI = cartAnalysis.requiresLocalPickup || isOradeaLocal;
 
   useEffect(() => {
-    if (cartAnalysis.requiresLocalPickup) {
+    if (showLocalUI) {
       setShipping(prev => ({ ...prev, county: "Bihor", city: "Oradea" }));
     }
-  }, [cartAnalysis.requiresLocalPickup]);
+  }, [showLocalUI]);
 
   const triggerError = (message) => {
     setErrorToastMsg(message);
@@ -290,34 +285,30 @@ export default function Checkout() {
     let sendCost = 0;
     let returnCost = 0;
     
-    // Taxă curier pentru PC ieftin (< 1000 RON)
     if (cartAnalysis.hasPC && cartAnalysis.hardwareSubtotal < 1000 * 100) {
         baseShippingCost += 2500; 
     }
     
-    // 👉 Logistică complexă Service Național (Tur-Retur)
-    if (cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup) {
+    // Costuri curier doar dacă E Național ȘI Clientul NU a optat pentru F2F Oradea
+    if (cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && !isOradeaLocal) {
         
-        // 1. CALCUL TRANSPORT TUR (De la client la Karix)
         if (sendMethod === "courier") sendCost = 2000;
         else if (sendMethod === "fanbox") sendCost = 1500;
 
-        // 2. CALCUL TRANSPORT RETUR (De la Karix la client)
         if (returnMethod === "courier") returnCost = 2000;
         else if (returnMethod === "fanbox") returnCost = 1500;
         
-        // 3. CALCUL ASIGURARE (Se aplică doar dacă circulă prin curier/fanbox)
         if (cartAnalysis.serviceMainCategory === "console") {
-            insuranceCost = 2000; // Asigurare de 20 RON pentru valoare declarată de ~2000 RON
+            insuranceCost = 2000; 
         } else if (cartAnalysis.serviceMainCategory === "controller") {
-            insuranceCost = 500; // Asigurare de 5 RON pentru controller
+            insuranceCost = 500; 
         }
     }
     
     const finalShippingCost = baseShippingCost + sendCost + returnCost + insuranceCost;
 
     return { finalShippingCost, sendCost, returnCost, insuranceCost };
-  }, [cartAnalysis, sendMethod, returnMethod]);
+  }, [cartAnalysis, sendMethod, returnMethod, isOradeaLocal]);
 
   const finalTotalCents = Math.max(0, totalCents - discountCents + shippingBreakdown.finalShippingCost);
 
@@ -346,8 +337,8 @@ export default function Checkout() {
         const companyData = data.found[0].date_generale || data.found[0];
         const parsedAddress = parseAnafAddress(companyData.adresa || "", JUDETE);
 
-        const finalCounty = cartAnalysis.requiresLocalPickup ? "Bihor" : (parsedAddress.county || shipping.county);
-        const finalCity = cartAnalysis.requiresLocalPickup ? "Oradea" : (parsedAddress.city || shipping.city);
+        const finalCounty = showLocalUI ? "Bihor" : (parsedAddress.county || shipping.county);
+        const finalCity = showLocalUI ? "Oradea" : (parsedAddress.city || shipping.city);
 
         setShipping(s => ({
           ...s,
@@ -372,10 +363,10 @@ export default function Checkout() {
       return;
     }
 
-    // 👉 VALIDĂRI PENTRU SERVICII NAȚIONALE (FANbox vs Curier)
-    const isNationalService = cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup;
+    // 👉 VALIDĂRI 
+    const isNationalLogisticActive = cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && !isOradeaLocal;
     
-    if (isNationalService) {
+    if (isNationalLogisticActive) {
         if (sendMethod === "fanbox" && !selectedSendFanbox) {
             triggerError("Te rugăm să selectezi un FANbox de predare de pe hartă.");
             return;
@@ -391,9 +382,9 @@ export default function Checkout() {
             }
         }
     } else {
-        // Validare normală (pentru PC sau Service Local)
+        // Validare pentru PC sau Service F2F
         if (!shipping.addressDetails || !shipping.city || !shipping.county) {
-            triggerError("Te rugăm să completezi datele complete de preluare/livrare.");
+            triggerError("Te rugăm să completezi adresa completă (Unde ne vedem?).");
             return;
         }
     }
@@ -460,13 +451,15 @@ export default function Checkout() {
 
     let finalAddressDetails = shipping.addressDetails;
     
-    // 👉 Construim stringul de adresă să conțină logică complexă de curier/fanbox
-    if (isNationalService) {
-        finalAddressDetails = ""; // Rescriem de la zero ca să fie clar pe factură
-        
-        finalAddressDetails += `[DUS spre Karix]: ${sendMethod === "fanbox" ? `Locker FANbox: ${selectedSendFanbox?.name} (${selectedSendFanbox?.id}) - ${selectedSendFanbox?.address}` : `Curier preia de la adresa: ${shipping.addressDetails}`}`;
-        
-        finalAddressDetails += ` | [RETUR spre Client]: ${returnMethod === "fanbox" ? `Locker FANbox: ${selectedReturnFanbox?.name} (${selectedReturnFanbox?.id}) - ${selectedReturnFanbox?.address}` : `Curier livrează la adresa: ${shipping.addressDetails}`}`;
+    // 👉 Formatare adresă factură
+    if (cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup) {
+        if (isOradeaLocal) {
+            finalAddressDetails = `[Preluare/Predare Personală Oradea] - Adresa de contact: ${shipping.addressDetails}`;
+        } else {
+            finalAddressDetails = ""; 
+            finalAddressDetails += `[DUS spre Karix]: ${sendMethod === "fanbox" ? `Locker FANbox: ${selectedSendFanbox?.name} (${selectedSendFanbox?.id}) - ${selectedSendFanbox?.address}` : `Curier preia de la adresa: ${shipping.addressDetails}`}`;
+            finalAddressDetails += ` | [RETUR spre Client]: ${returnMethod === "fanbox" ? `Locker FANbox: ${selectedReturnFanbox?.name} (${selectedReturnFanbox?.id}) - ${selectedReturnFanbox?.address}` : `Curier livrează la adresa: ${shipping.addressDetails}`}`;
+        }
     }
 
     if (shipping.assemblyNotes) {
@@ -482,7 +475,7 @@ export default function Checkout() {
       total: finalTotalCents, 
       shippingCents: shippingBreakdown.finalShippingCost,
       userEmail: user?.email, 
-      pickupType: cartAnalysis.requiresLocalPickup ? "KarixPersonal" : "Courier",
+      pickupType: showLocalUI ? "KarixPersonal" : "Courier",
       paymentMethod: paymentMethod, 
       couponCode: appliedCoupon?.code || null 
     };
@@ -526,7 +519,7 @@ export default function Checkout() {
         document.body.appendChild(form);
         form.submit(); 
         return; 
-        } else {
+      } else {
         await notifyDiscord(orderData, appliedCoupon);
         if (clearCart) clearCart();
         nav("/success?orderId=" + data.orderId); 
@@ -538,9 +531,7 @@ export default function Checkout() {
     }
   };
 
-  // Flag care ne zice dacă ascundem input-urile standard de adresă (Județ/Oraș/Strada)
-  // Le ascundem DOAR DACĂ pe tot traseul (send și return) se folosește strict FANbox.
-  const hideStandardAddressFields = cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && sendMethod === "fanbox" && returnMethod === "fanbox";
+  const hideStandardAddressFields = !showLocalUI && cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && sendMethod === "fanbox" && returnMethod === "fanbox";
 
   return (
     <>
@@ -549,7 +540,6 @@ export default function Checkout() {
         description="Finalizează comanda acum pentru livrare rapidă și suport tehnic de elită."
       />
 
-      {/* DIV PENTRU INITIALIZARE HARTA FANBOX */}
       <div id="fanbox-map-root"></div>
 
       <div className="min-h-screen pt-32 pb-24 px-4 sm:px-6 relative overflow-hidden bg-transparent text-left font-sans">
@@ -671,16 +661,39 @@ export default function Checkout() {
               {/* 2. DETALII PREDARE / LIVRARE */}
               <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
                 <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
-                  2. {cartAnalysis.requiresLocalPickup ? "Locație Preluare Locală" : "Logistică / Livrare"}
+                  2. {showLocalUI ? "Locație Preluare Locală" : "Logistică / Livrare"}
                 </h2>
 
-                {cartAnalysis.requiresLocalPickup ? (
-                  // --- UI PENTRU COMENZI CARE NECESITA PRELUARE IN ORADEA ---
-                  <div className="space-y-6">
+                {/* 👉 OPȚIUNI PENTRU SERVICII NAȚIONALE (ALEGERE LOCAL VS NAȚIONAL) */}
+                {cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && (
+                  <div className="flex flex-col sm:flex-row gap-4 mb-8">
+                     <button 
+                       type="button"
+                       onClick={() => setIsOradeaLocal(false)}
+                       className={`flex-1 p-4 rounded-xl border transition-all text-left ${!isOradeaLocal ? 'bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}
+                     >
+                       <div className="font-black text-sm text-white">🚚 Din țară (Național)</div>
+                       <div className="text-[10px] uppercase tracking-widest mt-1 opacity-70">Trimit prin Curier / FANbox</div>
+                     </button>
+                     
+                     <button 
+                       type="button"
+                       onClick={() => setIsOradeaLocal(true)}
+                       className={`flex-1 p-4 rounded-xl border transition-all text-left ${isOradeaLocal ? 'bg-emerald-500/20 border-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}
+                     >
+                       <div className="font-black text-sm text-white">📍 Sunt din Oradea</div>
+                       <div className="text-[10px] uppercase tracking-widest mt-1 opacity-70">Ne vedem personal (Gratuit)</div>
+                     </button>
+                  </div>
+                )}
+
+                {showLocalUI ? (
+                  // --- UI PENTRU PRELUARE IN ORADEA ---
+                  <div className="space-y-6 animate-in fade-in zoom-in duration-300">
                     <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-start gap-3">
                       <span className="text-indigo-400 mt-0.5">📍</span>
                       <p className="text-xs text-indigo-300 font-medium leading-relaxed">
-                        Ai selectat un serviciu disponibil <strong>exclusiv în Oradea (Bihor)</strong>. Câmpurile de oraș sunt blocate automat. Vom asigura preluarea/predarea echipamentului personal, fără costuri suplimentare.
+                        Ai optat pentru <strong>Predare Personală în Oradea (Bihor)</strong>. Câmpurile de oraș sunt blocate. Vom prelua/preda echipamentul gratuit!
                       </p>
                     </div>
 
@@ -724,11 +737,10 @@ export default function Checkout() {
                     </div>
                   </div>
                 ) : (
-                  // --- UI PENTRU COMENZI STANDARD SAU SERVICE NAȚIONAL ---
-                  <>
-                    {/* 👉 NOU: Dacă avem service național, arătăm opțiunile TUR - RETUR de FANbox vs Curier */}
+                  // --- UI PENTRU CURIER / FANBOX ---
+                  <div className="animate-in fade-in zoom-in duration-300">
                     {cartAnalysis.hasService && cartAnalysis.hasNationalService && (
-                      <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-6 transition-all space-y-6">
+                      <div className="md:col-span-2 p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 mb-6 transition-all space-y-6">
                           
                           {/* SECTIUNE DUS (De la client la Karix) */}
                           <div className="space-y-4">
@@ -802,7 +814,6 @@ export default function Checkout() {
                                     type="button" 
                                     onClick={() => {
                                         setReturnMethod("fanbox");
-                                        // Dacă dă click pe FANbox și deja a selectat unul la DUS, asumăm că îl vrea pe același
                                         if (sendMethod === "fanbox" && selectedSendFanbox) {
                                             setReturnToSameFanbox(true);
                                             setSelectedReturnFanbox(selectedSendFanbox);
@@ -818,7 +829,6 @@ export default function Checkout() {
                               {returnMethod === "fanbox" && (
                                   <div className="p-4 rounded-xl bg-black/40 border border-cyan-500/20 animate-in fade-in zoom-in duration-300">
                                     
-                                    {/* Dacă alege FANbox la dus, îl întrebăm dacă vrea înapoi în același loc */}
                                     {sendMethod === "fanbox" && selectedSendFanbox && (
                                         <label className="flex items-center gap-3 cursor-pointer group mb-4 pb-4 border-b border-white/10">
                                             <div className="relative flex items-center justify-center">
@@ -842,7 +852,6 @@ export default function Checkout() {
                                         </label>
                                     )}
 
-                                    {/* Dacă NU a ales să-l trimită în același FANbox, sau nu are FANbox la dus, arată selecția */}
                                     {(!returnToSameFanbox || sendMethod !== "fanbox") && (
                                         !selectedReturnFanbox ? (
                                           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -876,7 +885,6 @@ export default function Checkout() {
                       </div>
                     )}
 
-                    {/* 👉 Câmpurile standard de adresă sunt ascunse DACĂ se returnează și trimite strict prin FANbox */}
                     {!hideStandardAddressFields && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
                         <div className="space-y-2 relative" ref={dropdownRef}>
@@ -921,13 +929,13 @@ export default function Checkout() {
                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[80px] resize-none placeholder-gray-600" 
                             value={shipping.addressDetails} 
                             onChange={e => setShipping(s => ({ ...s, addressDetails: e.target.value }))} 
-                            placeholder="Strada, Număr, Bloc, Apartament..." 
+                            placeholder={sendMethod === "fanbox" && returnMethod === "fanbox" ? "Unde vrei să ajungă coletele?" : "Strada, Număr, Bloc, Apartament..."}
                           />
                         </div>
                       </div>
                     )}
 
-                    <div className="md:col-span-2 space-y-2 w-full">
+                    <div className="md:col-span-2 space-y-2 w-full mt-6">
                       <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Note Comandă (Opțional)</label>
                       <textarea 
                         className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:border-indigo-500/50 outline-none transition-all min-h-[60px] resize-none placeholder-gray-600 text-sm" 
@@ -936,7 +944,7 @@ export default function Checkout() {
                         placeholder="Detalii suplimentare pentru noi / curier..." 
                       />
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
 
@@ -1003,12 +1011,29 @@ export default function Checkout() {
                   )}
 
                   <div className="flex justify-between text-gray-400 font-medium text-sm items-center">
-                    <span>{cartAnalysis.requiresLocalPickup ? "Deplasare Locală" : "Transport Logistică"}</span>
+                    <span>{showLocalUI ? "Deplasare Locală" : "Transport Logistică"}</span>
                     <span className={`font-black text-[10px] uppercase tracking-widest ${shippingBreakdown.finalShippingCost === 0 ? "text-emerald-400" : "text-white"}`}>
                       {shippingBreakdown.finalShippingCost === 0 ? "Gratuit" : `+ ${formatRON(shippingBreakdown.finalShippingCost)}`}
                     </span>
                   </div>
 
+                  {/* Arătăm detaliat costurile doar dacă e comandă de service național și nu a ales predare locală */}
+                  {cartAnalysis.hasService && cartAnalysis.hasNationalService && !showLocalUI && (
+                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2 mt-2">
+                         <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
+                            <span>Tur (Către Karix)</span>
+                            <span>{formatRON(shippingBreakdown.sendCost)}</span>
+                         </div>
+                         <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
+                            <span>Retur (Către Tine)</span>
+                            <span>{formatRON(shippingBreakdown.returnCost)}</span>
+                         </div>
+                         <div className="flex justify-between text-indigo-400/70 text-[10px] uppercase font-bold tracking-widest pt-2 border-t border-white/5">
+                            <span>Asigurare Colete ({cartAnalysis.serviceMainCategory === 'console' ? 'Val: 2000 RON' : 'Val: Standard'})</span>
+                            <span>{formatRON(shippingBreakdown.insuranceCost)}</span>
+                         </div>
+                      </div>
+                  )}
 
                   <div className="h-px bg-white/10 w-full my-6" />
                   
