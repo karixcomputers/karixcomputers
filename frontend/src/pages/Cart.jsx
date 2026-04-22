@@ -343,7 +343,7 @@ export default function Cart() {
                                   {/* BADGE LOCAȚIE PE MOBIL */}
                                   {isService && (
                                     <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border inline-block ${item.isNationalService ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
-                                      {item.isNationalService ? '🚚 Național' : '📍 Oradea'}
+                                      {item.isNationalService ? '🚚 Toată Țara' : '📍 Oradea'}
                                     </span>
                                   )}
                               </div>
