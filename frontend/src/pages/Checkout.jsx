@@ -138,7 +138,7 @@ export default function Checkout() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const appliedCoupon = location.state?.coupon || null;
 
-  // --- ANALIZA COȘULUI ---
+  // --- ANALIZA COȘULUI NOUĂ ---
   const cartAnalysis = useMemo(() => {
     const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick', 'upgrade', 'instalare', 'reinstalare', 'windows', 'software', 'bios', 'recuperare', 'asamblare'];
     
@@ -146,6 +146,7 @@ export default function Checkout() {
     let totalServicesInCart = 0;
     let hasPC = false;
     let hasService = false;
+    let requiresLocalPickup = false; // Flag pentru blocare pe Oradea/Bihor
     
     items.forEach(item => {
       const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -154,6 +155,11 @@ export default function Checkout() {
       if (isSrv) {
         hasService = true;
         totalServicesInCart += parseInt(item.qty || item.quantity || 1, 10);
+        
+        // Dacă este un serviciu care NU este marcat ca national, forțăm pickup local
+        if (!item.isNationalService) {
+            requiresLocalPickup = true;
+        }
       } else {
         hasPC = true;
         const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
@@ -165,15 +171,15 @@ export default function Checkout() {
       }
     });
 
-    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart };
+    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart, requiresLocalPickup };
   }, [items]);
 
-  // 👉 LOGICĂ NOUĂ: Dacă avem service în coș, forțăm Bihor / Oradea
+  // 👉 Dacă coșul necesită preluare locală (are servicii de Oradea), blocăm județul
   useEffect(() => {
-    if (cartAnalysis.hasService) {
+    if (cartAnalysis.requiresLocalPickup) {
       setShipping(prev => ({ ...prev, county: "Bihor", city: "Oradea" }));
     }
-  }, [cartAnalysis.hasService]);
+  }, [cartAnalysis.requiresLocalPickup]);
 
   const triggerError = (message) => {
     setErrorToastMsg(message);
@@ -217,10 +223,18 @@ export default function Checkout() {
 
   const shippingCents = useMemo(() => {
     let cost = 0;
+    
+    // Taxă curier pentru PC ieftin (< 1000 RON)
     if (cartAnalysis.hasPC && cartAnalysis.hardwareSubtotal < 1000 * 100) {
-        cost += 2500; // Taxă curier pentru PC ieftin
+        cost += 2500; 
     }
-    // Transportul local pentru service este gratuit (0)
+    
+    // Dacă e comandă exclusiv de service, dar e NAȚIONALĂ, adăugăm transport
+    if (cartAnalysis.hasService && !cartAnalysis.requiresLocalPickup) {
+        // Presupunem un cost de 30 RON pentru transportul curier tur-retur la servicii naționale (sau modifică tu valoarea)
+        cost += 3000; 
+    }
+    
     return cost;
   }, [cartAnalysis]);
 
@@ -251,9 +265,9 @@ export default function Checkout() {
         const companyData = data.found[0].date_generale || data.found[0];
         const parsedAddress = parseAnafAddress(companyData.adresa || "", JUDETE);
 
-        // Menținem forțarea pe Bihor/Oradea dacă e comandă de service, indiferent de adresa firmei
-        const finalCounty = cartAnalysis.hasService ? "Bihor" : (parsedAddress.county || shipping.county);
-        const finalCity = cartAnalysis.hasService ? "Oradea" : (parsedAddress.city || shipping.city);
+        // Menținem forțarea pe Bihor/Oradea DOAR dacă e service local obligatoriu
+        const finalCounty = cartAnalysis.requiresLocalPickup ? "Bihor" : (parsedAddress.county || shipping.county);
+        const finalCity = cartAnalysis.requiresLocalPickup ? "Oradea" : (parsedAddress.city || shipping.city);
 
         setShipping(s => ({
           ...s,
@@ -356,7 +370,7 @@ export default function Checkout() {
       total: finalTotalCents, 
       shippingCents: shippingCents,
       userEmail: user?.email, 
-      pickupType: cartAnalysis.hasService ? "KarixPersonal" : "Courier",
+      pickupType: cartAnalysis.requiresLocalPickup ? "KarixPersonal" : "Courier",
       paymentMethod: paymentMethod, 
       couponCode: appliedCoupon?.code || null 
     };
@@ -540,16 +554,16 @@ export default function Checkout() {
               {/* 2. DETALII PREDARE / LIVRARE */}
               <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
                 <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
-                  2. {cartAnalysis.hasService ? "Locație Preluare / Predare" : "Adresă Livrare"}
+                  2. {cartAnalysis.requiresLocalPickup ? "Locație Preluare Locală" : "Adresă Livrare"}
                 </h2>
 
-                {cartAnalysis.hasService ? (
-                  // --- UI PENTRU COMENZI DE SERVICE (FORȚAT BIHOR / ORADEA) ---
+                {cartAnalysis.requiresLocalPickup ? (
+                  // --- UI PENTRU COMENZI CARE NECESITA PRELUARE IN ORADEA ---
                   <div className="space-y-6">
                     <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-start gap-3">
                       <span className="text-indigo-400 mt-0.5">📍</span>
                       <p className="text-xs text-indigo-300 font-medium leading-relaxed">
-                        Serviciile Karix sunt disponibile <strong>exclusiv în Oradea (Bihor)</strong>. Câmpurile de oraș sunt completate automat. Vom asigura preluarea/predarea echipamentului gratuit.
+                        Ai selectat un serviciu disponibil <strong>exclusiv în Oradea (Bihor)</strong>. Câmpurile de oraș sunt blocate automat. Vom asigura preluarea/predarea echipamentului personal.
                       </p>
                     </div>
 
@@ -593,7 +607,7 @@ export default function Checkout() {
                     </div>
                   </div>
                 ) : (
-                  // --- UI PENTRU COMENZI STANDARD DE PC (LIVRARE NAȚIONALĂ) ---
+                  // --- UI PENTRU COMENZI STANDARD (PC SAU SERVICIU NAȚIONAL) ---
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2 relative" ref={dropdownRef}>
                       <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ</label>
@@ -715,7 +729,7 @@ export default function Checkout() {
                   )}
 
                   <div className="flex justify-between text-gray-400 font-medium text-sm items-center">
-                    <span>{cartAnalysis.hasService ? "Deplasare / Preluare Locală" : "Transport Curier"}</span>
+                    <span>{cartAnalysis.requiresLocalPickup ? "Deplasare Locală" : "Transport Curier"}</span>
                     <span className={`font-black text-[10px] uppercase tracking-widest ${shippingCents === 0 ? "text-emerald-400" : "text-white"}`}>
                       {shippingCents === 0 ? "Gratuit" : `+ ${formatRON(shippingCents)}`}
                     </span>
