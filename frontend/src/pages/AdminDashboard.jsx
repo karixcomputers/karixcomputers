@@ -478,8 +478,7 @@ export default function AdminDashboard() {
                            }
                          }
 
-                         // 👉 LOG DEBUG PENTRU CONSOLĂ
-                         console.log("Specs pt", item.productName, ":", safeSpecs);
+                        
 
                          return (
                             <div key={item.id} className={`p-6 rounded-[25px] border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 transition-all group backdrop-blur-md ${
