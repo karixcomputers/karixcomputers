@@ -54,6 +54,7 @@ import AdminCoupons from "./pages/AdminCoupons";
 import ProductDetails from "./pages/ProductDetails"; 
 import AdminReviews from "./pages/AdminReviews";
 import AdminConfigurator from "./pages/AdminConfigurator.jsx";
+import Failed from "./pages/Failed";
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
@@ -93,6 +94,7 @@ export default function App() {
                 <Route path="/wishlist" element={<Wishlist />} />
                 <Route path="/configurator" element={<Configurator />} />
                 <Route path="/product/:id" element={<ProductDetails />} />
+                <Route path="/failed" element={<Failed />} />
 
                 {/* Rute Legale */}
                 <Route path="/terms" element={<Terms />} />

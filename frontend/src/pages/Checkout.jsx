@@ -524,7 +524,6 @@ export default function Checkout() {
         form.appendChild(dataInput);
 
         document.body.appendChild(form);
-        sessionStorage.setItem("orderJustPlaced", "true");
         form.submit(); 
         return; 
       } else {

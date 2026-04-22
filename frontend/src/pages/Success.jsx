@@ -29,8 +29,9 @@ export default function Success() {
   }, [isValid, clearCart]);
 
   // Metoda NATIVĂ și sigură din React Router pentru a redirecționa intrusii
-  if (!isValid) {
-    return <Navigate to="/" replace />;
+if (!isValid) {
+    // Dacă nu a venit printr-un flux curat (ex. a picat Netopia), trimite-l spre Error Page
+    return <Navigate to="/failed" replace />;
   }
 
   return (
