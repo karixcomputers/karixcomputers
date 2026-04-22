@@ -1011,23 +1011,6 @@ export default function Checkout() {
                     </span>
                   </div>
 
-                  {/* Arătăm detaliat costurile doar dacă e comandă de service național */}
-                  {cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && (
-                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2 mt-2">
-                         <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                            <span>Tur (Către Karix)</span>
-                            <span>{formatRON(shippingBreakdown.sendCost)}</span>
-                         </div>
-                         <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                            <span>Retur (Către Tine)</span>
-                            <span>{formatRON(shippingBreakdown.returnCost)}</span>
-                         </div>
-                         <div className="flex justify-between text-indigo-400/70 text-[10px] uppercase font-bold tracking-widest pt-2 border-t border-white/5">
-                            <span>Asigurare Colete ({cartAnalysis.serviceMainCategory === 'console' ? 'Val: 2000 RON' : 'Val: Standard'})</span>
-                            <span>{formatRON(shippingBreakdown.insuranceCost)}</span>
-                         </div>
-                      </div>
-                  )}
 
                   <div className="h-px bg-white/10 w-full my-6" />
                   

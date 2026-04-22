@@ -190,11 +190,10 @@ router.patch("/:id/cancel", requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// 6. PATCH: Status Update Granular (ITEM STATUS) - Generare AWB Livrare
+// 6. PATCH: Status Update Granular (ITEM STATUS) - Generare AWB Livrare (RETUR CĂTRE CLIENT)
 router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { itemId } = req.params;
-    // 👉 Preluăm declaredValue din body (poate fi null dacă nu e completat)
     const { status, awb, weight, packages, insurance, forceFanbox, declaredValue } = req.body; 
 
     const currentItem = await prisma.orderItem.findUnique({
@@ -209,17 +208,26 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
 
     const rawOrderAddress = order.shippingAddress || "";
     const isOradea = normalizeTxt(rawOrderAddress).includes('oradea') && order.pickupType === "KarixPersonal";
-
+    
+    // 👉 REZOLVARE EROARE 500: Asigurăm transmiterea corectă a parametrilor opționali către FAN Courier
     if (status === 'predat_curier' && !generatedAwb) {
         if (!isOradea) {
             try {
-                // 👉 Trimitem și declaredValue mai departe
+                const safeWeight = weight ? parseFloat(weight) : 1;
+                const safePackages = packages ? parseInt(packages, 10) : 1;
+                
                 generatedAwb = await createFanAWB(
-                    order, false, weight || 1, packages || 1, insurance || false, forceFanbox || false, declaredValue
+                    order, 
+                    false, // isReverse (e retur catre client, deci normal AWB = false)
+                    safeWeight, 
+                    safePackages, 
+                    insurance || false, 
+                    forceFanbox || false, 
+                    declaredValue
                 );
             } catch (awbError) {
-                console.error("❌ Eroare auto-generare AWB:", awbError);
-                return res.status(500).json({ error: awbError.message || "Eroare generare AWB" });
+                console.error("❌ Eroare auto-generare AWB (Retur Către Client):", awbError);
+                return res.status(500).json({ error: awbError.message || "Eroare generare AWB din cauza adresei sau datelor FAN Courier." });
             }
         }
     }
@@ -350,7 +358,6 @@ router.post("/", requireAuth, async (req, res, next) => {
               priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
               status: isServiceItem ? "in_asteptare_ridicare" : initialStatus,
               warrantyMonths: item.warrantyMonths ? parseInt(item.warrantyMonths) : (isServiceItem ? 0 : 24),
-              // 👉 AICI ESTE REZOLVAREA EROARII (Salvăm specificațiile în baza de date!)
               specs: item.specs || null
             };
           })
@@ -528,7 +535,7 @@ router.get("/:id/invoice", requireAuth, async (req, res, next) => {
   }
 });
 
-// 9. POST: Confirmare Plată OP (Admin)
+// 9. POST: Confirmare Plată OP (Admin) -> GENEREAZĂ AWB INVERS AICI LA CONFIRMARE
 router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -553,14 +560,35 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
     const hasAssembly = order.items.some(item => normalizeTxt(item.productName).includes("asamblare"));
 
     const rawOrderAddress = order.shippingAddress || "";
-    const isFanbox = order.serviceDeliveryMethod === "fanbox" || normalizeTxt(rawOrderAddress).includes("fanbox");
-    const isOradea = !isFanbox && normalizeTxt(rawOrderAddress).includes("oradea");
+    // Presupunem că e FANBox de ridicare (TUR) dacă textul include "fanbox" sau "locker" pe la "DUS spre Karix"
+    const isFanboxPickup = normalizeTxt(rawOrderAddress).includes("locker") || normalizeTxt(rawOrderAddress).includes("fanbox");
+    const isOradea = !isFanboxPickup && normalizeTxt(rawOrderAddress).includes("oradea");
 
     let reverseAwb = null;
+    
+    // 👉 REZOLVARE EROARE 500 LA AWB INVERS (De la client la Service)
     if (hasService && !isOradea && !hasAssembly) {
         try {
             console.log(`🔄 Generare AWB Invers (Ridicare de la client) pentru comanda #${order.id}`);
-            reverseAwb = await createReverseFanAWB(order); 
+            
+            // Extragem greutatea și valoarea bazată pe produsul din comandă
+            let declaredValue = 500; // Valoare default
+            let weight = 2; // Default
+            
+            const firstServiceItem = order.items.find(i => serviceKeywordsArray.some(kw => normalizeTxt(i.productName).includes(kw)));
+            if (firstServiceItem) {
+                const nameStr = normalizeTxt(firstServiceItem.productName);
+                if (nameStr.includes("consola") || nameStr.includes("playstation") || nameStr.includes("xbox")) {
+                    declaredValue = 2000;
+                    weight = 4;
+                } else if (nameStr.includes("controller") || nameStr.includes("maneta") || nameStr.includes("drift") || nameStr.includes("hall")) {
+                    declaredValue = 250;
+                    weight = 1;
+                }
+            }
+
+            reverseAwb = await createReverseFanAWB(order, weight, 1, true, isFanboxPickup, declaredValue); 
+            
         } catch (e) {
             console.error("⚠️ Eroare generare AWB Invers:", e.message);
         }
@@ -594,7 +622,7 @@ router.post("/:id/confirm-transfer", requireAuth, requireAdmin, async (req, res,
         const mailData = {
             customerName: order.shippingName,
             orderId: order.id,
-            isFanbox: isFanbox,
+            isFanbox: isFanboxPickup,
             isOradea: isOradea,
             reverseAwb: reverseAwb
         };
