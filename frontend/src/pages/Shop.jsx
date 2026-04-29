@@ -93,16 +93,17 @@ export default function Shop() {
         
         const initialSelections = {};
         onlyPcs.forEach(pc => {
-            // SETĂM CARCASA DEFAULT PE BAZA CELOR COMPATIBILE (Sau null dacă nu are niciuna setată)
             let defaultCaseId = null;
             if (pc.compatibleCases && pc.compatibleCases.length > 0) {
-                // Verificăm dacă primul ID chiar există în lista de carcase generale din DB
                 const firstValidCase = fetchedCases.find(c => c.id === pc.compatibleCases[0]);
                 if(firstValidCase) defaultCaseId = firstValidCase.id;
             }
 
+            // 👉 NOU: Preluăm valoarea default din baza de date pentru memorie (sau 1TB fallback)
+            const baseStorage = pc.storageGb || "1TB";
+
             initialSelections[pc.id] = { 
-                storage: "1TB", 
+                storage: baseStorage, 
                 caseId: defaultCaseId
             };
         });
@@ -291,6 +292,38 @@ export default function Shop() {
           ...prev,
           [pcId]: { ...prev[pcId], [type]: val }
       }));
+  };
+
+  // 👉 FUNCȚIE AJUTĂTOARE PENTRU A GENERA OPȚIUNILE DE STOCARE DINAMIC
+  const getStorageOptions = (baseStorage) => {
+      // Dacă valoarea de bază e completată aiurea (sau deloc), facem fallback
+      const base = baseStorage || "1TB";
+
+      // Definim lista completă de variante și prețul lor "teoretic" ca valoare pe unitate
+      // Presupunem că salturile de cost sunt: 512->1TB (+250RON), 1TB->2TB (+500RON), 1TB->4TB (+1750RON) etc.
+      const storageList = [
+          { value: "512GB", label: "512 GB NVMe M.2", cost: 0 },
+          { value: "1TB", label: "1 TB NVMe M.2", cost: 250 },
+          { value: "2TB", label: "2 TB NVMe M.2", cost: 750 },
+          { value: "4TB", label: "4 TB NVMe M.2", cost: 2000 }
+      ];
+
+      // Găsim cât "valorează" opțiunea de bază
+      const baseItem = storageList.find(s => s.value === base) || storageList[1];
+      const baseCost = baseItem.cost;
+
+      // Generăm lista finală: Arătăm doar opțiunea de bază și cele superioare
+      return storageList
+          .filter(s => s.cost >= baseCost)
+          .map(s => {
+              const diff = s.cost - baseCost;
+              return {
+                  value: s.value,
+                  label: s.value === base ? `${s.label} (Bază)` : `${s.label} (Upgrade)`,
+                  extraCents: diff * 100, // pentru calcul
+                  extraText: diff > 0 ? `+${diff} RON` : 0 // pentru afisare
+              };
+          });
   };
 
   if (loading) return (
@@ -514,42 +547,36 @@ export default function Shop() {
                 {filteredAndSortedPcs.map((pc) => {
                   const isCompared = compareList.find(c => c.id === pc.id);
                   
-                  // LOGICĂ PREȚ ȘI STOCARE CUSTOM (1TB Default, +2TB, +4TB)
-                  const selectedStorage = customSelections[pc.id]?.storage || "1TB";
-                  let storageAddedPrice = 0;
+                  // 👉 NOU: Preluăm opțiunile dinamice de stocare pe baza PC-ului curent
+                  const dynamicStorageOptions = getStorageOptions(pc.storageGb);
+                  const selectedStorage = customSelections[pc.id]?.storage || pc.storageGb || "1TB";
                   
-                  if (selectedStorage === "2TB") {
-                      storageAddedPrice = 500 * 100;
-                  } else if (selectedStorage === "4TB") {
-                      storageAddedPrice = 1750 * 100;
-                  }
-
-                  // 👉 FILTRARE: DOAR CARCASELE COMPATIBILE PENTRU ACEST PC
+                  // Găsim prețul suplimentar din lista noastră calculată
+                  const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
+                  const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
+                  
+                  // FILTRARE: DOAR CARCASELE COMPATIBILE PENTRU ACEST PC
                   const pcCompatibleCases = availableCases.filter(c => pc.compatibleCases?.includes(c.id));
 
-                  // Setăm ID-ul carcasei selectate (sau prima din lista celor compatibile)
                   const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
-                  let caseAddedPrice = 0;
+                  let caseAddedPriceCents = 0;
                   let selectedCaseObj = null;
 
                   if (selectedCaseId && pcCompatibleCases.length > 0) {
                       selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId);
                       if (selectedCaseObj) {
-                          caseAddedPrice = selectedCaseObj.price || 0; 
+                          caseAddedPriceCents = selectedCaseObj.price || 0; 
                       } else {
-                          // Dacă dintr-un motiv anume ID-ul nu s-a găsit în cele compatibile, selectăm default prima opțiune validă
                           selectedCaseObj = pcCompatibleCases[0];
-                          caseAddedPrice = selectedCaseObj.price || 0;
+                          caseAddedPriceCents = selectedCaseObj.price || 0;
                       }
                   }
 
-                  // CALCUL PREȚ TOTAL 
-                  const currentPriceCents = (pc.priceCents || 0) + storageAddedPrice + caseAddedPrice;
+                  // CALCUL PREȚ TOTAL
+                  const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
 
-                  // Construim stringul final pentru stocare ca să apară în coș corect
-                  let finalStorageText = pc.storageGb || "N/A";
-                  if (selectedStorage === "2TB") finalStorageText = "2TB NVMe M.2 (Upgrade)";
-                  if (selectedStorage === "4TB") finalStorageText = "4TB NVMe M.2 (Upgrade)";
+                  // Textul final de stocare care ajunge în coș
+                  const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
 
                   let finalCaseText = pc.case || "N/A";
                   if (selectedCaseObj) finalCaseText = selectedCaseObj.name;
@@ -665,7 +692,6 @@ export default function Shop() {
                         </div>
                       </div>
 
-                      {/* 👉 OPTIUNEA DE CARCASĂ FILTRATĂ DOAR CU CELE COMPATIBILE */}
                       {pcCompatibleCases.length > 0 && (
                           <div className="mt-2 mb-4 p-4 rounded-[20px] bg-white/5 border border-white/10">
                               <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Alege Carcasa</span>
@@ -693,14 +719,11 @@ export default function Shop() {
                           </div>
                       )}
 
+                      {/* 👉 AICI AFISĂM MEMORIILE DINAMICE */}
                       <div className="mt-2 mb-6 p-4 rounded-[20px] bg-white/5 border border-white/10">
                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">💾 Memorie Stocare</span>
                           <div className="flex flex-col gap-2">
-                              {[
-                                  { label: "1 TB NVMe M.2", value: "1TB", extra: 0 },
-                                  { label: "2 TB NVMe M.2", value: "2TB", extra: "+500 RON" },
-                                  { label: "4 TB NVMe M.2", value: "4TB", extra: "+1.750 RON" }
-                              ].map(option => (
+                              {dynamicStorageOptions.map(option => (
                                   <button
                                       key={option.value}
                                       onClick={() => updateSelection(pc.id, 'storage', option.value)}
@@ -712,7 +735,7 @@ export default function Shop() {
                                           </div>
                                           <span>{option.label}</span>
                                       </div>
-                                      {option.extra !== 0 && <span className="text-indigo-300">{option.extra}</span>}
+                                      {option.extraText !== 0 && <span className="text-indigo-300">{option.extraText}</span>}
                                   </button>
                               ))}
                           </div>
@@ -835,34 +858,33 @@ export default function Shop() {
                     
                     <button 
                       onClick={() => { 
-                        const selectedStorage = customSelections[pc.id]?.storage || "1TB";
-                        let storageAddedPrice = 0;
-                        if (selectedStorage === "2TB") storageAddedPrice = 500 * 100;
-                        if (selectedStorage === "4TB") storageAddedPrice = 1750 * 100;
+                        // Când adaugi din modalul de comparare, luăm iar selecțiile dinamice
+                        const dynamicStorageOptions = getStorageOptions(pc.storageGb);
+                        const selectedStorage = customSelections[pc.id]?.storage || pc.storageGb || "1TB";
+                        const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
+                        const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
                         
                         const pcCompatibleCases = availableCases.filter(c => pc.compatibleCases?.includes(c.id));
                         const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
-                        let caseAddedPrice = 0;
+                        let caseAddedPriceCents = 0;
                         let selectedCaseObj = null;
 
                         if (selectedCaseId && pcCompatibleCases.length > 0) {
                             selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId);
                             if (selectedCaseObj) {
-                                caseAddedPrice = selectedCaseObj.price || 0; 
+                                caseAddedPriceCents = selectedCaseObj.price || 0; 
                             } else {
                                 selectedCaseObj = pcCompatibleCases[0];
-                                caseAddedPrice = selectedCaseObj.price || 0;
+                                caseAddedPriceCents = selectedCaseObj.price || 0;
                             }
                         }
 
-                        let finalStorageText = pc.storageGb || "N/A";
-                        if (selectedStorage === "2TB") finalStorageText = "2TB NVMe M.2 (Upgrade)";
-                        if (selectedStorage === "4TB") finalStorageText = "4TB NVMe M.2 (Upgrade)";
+                        const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
                         
                         let finalCaseText = pc.case || "N/A";
                         if (selectedCaseObj) finalCaseText = selectedCaseObj.name;
 
-                        const currentPriceCents = (pc.priceCents || 0) + storageAddedPrice + caseAddedPrice;
+                        const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
 
                         const success = addItem({
                           id: pc.id,

@@ -25,7 +25,7 @@ export default function ProductDetails() {
   const [activeSection, setActiveSection] = useState("Detalii");
   
   // --- STATE-URI PENTRU CONFIGURATOR ---
-  const [selectedStorage, setSelectedStorage] = useState("1TB");
+  const [selectedStorage, setSelectedStorage] = useState("1TB"); // Se va suprascrie imediat la fetch
   const [selectedCaseId, setSelectedCaseId] = useState(null);
   const [availableCases, setAvailableCases] = useState([]);
 
@@ -114,7 +114,6 @@ export default function ProductDetails() {
       try {
         const cleanId = id.split(":")[0];
         
-        // 1. Aducem carcasele disponibile (toate)
         const casesRes = await apiFetch("/adminconfigurator");
         let fetchedCases = [];
         if (casesRes.ok) {
@@ -123,16 +122,15 @@ export default function ProductDetails() {
           setAvailableCases(fetchedCases);
         }
 
-        // 2. Aducem detaliile PC-ului
         const pcRes = await apiFetch(`/products/${cleanId}`);
         if (pcRes.ok) {
             const pcData = await pcRes.json();
             setProduct(pcData);
             
-            // Setăm stocarea de bază
-            setSelectedStorage(pcData.storageGb || "1TB");
+            // 👉 NOU: Preluăm valoarea de bază din produs
+            const baseStorage = pcData.storageGb || "1TB";
+            setSelectedStorage(baseStorage);
             
-            // Setăm carcasa default DOAR din cele compatibile
             let defaultCaseId = null;
             if (pcData.compatibleCases && pcData.compatibleCases.length > 0) {
                 const firstValidCase = fetchedCases.find(c => c.id === pcData.compatibleCases[0]);
@@ -146,20 +144,35 @@ export default function ProductDetails() {
     fetchData();
   }, [id]);
 
-  // --- LOGICĂ STOCARE (Limitare și Prețuri) ---
+  // --- LOGICĂ STOCARE DINAMICĂ ---
   const storageOptions = useMemo(() => {
       if (!product) return [];
       
-      const baseCapacity = extractStorageCapacity(product.storageGb);
-      
-      const allOptions = [
-          { label: "1 TB NVMe M.2", value: "1TB", extraPrice: 0, capacity: 1024 },
-          { label: "2 TB NVMe M.2", value: "2TB", extraPrice: 50000, capacity: 2048 },
-          { label: "4 TB NVMe M.2", value: "4TB", extraPrice: 175000, capacity: 4096 }
+      const base = product.storageGb || "1TB";
+
+      // Definim lista completă de variante și costul lor absolut pe piață
+      const storageList = [
+          { value: "512GB", label: "512 GB NVMe M.2", cost: 0 },
+          { value: "1TB", label: "1 TB NVMe M.2", cost: 250 },
+          { value: "2TB", label: "2 TB NVMe M.2", cost: 750 },
+          { value: "4TB", label: "4 TB NVMe M.2", cost: 2000 }
       ];
 
-      // Returnăm doar opțiunile care sunt mai mari sau egale cu ce are deja PC-ul
-      return allOptions.filter(opt => opt.capacity >= baseCapacity);
+      const baseItem = storageList.find(s => s.value === base) || storageList[1];
+      const baseCost = baseItem.cost;
+
+      // Filtrăm opțiunile inferioare valorii de bază și calculăm diferența de preț
+      return storageList
+          .filter(s => s.cost >= baseCost)
+          .map(s => {
+              const diff = s.cost - baseCost;
+              return {
+                  value: s.value,
+                  label: s.value === base ? `${s.label} (Bază)` : `${s.label} (Upgrade)`,
+                  extraCents: diff * 100, // Cents pentru totalul din cos
+                  extraText: diff > 0 ? `+${diff} RON` : 0 // Text afisare in meniu
+              };
+          });
   }, [product]);
 
   // --- FILTRARE CARCASE COMPATIBILE ---
@@ -174,8 +187,8 @@ export default function ProductDetails() {
       
       let storageAddedPrice = 0;
       const selectedStorageOpt = storageOptions.find(o => o.value === selectedStorage);
-      if (selectedStorageOpt && selectedStorageOpt.value !== product.storageGb) {
-          storageAddedPrice = selectedStorageOpt.extraPrice;
+      if (selectedStorageOpt) {
+          storageAddedPrice = selectedStorageOpt.extraCents;
       }
 
       let caseAddedPrice = 0;
@@ -187,14 +200,16 @@ export default function ProductDetails() {
       return (product.priceCents || 0) + storageAddedPrice + caseAddedPrice;
   }, [product, selectedStorage, selectedCaseId, pcCompatibleCases, storageOptions]);
 
-  // Determinam textele finale pentru Cos
+  // Text final pentru stocare folosit la adăugarea în coș și in Specificatii
   const finalStorageText = useMemo(() => {
       if (!product) return "N/A";
-      if (selectedStorage === product.storageGb) return product.storageGb;
-      if (selectedStorage === "2TB") return "2TB NVMe M.2 (Upgrade)";
-      if (selectedStorage === "4TB") return "4TB NVMe M.2 (Upgrade)";
+      const selectedOpt = storageOptions.find(o => o.value === selectedStorage);
+      if (selectedOpt) {
+          // Dacă e opțiunea de bază, afișăm simplu. Dacă e upgrade, afișăm label-ul complet (ex: 2TB NVMe (Upgrade))
+          return selectedOpt.value === product.storageGb ? product.storageGb : selectedOpt.label;
+      }
       return selectedStorage;
-  }, [selectedStorage, product]);
+  }, [selectedStorage, product, storageOptions]);
 
   const finalCaseText = useMemo(() => {
       if (!product) return "N/A";
@@ -396,7 +411,6 @@ export default function ProductDetails() {
               {/* --- CONFIGURATOR ÎN PAGINA PRODUSULUI --- */}
               <div className="flex flex-col gap-6 pt-6 border-t border-white/5">
                 
-                {/* SELECTARE CARCASĂ (Filtrată după compatibilitate) */}
                 {pcCompatibleCases.length > 0 && (
                   <div className="p-4 rounded-[20px] bg-white/5 border border-white/10">
                     <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Schimbă Carcasa</span>
@@ -423,7 +437,7 @@ export default function ProductDetails() {
                   </div>
                 )}
 
-                {/* SELECTARE STOCARE (Limitat la capacitate mai mare sau egală) */}
+                {/* SELECTARE STOCARE DINAMICĂ */}
                 {storageOptions.length > 1 && (
                   <div className="p-4 rounded-[20px] bg-white/5 border border-white/10">
                     <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">💾 Upgrade Stocare</span>
@@ -442,7 +456,7 @@ export default function ProductDetails() {
                                         </div>
                                         <span>{option.label}</span>
                                     </div>
-                                    {option.extraPrice !== 0 && <span className="text-indigo-300">+{formatRON(option.extraPrice)}</span>}
+                                    {option.extraText !== 0 && <span className="text-indigo-300">{option.extraText}</span>}
                                 </button>
                             );
                         })}
@@ -512,7 +526,7 @@ export default function ProductDetails() {
                   <div className="absolute -top-10 -right-10 text-[15rem] opacity-[0.03] rotate-12 group-hover:rotate-0 transition-transform duration-1000">🚚</div>
                   <div className="max-w-3xl space-y-8 relative z-10">
                       <h2 className="text-4xl font-black italic uppercase tracking-tighter"><span className="text-pink-500">Livrare</span></h2>
-                      <p className="text-gray-400 text-lg leading-relaxed italic font-medium italic">Sistemele noastre PC sunt asamblate și testate individual înainte de livrare, având un timp de procesare a comenzii de aproximativ 3-5 zile lucrătoare, urmat de expedierea prin curier rapid pe întreg teritoriul României.</p>
+                      <p className="text-gray-400 text-lg leading-relaxed italic font-medium">Sistemele noastre PC sunt asamblate și testate individual înainte de livrare, având un timp de procesare a comenzii de aproximativ 3-5 zile lucrătoare, urmat de expedierea prin curier rapid pe întreg teritoriul României.</p>
                   </div>
               </div>
           </section>

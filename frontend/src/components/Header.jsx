@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom"; // 👉 Am importat useLocation
 import { useCart } from "../context/CartContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useWishlist } from "../context/WishlistContext.jsx";
@@ -25,6 +25,8 @@ function Item({ to, children, onClick }) {
 
 export default function Header() {
   const nav = useNavigate();
+  const location = useLocation(); // 👉 Inițializăm useLocation pentru a ști pe ce pagină suntem
+  
   const { items, totalCents } = useCart();
   const { user, logout } = useAuth();
   const { wishlist } = useWishlist();
@@ -34,7 +36,6 @@ export default function Header() {
   const [open, setOpen] = useState(false); 
   const [mobileOpen, setMobileOpen] = useState(false); 
 
-  // 👉 STATE-URI ȘI TIMERE PENTRU MINI-CART
   const [miniCartOpen, setMiniCartOpen] = useState(false);
   const openTimerRef = useRef(null);
   const closeTimerRef = useRef(null);
@@ -47,14 +48,17 @@ export default function Header() {
     setMiniCartOpen(false);
   };
 
-  // 👉 LOGICĂ PENTRU HOVER-UL COȘULUI (Pod invizibil + Delay)
+  // 👉 VERIFICAREA ESTE AICI:
   const handleCartMouseEnter = () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current); // Anulăm închiderea dacă ne întoarcem repede
+    // Dacă suntem pe pagina de coș (sau de checkout), nu deschidem mini-cart-ul
+    if (location.pathname === '/cart' || location.pathname === '/checkout') return;
+
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current); 
     if (openTimerRef.current) clearTimeout(openTimerRef.current);
 
     openTimerRef.current = setTimeout(() => {
       setMiniCartOpen(true);
-    }, 600); // Se deschide după jumătate de secundă (mai rapid, UX mai bun)
+    }, 600); 
   };
 
   const handleCartMouseLeave = () => {
@@ -63,7 +67,7 @@ export default function Header() {
 
     closeTimerRef.current = setTimeout(() => {
       setMiniCartOpen(false);
-    }, 400); // Așteaptă 400ms înainte să se închidă ca să poți muta mouse-ul pe el
+    }, 400); 
   };
 
   useEffect(() => {
@@ -149,7 +153,6 @@ export default function Header() {
                 <span className="text-lg leading-none">❤️</span>
               </Link>
 
-              {/* CONTAINER COȘ CU HOVER */}
               <div 
                 className="relative flex" 
                 onMouseEnter={handleCartMouseEnter}
@@ -164,9 +167,7 @@ export default function Header() {
                   )}
                 </Link>
 
-                {/* DROPDOWN MINI-CART */}
                 {miniCartOpen && (
-                  // Am schimbat mt-4 cu pt-4 (padding) ca să creăm un pod invizibil
                   <div className="absolute top-full right-0 pt-4 w-80 z-[100]">
                     <div className="rounded-2xl overflow-hidden border border-white/10 bg-[#0b1020]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in-95 duration-200">
                       <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">

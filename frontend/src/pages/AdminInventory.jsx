@@ -14,14 +14,14 @@ export default function AdminInventory() {
 
   const [form, setForm] = useState({ 
     name: "", priceRon: "", description: "", longDescription: "", category: "pc",
-    imageUrl: "", cpuBrand: "", gpuBrand: "", ramGb: "", storageGb: "",
+    imageUrl: "", cpuBrand: "", gpuBrand: "", ramGb: "", storageGb: "1TB", // Setăm o valoare default
     motherboard: "", case: "", cooler: "", psu: "", 
     warrantyMonths: "24",
     benchmarks: [],
     isVisible: true,
     pcgarageWishlistId: "",
     compatibleCases: [],
-    isNationalService: false // <-- NOU: Câmp pentru serviciu național
+    isNationalService: false 
   });
 
   const [isUploading, setIsUploading] = useState(false);
@@ -58,7 +58,7 @@ export default function AdminInventory() {
     try {
       const token = localStorage.getItem("accessToken");
       
-      const res = await fetch("https://karixcomputers.ro/api/products/upload", {
+      const res = await fetch("https://api.karixcomputers.ro/api/products/upload", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
         body: formData
@@ -143,7 +143,7 @@ export default function AdminInventory() {
         isVisible: form.isVisible,
         pcgarageWishlistId: (form.category === "pc" && form.pcgarageWishlistId) ? form.pcgarageWishlistId : null,
         compatibleCases: form.category === "pc" ? form.compatibleCases : [],
-        isNationalService: form.category === "service" ? form.isNationalService : false // <-- Trimitem doar dacă e serviciu
+        isNationalService: form.category === "service" ? form.isNationalService : false
       };
 
       const method = editingId ? "PUT" : "POST";
@@ -163,7 +163,7 @@ export default function AdminInventory() {
   const resetForm = () => {
     setForm({ 
       name: "", priceRon: "", description: "", longDescription: "", category: "pc", 
-      imageUrl: "", cpuBrand: "", gpuBrand: "", ramGb: "", storageGb: "",
+      imageUrl: "", cpuBrand: "", gpuBrand: "", ramGb: "", storageGb: "1TB",
       motherboard: "", case: "", cooler: "", psu: "", warrantyMonths: "24",
       benchmarks: [],
       isVisible: true,
@@ -186,7 +186,7 @@ export default function AdminInventory() {
       cpuBrand: p.cpuBrand || "",
       gpuBrand: p.gpuBrand || "",
       ramGb: p.ramGb || "",
-      storageGb: p.storageGb || "",
+      storageGb: p.storageGb || "1TB", // Preluăm din DB sau punem default
       motherboard: p.motherboard || "", 
       case: p.case || "", 
       cooler: p.cooler || "", 
@@ -196,7 +196,7 @@ export default function AdminInventory() {
       isVisible: p.isVisible !== undefined ? p.isVisible : true,
       pcgarageWishlistId: p.pcgarageWishlistId || "",
       compatibleCases: p.compatibleCases || [],
-      isNationalService: p.isNationalService || false // <-- Preluăm starea existentă
+      isNationalService: p.isNationalService || false
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -245,7 +245,6 @@ export default function AdminInventory() {
 
             <input type="number" step="0.01" placeholder="Preț curent (RON)" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500" value={form.priceRon} onChange={e => setForm({...form, priceRon: e.target.value})} required />
             
-            {/* 👉 NOU: OPȚIUNE SERVICIU NAȚIONAL (Apare doar dacă e selectat 'service') */}
             {form.category === "service" && (
                 <label className="md:col-span-3 flex items-center gap-3 px-4 py-3 cursor-pointer group bg-pink-500/5 rounded-2xl border border-pink-500/20 hover:border-pink-500/40 transition-all">
                   <input 
@@ -321,7 +320,20 @@ export default function AdminInventory() {
                 <input type="text" placeholder="Placă Video" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.gpuBrand} onChange={e => setForm({...form, gpuBrand: e.target.value})} />
                 <input type="text" placeholder="Placă de bază" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.motherboard} onChange={e => setForm({...form, motherboard: e.target.value})} />
                 <input type="text" placeholder="Memorie RAM" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.ramGb} onChange={e => setForm({...form, ramGb: e.target.value})} />
-                <input type="text" placeholder="Stocare" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.storageGb} onChange={e => setForm({...form, storageGb: e.target.value})} />
+                
+                {/* 👉 AICI ESTE NOUL SELECT PENTRU STOCARE DE BAZĂ */}
+                <select 
+                  className="bg-[#0b1020] border border-white/10 p-4 rounded-2xl outline-none text-sm text-gray-300 focus:border-indigo-500" 
+                  value={form.storageGb} 
+                  onChange={e => setForm({...form, storageGb: e.target.value})}
+                >
+                  <option value="" disabled>Alege Stocare de Bază...</option>
+                  <option value="512GB">💾 512 GB SSD</option>
+                  <option value="1TB">💾 1 TB SSD</option>
+                  <option value="2TB">💾 2 TB SSD</option>
+                  <option value="4TB">💾 4 TB SSD</option>
+                </select>
+
                 <input type="text" placeholder="Carcasă Default (Nume Specs)" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.case} onChange={e => setForm({...form, case: e.target.value})} />
                 <input type="text" placeholder="Cooler" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.cooler} onChange={e => setForm({...form, cooler: e.target.value})} />
                 <input type="text" placeholder="Sursă (PSU)" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.psu} onChange={e => setForm({...form, psu: e.target.value})} />
@@ -393,7 +405,6 @@ export default function AdminInventory() {
                   {!p.isVisible && (
                     <span className="bg-pink-500/20 text-pink-500 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-pink-500/30">Privat</span>
                   )}
-                  {/* Badge pentru servicii nationale */}
                   {p.category === 'service' && p.isNationalService && (
                     <span className="bg-indigo-500/20 text-indigo-400 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-indigo-500/30">Național</span>
                   )}
