@@ -24,6 +24,7 @@ import configuratorRoutes from "./routes/configurator.routes.js";
 import couponRoutes from "./routes/coupon.routes.js";
 import reviewsRoutes from "./routes/reviews.routes.js";
 import adminConfiguratorRoutes from "./routes/adminconfigurator.routes.js";
+import usersRoutes from "./routes/users.routes.js";
 
 export const app = express();
 
@@ -103,6 +104,7 @@ app.use("/api/configurator", configuratorRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/reviews", reviewsRoutes);
 app.use("/api/adminconfigurator", adminConfiguratorRoutes);
+app.use('/api/users', usersRoutes);
 
 // 8. SERVIRE DOSAR STATIC (Imagini/Uploads)
 app.use('/api/uploads', (req, res, next) => {
