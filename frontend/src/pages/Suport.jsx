@@ -8,6 +8,10 @@ export default function Support() {
 
   const faqs = [
     {
+      question: "Care este programul de lucru al suportului tehnic?",
+      answer: "Suntem disponibili de Luni până Vineri între orele 08:00 și 20:00. În weekend (Sâmbătă - Duminică), preluăm solicitări și oferim suport în funcție de disponibilitate. Comenzile online pe site pot fi plasate 24/7."
+    },
+    {
       question: "Cât durează asamblarea și livrarea unui sistem Karix?",
       answer: "Asamblarea profesională, cable management-ul și testele de stres durează de obicei 3-5 zile lucrătoare. Livrarea se face prin curier rapid în 24-48h pe tot teritoriul României."
     },

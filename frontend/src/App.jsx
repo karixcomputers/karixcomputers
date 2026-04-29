@@ -141,7 +141,6 @@ export default function App() {
             
             <Footer />
             <CookieBanner />
-            <KarixAI />
           </div>
         </div>
 
