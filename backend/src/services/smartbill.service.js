@@ -7,7 +7,7 @@ const getAuthHeaders = () => {
     return Buffer.from(`${USER}:${TOKEN}`).toString("base64");
 };
 
-// 👉 HELPER PENTRU CURĂȚAREA ADRESEI PE FACTURĂ
+// 👉 HELPER PENTRU CURĂȚAREA ADRESEI PE FACTURĂ (Fallback pentru logistica veche)
 const getCleanAddress = (rawAddress) => {
     if (!rawAddress) return "România";
     let clean = rawAddress.split("| Note:")[0].trim();
@@ -99,11 +99,20 @@ export const createSmartBillInvoice = async (order) => {
         const SERIA = (process.env.SMARTBILL_SERIA || "").trim();
         const auth = getAuthHeaders();
         
-        const cleanAddress = getCleanAddress(order.shippingAddress);
+        // 👉 AICI ESTE MODIFICAREA PENTRU FACTURĂ:
+        // Verificăm dacă avem date separate de facturare salvate pe comandă
+        let finalBillingAddress = "";
+        if (order.invoiceAddress && order.invoiceCity && order.invoiceCounty) {
+            // Dacă a completat date de facturare separate, le folosim strict pe acelea
+            finalBillingAddress = `${order.invoiceAddress}, ${order.invoiceCity}, ${order.invoiceCounty}`;
+        } else {
+            // Fallback la adresa de livrare curățată (pentru comenzi vechi)
+            finalBillingAddress = getCleanAddress(order.shippingAddress);
+        }
 
         const clientObj = {
             name: order.isCompany ? order.companyName : (order.shippingName || "Client Karix"),
-            address: cleanAddress,
+            address: finalBillingAddress,
             country: "Romania",
             isTaxPayer: !!order.isCompany,
             saveToDb: false
@@ -116,7 +125,6 @@ export const createSmartBillInvoice = async (order) => {
             clientObj.regCom = order.regCom;
         }
 
-        // Acum trimitem și totalCents plătit real de client pentru auto-corecție
         const products = buildProductsList(order.items, order.shippingCents, order.totalCents);
 
         const payload = {
@@ -191,18 +199,28 @@ export const createSmartBillProforma = async (order, clientData, cartItems) => {
         const SERIA_PROFORMA = (process.env.SMARTBILL_PROFORMA_SERIA || process.env.SMARTBILL_SERIA || "").trim();
         const auth = getAuthHeaders();
         
-        // Formăm adresa inițială combinând componentele din checkout, apoi o curățăm
-        const rawAddress = `${clientData.addressDetails}, ${clientData.city}, ${clientData.county}`;
-        let cleanAddress = getCleanAddress(rawAddress);
+        // 👉 AICI ESTE MODIFICAREA PENTRU PROFORMĂ:
+        let finalBillingAddress = "";
         
-        // Extra fallback dacă formatarea a rezultat într-un string gol sau doar virgule
-        if (!cleanAddress || cleanAddress.trim() === "," || cleanAddress.trim() === ", ,") {
-            cleanAddress = "România";
+        // Căutăm întâi în `clientData` (venit fresh din Frontend) sau în `order` (salvat în DB)
+        const invAddr = clientData.invoiceAddress || order.invoiceAddress;
+        const invCity = clientData.invoiceCity || order.invoiceCity;
+        const invCounty = clientData.invoiceCounty || order.invoiceCounty;
+
+        if (invAddr && invCity && invCounty) {
+            finalBillingAddress = `${invAddr}, ${invCity}, ${invCounty}`;
+        } else {
+            // Fallback (Cum era înainte)
+            const rawAddress = `${clientData.addressDetails}, ${clientData.city}, ${clientData.county}`;
+            finalBillingAddress = getCleanAddress(rawAddress);
+            if (!finalBillingAddress || finalBillingAddress.trim() === "," || finalBillingAddress.trim() === ", ,") {
+                finalBillingAddress = "România";
+            }
         }
 
         const clientObj = {
             name: clientData.isCompany ? clientData.companyName : (clientData.name || "Client Karix"),
-            address: cleanAddress,
+            address: finalBillingAddress,
             country: "Romania",
             isTaxPayer: !!clientData.isCompany,
             saveToDb: false
@@ -215,7 +233,6 @@ export const createSmartBillProforma = async (order, clientData, cartItems) => {
             clientObj.regCom = clientData.regCom;
         }
 
-        // Construim produsele folosind funcția helper, shippingCents și totalul plătit!
         const products = buildProductsList(cartItems, order.shippingCents, order.totalCents);
 
         const dueDate = new Date();

@@ -136,9 +136,9 @@ export default function Checkout() {
     county: "", 
     city: "", 
     addressDetails: "",
-    invoiceCounty: "", // 👉 NOU: Județ separat pentru facturare
-    invoiceCity: "",   // 👉 NOU: Oraș separat pentru facturare
-    invoiceAddress: "",// 👉 NOU: Adresa separată pentru facturare
+    invoiceCounty: "", 
+    invoiceCity: "",   
+    invoiceAddress: "",
     isCompany: false,
     companyName: "",
     cui: "",
@@ -511,13 +511,17 @@ export default function Checkout() {
         invoiceAddressDetails += ` | Note: ${shipping.assemblyNotes}`;
     }
 
+    // 👉 AICI: Adăugăm noile câmpuri în obiectul "orderData" pentru a fi trimise la server
     const orderData = { 
       client: { 
         ...shipping,
         county: shipping.county, 
         city: shipping.city,     
-        addressDetails: invoiceAddressDetails, // Ce apare vizual pe factură
-        fanboxAddressText: systemAddressDetails // Ce se trimite strict la curier ca adresă 
+        invoiceCounty: shipping.invoiceCounty,   // Câmp nou facturare
+        invoiceCity: shipping.invoiceCity,       // Câmp nou facturare
+        invoiceAddress: shipping.invoiceAddress, // Câmp nou facturare
+        addressDetails: invoiceAddressDetails, 
+        fanboxAddressText: systemAddressDetails 
       }, 
       cartItems: enrichedItems,
       total: finalTotalCents, 
@@ -712,7 +716,6 @@ export default function Checkout() {
                     </>
                   )}
                   
-                  {/* 👉 ADRESA DE FACTURARE NOUA AICI */}
                   <div className="space-y-2 relative" ref={invoiceDropdownRef}>
                     <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Județ Facturare</label>
                     <input 
@@ -766,7 +769,6 @@ export default function Checkout() {
                     <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">
                     2. {showLocalUI ? "Locație Preluare Locală" : "Logistică / Livrare"}
                     </h2>
-                    {/* Buton prin care sa copieze adresa ca sa nu scrie de doua ori daca e acasa */}
                     <button 
                        onClick={handleCopyAddressToShipping}
                        className="text-[10px] text-gray-400 hover:text-white border border-white/10 px-3 py-1.5 rounded-lg bg-black/20"

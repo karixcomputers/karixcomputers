@@ -194,7 +194,6 @@ router.patch("/:id/cancel", requireAuth, async (req, res, next) => {
 router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { itemId } = req.params;
-    // 👉 Preluăm declaredValue din body (poate fi null dacă nu e completat)
     const { status, awb, weight, packages, insurance, forceFanbox, declaredValue } = req.body; 
 
     const currentItem = await prisma.orderItem.findUnique({
@@ -213,7 +212,6 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
     if (status === 'predat_curier' && !generatedAwb) {
         if (!isOradea) {
             try {
-                // 👉 Trimitem și declaredValue mai departe
                 generatedAwb = await createFanAWB(
                     order, false, weight || 1, packages || 1, insurance || false, forceFanbox || false, declaredValue
                 );
@@ -337,6 +335,11 @@ router.post("/", requireAuth, async (req, res, next) => {
         paymentMethod: paymentMethod,
         status: initialStatus,
 
+        // 👉 AICI: Salvăm datele noi de facturare primite din frontend
+        invoiceCounty: client.invoiceCounty || null,
+        invoiceCity: client.invoiceCity || null,
+        invoiceAddress: client.invoiceAddress || null,
+
         items: {
           create: cartItems.map(item => {
             const nameFinal = item.productName || item.name;
@@ -350,7 +353,6 @@ router.post("/", requireAuth, async (req, res, next) => {
               priceCentsAtBuy: item.priceCents || item.priceCentsAtBuy,
               status: isServiceItem ? "in_asteptare_ridicare" : initialStatus,
               warrantyMonths: item.warrantyMonths ? parseInt(item.warrantyMonths) : (isServiceItem ? 0 : 24),
-              // 👉 AICI ESTE REZOLVAREA EROARII (Salvăm specificațiile în baza de date!)
               specs: item.specs || null
             };
           })
