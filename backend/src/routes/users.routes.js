@@ -1,9 +1,15 @@
-// Adaugă asta în backend/routes/users.routes.js (sau fișierul tău de rute pt useri)
+import express from "express";
+import { PrismaClient } from "@prisma/client";
+import { requireAuth } from "../middleware/auth.js"; // verifică dacă calea e corectă (src/middleware/auth.js)
 
-// GET: Toți utilizatorii (Doar pentru Admin)
+const prisma = new PrismaClient();
+const router = express.Router();
+
+// ... rutele tale vechi (profile, update, etc.) ...
+
+// Ruta nouă pentru Admin
 router.get("/admin-all", requireAuth, async (req, res) => {
   try {
-    // Verificăm dacă cel care cere este admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: "Acces interzis." });
     }
@@ -23,6 +29,9 @@ router.get("/admin-all", requireAuth, async (req, res) => {
     res.json(users);
   } catch (error) {
     console.error("Eroare fetch users:", error);
-    res.status(500).json({ error: "Eroare internă server." });
+    res.status(500).json({ error: "Eroare server." });
   }
 });
+
+// 👉 LINIA ASTA LIPSEȘTE SAU E GREȘITĂ:
+export default router;
