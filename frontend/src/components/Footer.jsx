@@ -33,33 +33,30 @@ export default function Footer() {
         {/* Secțiune Plăți & Autorități */}
         <div className="flex flex-col items-center gap-8 mb-10 w-full">
           {/* Plăți */}
-<div className="flex flex-col items-center gap-4">
-  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-600">
-    Plăți securizate prin Netopia
-  </p>
-  <div className="flex items-center justify-center">
-    <img 
-      src="https://mny.ro/np-black-0.svg" 
-      alt="Netopia Payments" 
-      className="h-10 md:h-12 opacity-70 hover:opacity-100 transition-opacity object-contain" 
-    />
-  </div>
-</div>
+          <div className="flex flex-col items-center gap-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-600">
+              Plăți securizate prin Netopia
+            </p>
+            <div className="flex items-center justify-center">
+              <img 
+                src="https://mny.ro/np-black-0.svg" 
+                alt="Netopia Payments" 
+                className="h-10 md:h-12 opacity-70 hover:opacity-100 transition-opacity object-contain" 
+              />
+            </div>
+          </div>
 
           {/* Autorități cu poze PNG */}
-          {/* Modificat: Folosim flex-row și un gap mai mic pentru mobil pentru a forța alinierea stânga-dreapta */}
           <div className="flex flex-row justify-center gap-3 md:gap-6 items-center w-full max-w-[400px]">
             <a
               href="https://anpc.ro/"
               target="_blank"
               rel="noreferrer"
-              /* Modificat: w-1/2 pe mobil pentru a ocupa jumătate din spațiu */
               className="block w-1/2 md:w-auto transition-transform hover:scale-105"
             >
               <img
                 src="https://grecupartners.ro/wp-content/uploads/2023/04/anpc-sal.png"
                 alt="ANPC"
-                /* Modificat: lățime 100% din containerul părintelui (w-full) pe mobil, și fixă pe desktop */
                 className="w-full h-auto md:w-[168px] md:h-[42px] object-contain rounded-md" 
               />
             </a>
@@ -67,20 +64,18 @@ export default function Footer() {
               href="https://ec.europa.eu/consumers/odr"
               target="_blank"
               rel="noreferrer"
-              /* Modificat: w-1/2 pe mobil */
               className="block w-1/2 md:w-auto transition-transform hover:scale-105"
             >
               <img
                 src="https://www.davaldi.ro/wp-content/uploads/2025/06/solutionarea_online_a_litigiilor.png"
                 alt="SOL"
-                /* Modificat: la fel ca mai sus */
                 className="w-full h-auto md:w-[168px] md:h-[42px] object-contain rounded-md"
               />
             </a>
           </div>
         </div>
 
-        {/* Date Fiscale Firma */}
+        {/* Date Fiscale Firma & Program */}
         <div className="text-center mb-10 px-4">
             <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed">
               Cristea Raul Gabriel PFA <span className="mx-2 text-white/10">|</span> 
@@ -88,7 +83,11 @@ export default function Footer() {
               F2026012678004
             </p>
             <p className="text-[10px] text-gray-600 mt-1 italic">
-              Sediu Social: Str. Sovata, Nr. 52, Bl. C6, Ap. 51, Oradea, Bihor
+              Sediu Social: Oradea, Bihor
+            </p>
+            {/* 👉 NOU: Program adăugat în Footer */}
+            <p className="text-[10px] text-indigo-400 font-bold mt-3 italic tracking-wide">
+              🕒 Luni - Vineri: 08:00 - 20:00 <span className="mx-2 text-white/10">|</span> Sâmbătă - Duminică: În funcție de disponibilitate
             </p>
         </div>
 

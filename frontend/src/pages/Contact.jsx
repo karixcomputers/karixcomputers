@@ -65,8 +65,6 @@ export default function Contact() {
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent">
         
-
-
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center mb-20">
             <h1 className="text-6xl md:text-7xl font-black text-white tracking-tighter mb-4 italic uppercase">
@@ -85,13 +83,16 @@ export default function Contact() {
                 {[
                   { label: "Email Oficial", val: "contact@karixcomputers.ro", icon: "📧", color: "indigo" },
                   { label: "Suport Telefon", val: "0770 619 935", icon: "📞", color: "pink" },
-                  { label: "Sediu", val: "Oradea, Bihor, România", icon: "📍", color: "emerald" }
+                  { label: "Sediu", val: "Oradea, Bihor, România", icon: "📍", color: "emerald" },
+                  // 👉 NOU: Blocul cu Programul de funcționare
+                  { label: "Program", val: "L-V: 08:00 - 20:00 | S-D: În funcție de disponibilitate", icon: "🕒", color: "amber" }
                 ].map((item, idx) => (
                   <div key={idx} className="p-6 rounded-[24px] bg-white/[0.03] border border-white/10 backdrop-blur-xl flex items-center gap-5 group hover:bg-white/[0.06] transition-all">
-                    <div className={`h-14 w-14 rounded-2xl bg-${item.color}-500/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform`}>{item.icon}</div>
+                    <div className={`h-14 w-14 rounded-2xl bg-${item.color}-500/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shrink-0`}>{item.icon}</div>
                     <div className="text-left">
                       <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">{item.label}</p>
-                      <p className="text-white font-bold text-lg">{item.val}</p>
+                      {/* Font ușor ajustat pentru a încăpea programul pe ecrane mici */}
+                      <p className="text-white font-bold text-[15px] sm:text-lg">{item.val}</p>
                     </div>
                   </div>
                 ))}
