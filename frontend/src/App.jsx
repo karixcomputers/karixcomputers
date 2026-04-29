@@ -55,7 +55,7 @@ import ProductDetails from "./pages/ProductDetails";
 import AdminReviews from "./pages/AdminReviews";
 import AdminConfigurator from "./pages/AdminConfigurator.jsx";
 import Failed from "./pages/Failed";
-import AdminUsers from "./pages/admin/AdminUsers";
+import AdminUsers from "./pages/AdminUsers";
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
