@@ -42,7 +42,6 @@ export default function Cart() {
     return appliedCoupon.discountValue; 
   }, [appliedCoupon, totalCents]);
 
-  // Totalul se bazează acum STRICT pe prețul produselor - reducere (fără transport)
   const finalTotalCents = Math.max(0, totalCents - discountCents);
 
   useEffect(() => {
@@ -193,10 +192,11 @@ export default function Cart() {
 
   const handleDecrement = (item) => {
     const currentQty = item.qty || 1;
+    const uniqueId = item.cartItemId || item.id;
     if (currentQty === 1) {
-      setDeleteConfirm({ show: true, itemId: item.id, itemName: item.productName || item.name });
+      setDeleteConfirm({ show: true, itemId: uniqueId, itemName: item.productName || item.name });
     } else {
-      updateQty(item.id, -1);
+      updateQty(uniqueId, -1);
     }
   };
 
@@ -277,8 +277,9 @@ export default function Cart() {
                   const displayWarranty = isPC ? (baseWarrantyMonths + (item.extendedWarranty === 1 ? 12 : (item.extendedWarranty === 2 ? 24 : 0))) : 0;
 
                   return (
-                    <div key={item.id} className="group p-5 sm:p-6 rounded-[25px] sm:rounded-[35px] bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 hover:bg-white/[0.08] hover:border-indigo-500/30 transition-all duration-300 shadow-xl relative">
-                      <button onClick={() => removeFromCart(item.id)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-500 hover:text-pink-500 transition-colors h-8 w-8 flex items-center justify-center rounded-full hover:bg-pink-500/10 z-20">✕</button>
+                    <div key={item.cartItemId || item.id} className="group p-5 sm:p-6 rounded-[25px] sm:rounded-[35px] bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 hover:bg-white/[0.08] hover:border-indigo-500/30 transition-all duration-300 shadow-xl relative">
+                      
+                      <button onClick={() => removeFromCart(item.cartItemId || item.id)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-500 hover:text-pink-500 transition-colors h-8 w-8 flex items-center justify-center rounded-full hover:bg-pink-500/10 z-20">✕</button>
 
                       <div className="flex flex-col items-center gap-2 w-full sm:w-auto pr-8 sm:pr-0">
                         <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -296,7 +297,6 @@ export default function Cart() {
                                   <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
                                     {isPC ? 'Hardware' : 'Service'}
                                   </span>
-                                  {/* BADGE LOCAȚIE PE MOBIL */}
                                   {isService && (
                                     <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border inline-block ${item.isNationalService ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
                                       {item.isNationalService ? '🚚 Toată Țara' : '📍 Oradea'}
@@ -325,7 +325,6 @@ export default function Cart() {
                               <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border inline-block ${isPC ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
                                 {isPC ? 'Hardware' : 'Service'}
                               </span>
-                              {/* BADGE LOCAȚIE PE DESKTOP */}
                               {isService && (
                                 <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border inline-block ${item.isNationalService ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
                                   {item.isNationalService ? '🚚 Național' : '📍 Doar Oradea'}
@@ -377,7 +376,7 @@ export default function Cart() {
                                     return (
                                       <button
                                         key={opt.level}
-                                        onClick={() => updateItemWarranty && updateItemWarranty(item.id, opt.level)}
+                                        onClick={() => updateItemWarranty && updateItemWarranty(item.cartItemId || item.id, opt.level)}
                                         className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${isSelected ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 shadow-inner' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'}`}
                                       >
                                         <div className="flex items-center gap-3">
@@ -416,7 +415,7 @@ export default function Cart() {
                         <div className="flex items-center bg-white/5 rounded-2xl p-1 border border-white/10">
                           <button onClick={() => handleDecrement(item)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-xl transition-all">-</button>
                           <span className="w-8 text-center text-xs font-black text-indigo-400 italic">{quantity}</span>
-                          <button onClick={() => updateQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-xl transition-all">+</button>
+                          <button onClick={() => updateQty(item.cartItemId || item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-xl transition-all">+</button>
                         </div>
                       </div>
                     </div>
