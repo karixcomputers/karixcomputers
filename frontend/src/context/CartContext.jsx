@@ -66,19 +66,32 @@ export const CartProvider = ({ children }) => {
     setItems((prev) => {
       const currentCart = clearPrevious ? [] : prev;
       
-      const exists = currentCart.find((i) => i.id === product.id);
-      
       const actualPrice = product.priceCents || product.price || product.totalCents || 0;
       const qtyToAdd = product.qty || 1;
       const isSrv = isProductService(product);
 
+      // 👉 GENERĂM UN ID UNIC BAZAT PE CONFIGURAȚIE
+      // Dacă produsul are specs (este PC), combinăm ID-ul original cu stocarea și carcasa (fără spații).
+      // Altfel, folosim doar ID-ul normal.
+      let uniqueCartId = product.id.toString();
+      if (product.specs) {
+        const safeStorage = (product.specs.storage || "").replace(/\s+/g, '');
+        const safeCase = (product.specs.case || "").replace(/\s+/g, '');
+        uniqueCartId = `${product.id}-${safeStorage}-${safeCase}`;
+      }
+
+      // Acum căutăm dacă produsul CU EXACT ACEEAȘI CONFIGURAȚIE există deja
+      const exists = currentCart.find((i) => i.cartItemId === uniqueCartId);
+
       let newCart;
 
       if (exists) {
+        // Dacă e fix aceeași configurație, creștem cantitatea
         newCart = currentCart.map((i) =>
-          i.id === product.id ? { ...i, qty: i.qty + qtyToAdd } : i
+          i.cartItemId === uniqueCartId ? { ...i, qty: i.qty + qtyToAdd } : i
         );
       } else {
+        // Dacă e o configurație nouă (sau un produs cu totul nou), adăugăm un rând separat
         let finalImages = product.images || [];
         if (finalImages.length === 0) {
            if (product.imageUrl) finalImages = [product.imageUrl];
@@ -87,7 +100,8 @@ export const CartProvider = ({ children }) => {
         const finalImageUrl = product.imageUrl || finalImages[0] || null;
 
         newCart = [...currentCart, { 
-          id: product.id, 
+          cartItemId: uniqueCartId, // 👉 Salvăm acest ID unic intern
+          id: product.id,           // ID-ul real de DB rămâne aici pentru API 
           productName: product.name || product.productName, 
           name: product.name || product.productName,
           category: product.category || (isSrv ? "service" : "pc"),
@@ -100,7 +114,6 @@ export const CartProvider = ({ children }) => {
           warrantyMonths: product.warrantyMonths || (isSrv ? 0 : 24), 
           extendedWarranty: 0, 
           qty: qtyToAdd,
-          // 👉 NOU: Preia informația despre serviciul național (Dacă nu e furnizată, consideră local = fals)
           isNationalService: product.isNationalService || false 
         }];
       }
@@ -143,22 +156,23 @@ export const CartProvider = ({ children }) => {
     return true;
   };
 
-  const removeFromCart = (id) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
+  const removeFromCart = (cartItemIdOrId) => {
+    // Verificăm și după cartItemId (pt produsele noi), și după id normal (pt fallback)
+    setItems((prev) => prev.filter((i) => (i.cartItemId || i.id) !== cartItemIdOrId));
   };
 
-  const updateQty = (id, delta) => {
+  const updateQty = (cartItemIdOrId, delta) => {
     setItems((prev) => {
       return prev.map((i) =>
-        i.id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i
+        (i.cartItemId || i.id) === cartItemIdOrId ? { ...i, qty: Math.max(1, i.qty + delta) } : i
       );
     });
   };
 
-  const updateItemWarranty = (id, warrantyLevel) => {
+  const updateItemWarranty = (cartItemIdOrId, warrantyLevel) => {
     setItems((prev) => 
       prev.map((i) => 
-        i.id === id ? { ...i, extendedWarranty: warrantyLevel } : i
+        (i.cartItemId || i.id) === cartItemIdOrId ? { ...i, extendedWarranty: warrantyLevel } : i
       )
     );
   };
