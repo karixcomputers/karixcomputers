@@ -34,39 +34,6 @@ export default function Cart() {
   const API_URL = import.meta.env.VITE_API_URL || "https://karixcomputers.ro/api";
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  // --- ANALIZĂ COȘ PENTRU A DETERMINA TIPUL DE TRANSPORT ---
-  const cartAnalysis = useMemo(() => {
-    const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick', 'upgrade', 'instalare', 'reinstalare', 'windows', 'software', 'bios', 'recuperare', 'asamblare'];
-    
-    let hardwareSubtotal = 0;
-    let hasPC = false;
-    let hasService = false;
-    let requiresLocalPickup = false;
-    
-    items.forEach(item => {
-      const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const isSrv = item.category === 'service' || (!item.specs && isServiceKeywords.some(kw => nameStr.includes(kw)));
-      
-      if (isSrv) {
-        hasService = true;
-        // Dacă e un serviciu care NU are flag-ul de național, forțăm Oradea
-        if (!item.isNationalService) {
-            requiresLocalPickup = true;
-        }
-      } else {
-        hasPC = true;
-        const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
-        let extraWarrantyPrice = 0;
-        if (item.extendedWarranty === 1) extraWarrantyPrice = Math.round(basePrice * 0.09);
-        if (item.extendedWarranty === 2) extraWarrantyPrice = Math.round(basePrice * 0.16);
-        
-        hardwareSubtotal += ((basePrice + extraWarrantyPrice) * parseInt(item.qty || item.quantity || 1, 10));
-      }
-    });
-
-    return { hasPC, hasService, hardwareSubtotal, requiresLocalPickup };
-  }, [items]);
-
   const discountCents = useMemo(() => {
     if (!appliedCoupon) return 0;
     if (appliedCoupon.discountType === "percentage") {
@@ -75,19 +42,8 @@ export default function Cart() {
     return appliedCoupon.discountValue; 
   }, [appliedCoupon, totalCents]);
 
-  const shippingCents = useMemo(() => {
-    let cost = 0;
-    if (cartAnalysis.hasPC && cartAnalysis.hardwareSubtotal < 1000 * 100) {
-        cost += 2500; 
-    }
-    // Dacă are serviciu NAȚIONAL (fără necesitate de local), adăugăm taxa de curier
-    if (cartAnalysis.hasService && !cartAnalysis.requiresLocalPickup) {
-        cost += 3000; 
-    }
-    return cost;
-  }, [cartAnalysis]);
-
-  const finalTotalCents = Math.max(0, totalCents - discountCents + shippingCents);
+  // Totalul se bazează acum STRICT pe prețul produselor - reducere (fără transport)
+  const finalTotalCents = Math.max(0, totalCents - discountCents);
 
   useEffect(() => {
     const hash = window.location.hash;
