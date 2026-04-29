@@ -10,7 +10,8 @@ export default function TicketDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [newMessage, setNewMessage] = useState("");
+  const [newMessage, useStateNewMessage] = useState("");
+  const [newMessageValue, setNewMessageValue] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const scrollRef = useRef(null);
@@ -43,7 +44,7 @@ export default function TicketDetail() {
       return res.json();
     },
     onSuccess: () => {
-      setNewMessage("");
+      setNewMessageValue("");
       setSelectedFile(null);
       setPreviewUrl(null);
       queryClient.invalidateQueries(["ticket", id]);
@@ -69,10 +70,10 @@ export default function TicketDetail() {
 
   const handleSend = (e) => {
     e.preventDefault();
-    if ((!newMessage.trim() && !selectedFile) || sendMessageMutation.isPending) return;
+    if ((!newMessageValue.trim() && !selectedFile) || sendMessageMutation.isPending) return;
 
     const formData = new FormData();
-    formData.append("text", newMessage.trim());
+    formData.append("text", newMessageValue.trim());
     if (selectedFile) {
       formData.append("image", selectedFile);
     }
@@ -85,9 +86,9 @@ export default function TicketDetail() {
 
   return (
     <>
-      {/* SEO DINAMIC: TITLU PENTRU TICHET */}
+      {/* SEO DINAMIC: Transformăm ID-ul în String înainte de slice pentru a evita eroarea */}
       <SEO 
-        title={`Suport Tichet #${ticket.id.slice(-4).toUpperCase()}`}
+        title={`Suport Tichet #${String(ticket.id).slice(-4).toUpperCase()}`}
         description="Conversație suport tehnic Karix Computers. Suntem aici pentru a te ajuta cu orice problemă legată de sistemul tău."
       />
 
@@ -114,7 +115,6 @@ export default function TicketDetail() {
           <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-6 pr-4 custom-scrollbar mb-6 px-2">
             {ticket.messages.map((msg) => {
               const isAdminMsg = msg.senderRole === 'admin';
-              // Folosim API_URL-ul corect pentru imagini
               const imageUrl = msg.image ? `${API_URL}${msg.image}` : null;
 
               return (
@@ -168,8 +168,8 @@ export default function TicketDetail() {
               <form onSubmit={handleSend} className="relative flex items-center gap-3">
                 <div className="flex-1 relative group">
                   <textarea
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    value={newMessageValue}
+                    onChange={(e) => setNewMessageValue(e.target.value)}
                     placeholder="Răspunde..."
                     className="w-full bg-[#0b1020]/50 border border-white/10 rounded-[30px] px-8 py-5 pr-28 text-white font-medium outline-none focus:border-indigo-500/50 backdrop-blur-3xl transition-all shadow-2xl resize-none text-left"
                     rows="1"

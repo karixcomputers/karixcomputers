@@ -489,12 +489,6 @@ export default function Cart() {
                       </div>
                     )}
 
-                    <div className="flex justify-between text-gray-400 font-medium text-sm items-center">
-                      <span>{cartAnalysis.requiresLocalPickup ? "Preluare Locală (Oradea)" : "Transport Curier"}</span>
-                      <span className={`font-black text-[10px] uppercase tracking-widest ${shippingCents === 0 ? "text-emerald-400" : "text-white"}`}>
-                        {shippingCents === 0 ? "Gratuit" : `+ ${formatRON(shippingCents)}`}
-                      </span>
-                    </div>
 
                     <div className="pt-6 border-t border-white/5">
                       <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3 italic">Cod Reducere / Voucher</p>
