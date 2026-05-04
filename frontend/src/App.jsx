@@ -9,6 +9,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import NetworkBackground from "./components/NetworkBackground.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx"; 
 import AnnouncementBanner from "./components/AnnouncementBanner";
+import MaintenanceGuard from "./components/MaintenanceGuard"; // <--- Aici e importat
 
 // Pagini
 import Home from "./pages/Home.jsx";
@@ -58,8 +59,6 @@ import AdminConfigurator from "./pages/AdminConfigurator.jsx";
 import Failed from "./pages/Failed";
 import AdminUsers from "./pages/AdminUsers";
 import AdminAnnouncements from "./pages/AdminAnnouncements";
-import MaintenanceGuard from "./components/MaintenanceGuard";
-
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
@@ -82,76 +81,81 @@ export default function App() {
 
           <div className="relative z-10 flex flex-col flex-1 w-full">
             
-            <Header />
-            
-            <main className="flex-1 w-full relative z-20">
-              <AnnouncementBanner />
-              <Routes>
-                {/* Rute Publice */}
-                <Route path="/" element={<Home />} />
-                <Route path="/shop" element={<Shop />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/checkout" element={<Checkout />} />
-                <Route path="/success" element={<Success />} />
-                <Route path="/cancel" element={<Cancel />} />
-                <Route path="/servicii" element={<Servicii />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/suport" element={<Suport />} />
-                <Route path="/wishlist" element={<Wishlist />} />
-                <Route path="/configurator" element={<Configurator />} />
-                <Route path="/product/:id" element={<ProductDetails />} />
-                <Route path="/failed" element={<Failed />} />
-                <Route path="/failed" element={<Failed />} />
+            {/* 👉 AICI ÎNCEPE SCUTUL DE MENTENANȚĂ */}
+            <MaintenanceGuard>
+              
+              <Header />
+              
+              <main className="flex-1 w-full relative z-20">
+                <AnnouncementBanner />
+                <Routes>
+                  {/* Rute Publice */}
+                  <Route path="/" element={<Home />} />
+                  <Route path="/shop" element={<Shop />} />
+                  <Route path="/cart" element={<Cart />} />
+                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="/success" element={<Success />} />
+                  <Route path="/cancel" element={<Cancel />} />
+                  <Route path="/servicii" element={<Servicii />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/suport" element={<Suport />} />
+                  <Route path="/wishlist" element={<Wishlist />} />
+                  <Route path="/configurator" element={<Configurator />} />
+                  <Route path="/product/:id" element={<ProductDetails />} />
+                  <Route path="/failed" element={<Failed />} />
 
-                {/* Rute Legale */}
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/warranty" element={<Warranty />} />
-                <Route path="/retur" element={<Retur />} />
-                <Route path="/confidentialitate" element={<Confidentialitate />} />
+                  {/* Rute Legale */}
+                  <Route path="/terms" element={<Terms />} />
+                  <Route path="/warranty" element={<Warranty />} />
+                  <Route path="/retur" element={<Retur />} />
+                  <Route path="/confidentialitate" element={<Confidentialitate />} />
 
-                {/* Rute Autentificare */}
-                <Route path="/auth/login" element={<Login />} />
-                <Route path="/auth/register" element={<Register />} />
-                <Route path="/auth/verify" element={<VerifyCode />} />
-                <Route path="/auth/verify-email" element={<VerifyEmail />} />
-                <Route path="/auth/forgot" element={<ForgotPassword />} />
-                <Route path="/auth/reset" element={<ResetPassword />} />
+                  {/* Rute Autentificare */}
+                  <Route path="/auth/login" element={<Login />} />
+                  <Route path="/auth/register" element={<Register />} />
+                  <Route path="/auth/verify" element={<VerifyCode />} />
+                  <Route path="/auth/verify-email" element={<VerifyEmail />} />
+                  <Route path="/auth/forgot" element={<ForgotPassword />} />
+                  <Route path="/auth/reset" element={<ResetPassword />} />
 
-                {/* Rute Protejate (Utilizator) */}
-                <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
-                <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-                <Route path="/account/warranties" element={<ProtectedRoute><Warranties /></ProtectedRoute>} />
-                <Route path="/service-request" element={<ProtectedRoute><ServiceRequest /></ProtectedRoute>} />
-                <Route path="/tickets" element={<ProtectedRoute><Tickets /></ProtectedRoute>} />
-                <Route path="/tickets/:id" element={<ProtectedRoute><TicketDetail /></ProtectedRoute>} />
-                <Route path="/return-request" element={<ProtectedRoute><ReturnRequest /></ProtectedRoute>} />
+                  {/* Rute Protejate (Utilizator) */}
+                  <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
+                  <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+                  <Route path="/account/warranties" element={<ProtectedRoute><Warranties /></ProtectedRoute>} />
+                  <Route path="/service-request" element={<ProtectedRoute><ServiceRequest /></ProtectedRoute>} />
+                  <Route path="/tickets" element={<ProtectedRoute><Tickets /></ProtectedRoute>} />
+                  <Route path="/tickets/:id" element={<ProtectedRoute><TicketDetail /></ProtectedRoute>} />
+                  <Route path="/return-request" element={<ProtectedRoute><ReturnRequest /></ProtectedRoute>} />
 
-                {/* Rute Administrare (Toate securizate cu requireAdmin) */}
-                <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
-                <Route path="/admin/history" element={<ProtectedRoute requireAdmin><AdminHistory /></ProtectedRoute>} />
-                <Route path="/admin/inventory" element={<ProtectedRoute requireAdmin><AdminInventory /></ProtectedRoute>} />
-                <Route path="/admin/warranties" element={<ProtectedRoute requireAdmin><AdminWarranties /></ProtectedRoute>} />
-                <Route path="/admin/tickets" element={<ProtectedRoute requireAdmin><AdminTickets /></ProtectedRoute>} />
-                <Route path="/admin/service" element={<ProtectedRoute requireAdmin><AdminService /></ProtectedRoute>} />
-                <Route path="/admin/returns" element={<ProtectedRoute requireAdmin><AdminReturns /></ProtectedRoute>} />
-                <Route path="/admin/service/history" element={<ProtectedRoute requireAdmin><AdminServiceHistory /></ProtectedRoute>} />
-                <Route path="/admin/coupons" element={<ProtectedRoute requireAdmin><AdminCoupons /></ProtectedRoute>} />
-                <Route path="/admin/reviews" element={<ProtectedRoute requireAdmin><AdminReviews /></ProtectedRoute>} />
-                <Route path="/admin/configurator" element={<ProtectedRoute requireAdmin><AdminConfigurator /></ProtectedRoute>} />
-                <Route path="/admin/users" element={<AdminUsers />} />
-                <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+                  {/* Rute Administrare (Toate securizate cu requireAdmin) */}
+                  <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
+                  <Route path="/admin/history" element={<ProtectedRoute requireAdmin><AdminHistory /></ProtectedRoute>} />
+                  <Route path="/admin/inventory" element={<ProtectedRoute requireAdmin><AdminInventory /></ProtectedRoute>} />
+                  <Route path="/admin/warranties" element={<ProtectedRoute requireAdmin><AdminWarranties /></ProtectedRoute>} />
+                  <Route path="/admin/tickets" element={<ProtectedRoute requireAdmin><AdminTickets /></ProtectedRoute>} />
+                  <Route path="/admin/service" element={<ProtectedRoute requireAdmin><AdminService /></ProtectedRoute>} />
+                  <Route path="/admin/returns" element={<ProtectedRoute requireAdmin><AdminReturns /></ProtectedRoute>} />
+                  <Route path="/admin/service/history" element={<ProtectedRoute requireAdmin><AdminServiceHistory /></ProtectedRoute>} />
+                  <Route path="/admin/coupons" element={<ProtectedRoute requireAdmin><AdminCoupons /></ProtectedRoute>} />
+                  <Route path="/admin/reviews" element={<ProtectedRoute requireAdmin><AdminReviews /></ProtectedRoute>} />
+                  <Route path="/admin/configurator" element={<ProtectedRoute requireAdmin><AdminConfigurator /></ProtectedRoute>} />
+                  <Route path="/admin/users" element={<AdminUsers />} />
+                  <Route path="/admin/announcements" element={<AdminAnnouncements />} />
 
-                <Route path="/order-canceled" element={<OrderCanceled />} />
+                  <Route path="/order-canceled" element={<OrderCanceled />} />
 
-                {/* ULTIMA RUTĂ: Catch-all pentru 404 */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </main>
-            <AnnouncementBanner />
-            <Footer />
-            <CookieBanner />
-            <MaintenanceGuard/>
+                  {/* ULTIMA RUTĂ: Catch-all pentru 404 */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </main>
+              
+              <Footer />
+              <CookieBanner />
+
+            {/* 👉 AICI SE TERMINĂ SCUTUL DE MENTENANȚĂ */}
+            </MaintenanceGuard>
+
           </div>
         </div>
 
