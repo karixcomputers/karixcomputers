@@ -9,7 +9,12 @@ export default function AdminAnnouncements() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Formular
+  // Stări pentru Editare
+  const [editingId, setEditingId] = useState(null);
+
+  // Stări pentru Modale
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null, text: "" });
+
   const [formData, setFormData] = useState({
     text: "",
     link: "",
@@ -17,7 +22,6 @@ export default function AdminAnnouncements() {
     targetPage: "all"
   });
 
-  // Lista paginilor din site-ul tău pentru dropdown
   const sitePages = [
     { value: "all", label: "Toate Paginile (Global)" },
     { value: "/", label: "Acasă (Home)" },
@@ -35,7 +39,7 @@ export default function AdminAnnouncements() {
     setLoading(true);
     try {
       const res = await apiFetch("/announcements/admin-all");
-      if (!res.ok) throw new Error("Eroare la preluarea anunțurilor. Ai dat restart la backend?");
+      if (!res.ok) throw new Error("Eroare la preluarea anunțurilor.");
       const data = await res.json();
       setAnnouncements(data);
     } catch (err) {
@@ -49,7 +53,7 @@ export default function AdminAnnouncements() {
     fetchAnnouncements();
   }, []);
 
-  const handleAdd = async (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
@@ -60,20 +64,43 @@ export default function AdminAnnouncements() {
     }
 
     try {
-      const res = await apiFetch("/announcements", {
-        method: "POST",
+      const isEditing = editingId !== null;
+      const endpoint = isEditing ? `/announcements/${editingId}` : "/announcements";
+      const method = isEditing ? "PUT" : "POST";
+
+      const res = await apiFetch(endpoint, {
+        method: method,
         body: JSON.stringify(formData)
       });
-      if (!res.ok) throw new Error("Eroare la adăugarea anunțului.");
       
+      if (!res.ok) throw new Error("Eroare la salvarea anunțului.");
+      
+      // Reset formular
       setFormData({ text: "", link: "", type: "info", targetPage: "all" });
-      setSuccessMsg("Anunțul a fost adăugat cu succes!");
+      setEditingId(null);
+      setSuccessMsg(isEditing ? "Anunț modificat cu succes!" : "Anunț adăugat cu succes!");
       fetchAnnouncements();
       
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (err) {
       setError(err.message);
     }
+  };
+
+  const handleEditClick = (announcement) => {
+    setFormData({
+      text: announcement.text,
+      link: announcement.link || "",
+      type: announcement.type,
+      targetPage: announcement.targetPage
+    });
+    setEditingId(announcement.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // ducem view-ul sus la formular
+  };
+
+  const cancelEdit = () => {
+    setFormData({ text: "", link: "", type: "info", targetPage: "all" });
+    setEditingId(null);
   };
 
   const handleToggle = async (id, currentStatus) => {
@@ -88,18 +115,19 @@ export default function AdminAnnouncements() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Ești sigur că vrei să ștergi acest anunț definitiv?")) return;
-    
+  const confirmDeleteAction = async () => {
+    if (!deleteConfirm.id) return;
     try {
-      const res = await apiFetch(`/announcements/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/announcements/${deleteConfirm.id}`, { method: "DELETE" });
       if (res.ok) {
-        setSuccessMsg("Anunțul a fost șters!");
+        setSuccessMsg("Anunțul a fost șters definitiv!");
         fetchAnnouncements();
         setTimeout(() => setSuccessMsg(""), 3000);
       }
     } catch (err) {
       setError("Eroare la ștergerea anunțului.");
+    } finally {
+      setDeleteConfirm({ show: false, id: null, text: "" });
     }
   };
 
@@ -128,17 +156,33 @@ export default function AdminAnnouncements() {
             </Link>
           </header>
 
-          {error && <div className="mb-6 p-4 rounded-xl bg-pink-500/10 border border-pink-500/30 text-pink-400 text-xs font-bold uppercase tracking-widest text-center">{error}</div>}
-          {successMsg && <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-widest text-center">{successMsg}</div>}
+          {/* ALERTE */}
+          <div className="fixed bottom-8 right-8 z-[100] flex flex-col gap-3 pointer-events-none">
+             {error && (
+                <div className="animate-in slide-in-from-right-full p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold uppercase tracking-widest shadow-2xl backdrop-blur-xl">
+                    ⚠️ {error}
+                </div>
+             )}
+             {successMsg && (
+                <div className="animate-in slide-in-from-right-full p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-widest shadow-2xl backdrop-blur-xl">
+                    ✓ {successMsg}
+                </div>
+             )}
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            {/* FORMULAR ADAUGARE */}
+            {/* FORMULAR ADAUGARE / EDITARE */}
             <div className="lg:col-span-4">
-              <div className="p-8 rounded-[35px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl sticky top-32">
-                <h2 className="text-lg font-black text-white uppercase italic tracking-widest mb-6">Adaugă Anunț Nou</h2>
+              <div className={`p-8 rounded-[35px] border backdrop-blur-xl shadow-2xl sticky top-32 transition-colors duration-500 ${editingId ? 'bg-amber-500/5 border-amber-500/30' : 'bg-white/5 border-white/10'}`}>
+                <div className="flex justify-between items-center mb-6">
+                   <h2 className="text-lg font-black text-white uppercase italic tracking-widest">
+                     {editingId ? "Editează Anunțul" : "Adaugă Anunț Nou"}
+                   </h2>
+                   {editingId && <button onClick={cancelEdit} className="text-xs text-gray-500 hover:text-white underline font-bold uppercase tracking-widest">Anulează</button>}
+                </div>
                 
-                <form onSubmit={handleAdd} className="space-y-4">
+                <form onSubmit={handleSave} className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Text Anunț *</label>
                     <textarea 
@@ -175,7 +219,6 @@ export default function AdminAnnouncements() {
                       </select>
                     </div>
 
-                    {/* 👉 AICI ESTE DROPDOWN-UL NOU PENTRU PAGINI */}
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Pagină Țintă</label>
                       <select 
@@ -194,9 +237,9 @@ export default function AdminAnnouncements() {
 
                   <button 
                     type="submit"
-                    className="w-full py-4 mt-4 rounded-2xl bg-pink-600 hover:bg-pink-500 text-white font-black uppercase tracking-widest text-[11px] shadow-lg shadow-pink-600/20 active:scale-[0.98] transition-all"
+                    className={`w-full py-4 mt-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg active:scale-[0.98] transition-all ${editingId ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/20 text-white' : 'bg-pink-600 hover:bg-pink-500 shadow-pink-600/20 text-white'}`}
                   >
-                    + Salvează Anunțul
+                    {editingId ? "💾 Salvează Modificările" : "+ Adaugă Anunțul"}
                   </button>
                 </form>
               </div>
@@ -222,11 +265,10 @@ export default function AdminAnnouncements() {
                       if (a.type === "promo") { typeLabel = "Promo"; typeColor = "text-pink-400 bg-pink-500/10 border-pink-500/20"; }
                       if (a.type === "warning") { typeLabel = "Atenție"; typeColor = "text-amber-400 bg-amber-500/10 border-amber-500/20"; }
 
-                      // Găsim label-ul frumos pentru pagina afișată
                       const pageLabel = sitePages.find(p => p.value === a.targetPage)?.label || a.targetPage;
 
                       return (
-                        <div key={a.id} className={`p-6 rounded-[25px] border transition-all ${a.isActive ? 'bg-white/[0.03] border-white/10' : 'bg-black/40 border-white/5 opacity-60'}`}>
+                        <div key={a.id} className={`p-6 rounded-[25px] border transition-all ${a.isActive ? 'bg-white/[0.03] border-white/10' : 'bg-black/40 border-white/5 opacity-60'} ${editingId === a.id ? 'ring-2 ring-amber-500/50' : ''}`}>
                           <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                             
                             <div className="flex-1">
@@ -251,19 +293,28 @@ export default function AdminAnnouncements() {
                               )}
                             </div>
 
-                            <div className="flex flex-row sm:flex-col gap-2 shrink-0 w-full sm:w-auto mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-white/10 sm:border-0">
+                            <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-white/10 sm:border-0">
                               <button 
-                                onClick={() => handleToggle(a.id, a.isActive)}
-                                className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors ${a.isActive ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'}`}
+                                onClick={() => handleEditClick(a)}
+                                className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500 hover:text-white transition-colors"
                               >
-                                {a.isActive ? "Dezactivează" : "Activează"}
+                                ✏️ Editează
                               </button>
-                              <button 
-                                onClick={() => handleDelete(a.id)}
-                                className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-colors"
-                              >
-                                Șterge
-                              </button>
+                              
+                              <div className="flex gap-2">
+                                  <button 
+                                    onClick={() => handleToggle(a.id, a.isActive)}
+                                    className={`flex-1 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors ${a.isActive ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'}`}
+                                  >
+                                    {a.isActive ? "Oprește" : "Pornește"}
+                                  </button>
+                                  <button 
+                                    onClick={() => setDeleteConfirm({ show: true, id: a.id, text: a.text })}
+                                    className="flex-1 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-colors"
+                                  >
+                                    Șterge
+                                  </button>
+                              </div>
                             </div>
 
                           </div>
@@ -278,6 +329,23 @@ export default function AdminAnnouncements() {
           </div>
         </div>
       </div>
+
+      {/* MODAL ȘTERGERE FRUMOS (Înlocuiește window.confirm) */}
+      {deleteConfirm.show && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 backdrop-blur-md bg-black/60">
+          <div className="relative w-full max-w-sm bg-[#161e31]/90 backdrop-blur-2xl border border-rose-500/20 p-10 rounded-[40px] text-center shadow-2xl animate-in zoom-in">
+            <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">🗑️</div>
+            <h2 className="text-2xl font-black text-white mb-2 italic uppercase">Ștergere Anunț</h2>
+            <p className="text-gray-400 text-sm mb-8 leading-relaxed font-medium italic">
+              Ești sigur că vrei să ștergi definitiv acest anunț? <br/><br/> <span className="text-white font-bold opacity-80">"{deleteConfirm.text}"</span>
+            </p>
+            <div className="flex gap-4">
+              <button onClick={() => setDeleteConfirm({ show: false, id: null, text: "" })} className="flex-1 py-4 rounded-2xl font-black text-gray-400 bg-white/5 hover:bg-white/10 uppercase tracking-widest text-[10px] transition-all">Anulează</button>
+              <button onClick={confirmDeleteAction} className="flex-1 py-4 rounded-2xl font-black text-white bg-rose-600 hover:bg-rose-500 uppercase tracking-widest text-[10px] shadow-lg shadow-rose-600/20 transition-all">Da, Șterge</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
