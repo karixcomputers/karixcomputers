@@ -57,7 +57,7 @@ import AdminReviews from "./pages/AdminReviews";
 import AdminConfigurator from "./pages/AdminConfigurator.jsx";
 import Failed from "./pages/Failed";
 import AdminUsers from "./pages/admin/AdminUsers"; // Atenție: e bine să fie din /admin/
-import AdminAnnouncements from "./pagesAdminAnnouncements"; // Atenție: e bine să fie din /admin/
+import AdminAnnouncements from "./pages/AdminAnnouncements"; // Atenție: e bine să fie din /admin/
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
