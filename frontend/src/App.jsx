@@ -56,9 +56,8 @@ import ProductDetails from "./pages/ProductDetails";
 import AdminReviews from "./pages/AdminReviews";
 import AdminConfigurator from "./pages/AdminConfigurator.jsx";
 import Failed from "./pages/Failed";
-import AdminUsers from "./pages/AdminUsers";
-import AdminAnnouncements from "./pages/AdminAnnouncements";
-
+import AdminUsers from "./pages/admin/AdminUsers"; // Atenție: e bine să fie din /admin/
+import AdminAnnouncements from "./pages/admin/AdminAnnouncements"; // Atenție: e bine să fie din /admin/
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
@@ -80,6 +79,10 @@ export default function App() {
           </div>
 
           <div className="relative z-10 flex flex-col flex-1 w-full">
+            
+            {/* 👉 AICI PUNEM BANNERUL (Deasupra Header-ului) */}
+            <AnnouncementBanner />
+
             <Header />
             
             <main className="flex-1 w-full relative z-20">
@@ -98,7 +101,6 @@ export default function App() {
                 <Route path="/wishlist" element={<Wishlist />} />
                 <Route path="/configurator" element={<Configurator />} />
                 <Route path="/product/:id" element={<ProductDetails />} />
-                <Route path="/failed" element={<Failed />} />
                 <Route path="/failed" element={<Failed />} />
 
                 {/* Rute Legale */}
@@ -136,8 +138,8 @@ export default function App() {
                 <Route path="/admin/coupons" element={<ProtectedRoute requireAdmin><AdminCoupons /></ProtectedRoute>} />
                 <Route path="/admin/reviews" element={<ProtectedRoute requireAdmin><AdminReviews /></ProtectedRoute>} />
                 <Route path="/admin/configurator" element={<ProtectedRoute requireAdmin><AdminConfigurator /></ProtectedRoute>} />
-                <Route path="/admin/users" element={<AdminUsers />} />
-                <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+                <Route path="/admin/users" element={<ProtectedRoute requireAdmin><AdminUsers /></ProtectedRoute>} />
+                <Route path="/admin/announcements" element={<ProtectedRoute requireAdmin><AdminAnnouncements /></ProtectedRoute>} />
 
                 <Route path="/order-canceled" element={<OrderCanceled />} />
 
@@ -145,7 +147,7 @@ export default function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
-            <AnnouncementBanner />
+            
             <Footer />
             <CookieBanner />
           </div>
