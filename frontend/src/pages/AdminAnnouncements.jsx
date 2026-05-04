@@ -17,11 +17,25 @@ export default function AdminAnnouncements() {
     targetPage: "all"
   });
 
+  // Lista paginilor din site-ul tău pentru dropdown
+  const sitePages = [
+    { value: "all", label: "Toate Paginile (Global)" },
+    { value: "/", label: "Acasă (Home)" },
+    { value: "/shop", label: "Magazin (Shop)" },
+    { value: "/cart", label: "Coș de cumpărături" },
+    { value: "/checkout", label: "Finalizare Comandă" },
+    { value: "/contact", label: "Contact" },
+    { value: "/support", label: "Suport Tehnic (FAQ)" },
+    { value: "/warranty", label: "Garanție Extinsă" },
+    { value: "/terms", label: "Termeni și Condiții" },
+    { value: "/confidentialitate", label: "Politica de Confidențialitate" }
+  ];
+
   const fetchAnnouncements = async () => {
     setLoading(true);
     try {
       const res = await apiFetch("/announcements/admin-all");
-      if (!res.ok) throw new Error("Eroare la preluarea anunțurilor.");
+      if (!res.ok) throw new Error("Eroare la preluarea anunțurilor. Ai dat restart la backend?");
       const data = await res.json();
       setAnnouncements(data);
     } catch (err) {
@@ -151,7 +165,7 @@ export default function AdminAnnouncements() {
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Tip Banner</label>
                       <select 
-                        className="w-full bg-[#0b1020]/50 border border-white/10 rounded-2xl p-4 text-white focus:border-pink-500/50 outline-none transition-all font-bold text-xs uppercase tracking-widest cursor-pointer"
+                        className="w-full bg-[#0b1020]/50 border border-white/10 rounded-2xl p-4 text-white focus:border-pink-500/50 outline-none transition-all font-bold text-[10px] uppercase tracking-widest cursor-pointer"
                         value={formData.type}
                         onChange={e => setFormData({ ...formData, type: e.target.value })}
                       >
@@ -161,15 +175,20 @@ export default function AdminAnnouncements() {
                       </select>
                     </div>
 
+                    {/* 👉 AICI ESTE DROPDOWN-UL NOU PENTRU PAGINI */}
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-500 uppercase ml-1 italic">Pagină Țintă</label>
-                      <input 
-                        type="text"
-                        className="w-full bg-[#0b1020]/50 border border-white/10 rounded-2xl p-4 text-white focus:border-pink-500/50 outline-none transition-all font-bold text-xs placeholder-gray-600"
-                        placeholder="all sau /cart"
+                      <select 
+                        className="w-full bg-[#0b1020]/50 border border-white/10 rounded-2xl p-4 text-white focus:border-pink-500/50 outline-none transition-all font-bold text-[10px] uppercase tracking-widest cursor-pointer"
                         value={formData.targetPage}
                         onChange={e => setFormData({ ...formData, targetPage: e.target.value })}
-                      />
+                      >
+                        {sitePages.map(page => (
+                          <option key={page.value} value={page.value}>
+                            {page.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -203,6 +222,9 @@ export default function AdminAnnouncements() {
                       if (a.type === "promo") { typeLabel = "Promo"; typeColor = "text-pink-400 bg-pink-500/10 border-pink-500/20"; }
                       if (a.type === "warning") { typeLabel = "Atenție"; typeColor = "text-amber-400 bg-amber-500/10 border-amber-500/20"; }
 
+                      // Găsim label-ul frumos pentru pagina afișată
+                      const pageLabel = sitePages.find(p => p.value === a.targetPage)?.label || a.targetPage;
+
                       return (
                         <div key={a.id} className={`p-6 rounded-[25px] border transition-all ${a.isActive ? 'bg-white/[0.03] border-white/10' : 'bg-black/40 border-white/5 opacity-60'}`}>
                           <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -213,7 +235,7 @@ export default function AdminAnnouncements() {
                                   {typeLabel}
                                 </span>
                                 <span className="px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-gray-400 text-[8px] font-black uppercase tracking-widest">
-                                  {a.targetPage === "all" ? "Toate paginile" : a.targetPage}
+                                  {pageLabel}
                                 </span>
                                 {!a.isActive && (
                                   <span className="px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[8px] font-black uppercase tracking-widest">Inactiv</span>
