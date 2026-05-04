@@ -8,6 +8,7 @@ import Footer from "./components/Footer.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import NetworkBackground from "./components/NetworkBackground.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx"; 
+import AnnouncementBanner from "./components/AnnouncementBanner";
 
 // Pagini
 import Home from "./pages/Home.jsx";
@@ -56,6 +57,8 @@ import AdminReviews from "./pages/AdminReviews";
 import AdminConfigurator from "./pages/AdminConfigurator.jsx";
 import Failed from "./pages/Failed";
 import AdminUsers from "./pages/AdminUsers";
+import AdminAnnouncements from "./pages/AdminAnnouncements";
+
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
@@ -96,6 +99,7 @@ export default function App() {
                 <Route path="/configurator" element={<Configurator />} />
                 <Route path="/product/:id" element={<ProductDetails />} />
                 <Route path="/failed" element={<Failed />} />
+                <Route path="/failed" element={<Failed />} />
 
                 {/* Rute Legale */}
                 <Route path="/terms" element={<Terms />} />
@@ -133,6 +137,7 @@ export default function App() {
                 <Route path="/admin/reviews" element={<ProtectedRoute requireAdmin><AdminReviews /></ProtectedRoute>} />
                 <Route path="/admin/configurator" element={<ProtectedRoute requireAdmin><AdminConfigurator /></ProtectedRoute>} />
                 <Route path="/admin/users" element={<AdminUsers />} />
+                <Route path="/admin/announcements" element={<AdminAnnouncements />} />
 
                 <Route path="/order-canceled" element={<OrderCanceled />} />
 
@@ -140,7 +145,7 @@ export default function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
-            
+            <AnnouncementBanner />
             <Footer />
             <CookieBanner />
           </div>

@@ -241,3 +241,14 @@ model ConfiguratorComponent {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 }
+
+model Announcement {
+  id         Int      @id @default(autoincrement())
+  text       String   // Textul afișat (ex: "Livrări gratuite azi!")
+  link       String?  // Link opțional dacă vrei ca anunțul să fie apăsabil
+  type       String   @default("info") // tip: "info", "promo", "warning"
+  targetPage String   @default("all")  // "all" sau "/shop", "/cart", "/contact", etc.
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
