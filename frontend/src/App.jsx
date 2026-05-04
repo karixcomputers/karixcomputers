@@ -58,6 +58,7 @@ import AdminConfigurator from "./pages/AdminConfigurator.jsx";
 import Failed from "./pages/Failed";
 import AdminUsers from "./pages/AdminUsers";
 import AdminAnnouncements from "./pages/AdminAnnouncements";
+import MaintenanceGuard from "./components/MaintenanceGuard";
 
 
 // IMPORT NOU PENTRU PAGINA 404
@@ -150,6 +151,7 @@ export default function App() {
             <AnnouncementBanner />
             <Footer />
             <CookieBanner />
+            <MaintenanceGuard/>
           </div>
         </div>
 
