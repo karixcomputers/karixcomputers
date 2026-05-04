@@ -80,10 +80,11 @@ export default function App() {
           </div>
 
           <div className="relative z-10 flex flex-col flex-1 w-full">
-            <AnnouncementBanner />
+            
             <Header />
             
             <main className="flex-1 w-full relative z-20">
+              <AnnouncementBanner />
               <Routes>
                 {/* Rute Publice */}
                 <Route path="/" element={<Home />} />
