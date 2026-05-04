@@ -12,7 +12,7 @@ export default function MaintenanceGuard({ children }) {
 
   // 2. Setăm dacă site-ul e în mentenanță sau nu (Schimbi în `true` când vrei să-l închizi)
   // Într-o variantă mai avansată, acest `true/false` l-ai lua din baza de date printr-un API call.
-  const MAINTENANCE_MODE_ACTIVE = true; // 👉 SCHIMBĂ AICI CÂND VREI SĂ PUI SITE-UL ÎN MENTENANȚĂ
+  const MAINTENANCE_MODE_ACTIVE = false; // 👉 SCHIMBĂ AICI CÂND VREI SĂ PUI SITE-UL ÎN MENTENANȚĂ
 
   useEffect(() => {
     // Verificăm dacă ai parola în URL (ex: karixcomputers.ro/?bypass=karix-admin-acces-rapid)
