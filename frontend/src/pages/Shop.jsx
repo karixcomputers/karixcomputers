@@ -18,7 +18,6 @@ export default function Shop() {
   const [toasts, setToasts] = useState([]);
 
   const [availableCases, setAvailableCases] = useState([]);
-
   const [customSelections, setCustomSelections] = useState({});
 
   const [filterCpu, setFilterCpu] = useState("Toate"); 
@@ -38,13 +37,12 @@ export default function Shop() {
   
   const specRefs = useRef([]);
 
-// MODIFICĂ ASTA:
-const getImageUrl = (img) => {
-  if (!img) return "https://placehold.co/600x400/0b1020/ffffff?text=Karix+PC";
-  if (img.startsWith("http")) return img;
-  // Trebuie să fie /api/uploads/ pentru a se potrivi cu setările din app.js
-  return `https://karixcomputers.ro/api/uploads/${img}`; 
-};
+  // 👉 FIX: URL corectat pentru backend
+  const getImageUrl = (img) => {
+    if (!img) return "https://placehold.co/600x400/0b1020/ffffff?text=Karix+PC";
+    if (img.startsWith("http")) return img;
+    return `https://karixcomputers.ro/api/uploads/${img}`; 
+  };
 
   useEffect(() => {
     if (showCompareModal) {
@@ -99,7 +97,10 @@ const getImageUrl = (img) => {
         onlyPcs.forEach(pc => {
             let defaultCaseId = null;
             if (pc.compatibleCases && pc.compatibleCases.length > 0) {
-                const firstValidCase = fetchedCases.find(c => c.id === pc.compatibleCases[0]);
+                // 👉 FIX: Comparare ID-uri robustă la inițializare
+                const firstValidCase = fetchedCases.find(c => 
+                    pc.compatibleCases?.some(compatId => String(compatId).trim() === String(c.id).trim())
+                );
                 if(firstValidCase) defaultCaseId = firstValidCase.id;
             }
 
@@ -359,7 +360,6 @@ const getImageUrl = (img) => {
           }
         `}</style>
 
-
         <div className="max-w-6xl mx-auto relative z-10">
           
           <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
@@ -371,7 +371,6 @@ const getImageUrl = (img) => {
             </div>
 
             <div className="flex flex-wrap items-center gap-4 relative">
-              
               {user?.role === "admin" && (
                 <button 
                   onClick={toggleReorderMode}
@@ -410,14 +409,12 @@ const getImageUrl = (img) => {
                   </div>
                 </>
               )}
-
             </div>
           </header>
 
           {showFilters && !isReordering && (
             <div className="mb-12 p-8 rounded-[35px] bg-[#0b1020]/60 border border-white/10 backdrop-blur-xl shadow-2xl animate-in fade-in slide-in-from-top-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                
                 <div className="flex flex-col gap-3">
                   <label className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] italic">Procesor (CPU)</label>
                   <select 
@@ -475,13 +472,11 @@ const getImageUrl = (img) => {
                     <span>Max</span>
                   </div>
                 </div>
-
               </div>
             </div>
           )}
 
           {isReordering ? (
-            
             <div className="bg-[#12192b] border border-white/10 p-8 rounded-[40px] shadow-2xl">
               <div className="flex justify-between items-center mb-8">
                 <div>
@@ -528,9 +523,7 @@ const getImageUrl = (img) => {
                 </Droppable>
               </DragDropContext>
             </div>
-
           ) : (
-            
             filteredAndSortedPcs.length === 0 ? (
               <div className="text-center py-24 border border-white/5 rounded-[40px] bg-white/5 backdrop-blur-md shadow-2xl">
                 <p className="text-gray-400 font-black italic uppercase tracking-[0.2em] text-sm">Nu am găsit sisteme cu aceste specificații.</p>
@@ -540,242 +533,212 @@ const getImageUrl = (img) => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-{filteredAndSortedPcs.map((pc) => {
-  const isCompared = compareList.find(c => c.id === pc.id);
-  
-  // 1. Logica Stocare
-  const dynamicStorageOptions = getStorageOptions(pc.storageGb);
-  const selectedStorage = customSelections[pc.id]?.storage || pc.storageGb || "1TB";
-  const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
-  const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
-  
-  // 2. Filtrare Carcase (Folosim String().trim() pentru a curăța ID-urile)
-  const pcCompatibleCases = availableCases.filter(c => 
-    pc.compatibleCases?.some(compatId => String(compatId).trim() === String(c.id).trim())
-  );
+                {filteredAndSortedPcs.map((pc) => {
+                  const isCompared = compareList.find(c => c.id === pc.id);
+                  
+                  // 👉 FIX LOGICĂ COMPONENTE DINAMICE
+                  const dynamicStorageOptions = getStorageOptions(pc.storageGb);
+                  const selectedStorage = customSelections[pc.id]?.storage || pc.storageGb || "1TB";
+                  const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
+                  const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
+                  
+                  // 1. Filtrare Carcase (Robustă cu String comparison)
+                  const pcCompatibleCases = availableCases.filter(c => 
+                    pc.compatibleCases?.some(compatId => String(compatId).trim() === String(c.id).trim())
+                  );
 
-  // 3. Identificare Carcasă Selectată
-  const selectedCaseIdFromState = customSelections[pc.id]?.caseId;
-  const activeCaseId = selectedCaseIdFromState || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
-  
-  // 4. Găsim obiectul carcasei
-  const selectedCaseObj = pcCompatibleCases.find(c => String(c.id).trim() === String(activeCaseId).trim());
-  
-  // 5. STABILIM IMAGINEA (Aici e magia)
-  // Verificăm dacă obiectul există și are imagine. Dacă nu, punem poza default a PC-ului.
-  const displayImage = (selectedCaseObj && selectedCaseObj.image && selectedCaseObj.image !== "") 
-    ? selectedCaseObj.image 
-    : (pc.images && pc.images.length > 0 ? pc.images[0] : null);
+                  // 2. Determinăm ID-ul selectat (Păstrăm numele variabil pentru a fi disponibil în JSX)
+                  const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
 
-  const caseAddedPriceCents = selectedCaseObj?.price || 0;
-  const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
+                  // 3. Găsim obiectul carcasei
+                  const selectedCaseObj = pcCompatibleCases.find(c => String(c.id).trim() === String(selectedCaseId).trim());
 
-  const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
-  const finalCaseText = selectedCaseObj ? selectedCaseObj.name : (pc.case || "N/A");
+                  // 4. ALEGEM IMAGINEA (Magia reactivității)
+                  const displayImage = (selectedCaseObj && selectedCaseObj.image && selectedCaseObj.image !== "") 
+                    ? selectedCaseObj.image 
+                    : (pc.images && pc.images.length > 0 ? pc.images[0] : null);
 
-  // Debug (Șterge-l după ce funcționează):
-  // console.log(`PC: ${pc.name}, Case: ${selectedCaseObj?.name}, Img: ${displayImage}`);
+                  // 5. Calcule finale preț
+                  const caseAddedPriceCents = selectedCaseObj?.price || 0;
+                  const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
+
+                  const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
+                  const finalCaseText = selectedCaseObj ? selectedCaseObj.name : (pc.case || "N/A");
 
                   return (
-                  <div key={pc.id} className="flex flex-col rounded-[35px] bg-white/5 border border-white/10 overflow-hidden group hover:border-indigo-500/40 transition-all duration-500 backdrop-blur-md shadow-2xl relative">
-                    
-                    <div className="relative h-64 overflow-hidden bg-black/20">
-                      <div className="absolute top-5 left-5 z-20 flex flex-col gap-2">
-                        <div className="group/badge relative">
-                            <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-black text-[10px] font-black uppercase tracking-widest shadow-xl cursor-help block">
-                                Asamblat la Comandă
-                            </span>
-                            <div className="absolute top-full left-0 mt-2 w-48 p-2 bg-[#0b1020] text-gray-300 text-[9px] border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover/badge:opacity-100 group-hover/badge:visible transition-all z-30">
-                                Sistem asamblat la comandă, produs personalizat ce nu se supune returului în 14 zile cf. OUG 34/2014, art.16, lit. c.
+                    <div key={pc.id} className="flex flex-col rounded-[35px] bg-white/5 border border-white/10 overflow-hidden group hover:border-indigo-500/40 transition-all duration-500 backdrop-blur-md shadow-2xl relative">
+                      
+                      <div className="relative h-64 overflow-hidden bg-black/20">
+                        <div className="absolute top-5 left-5 z-20 flex flex-col gap-2">
+                          <div className="group/badge relative">
+                              <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-black text-[10px] font-black uppercase tracking-widest shadow-xl cursor-help block">
+                                  Asamblat la Comandă
+                              </span>
+                              <div className="absolute top-full left-0 mt-2 w-48 p-2 bg-[#0b1020] text-gray-300 text-[9px] border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover/badge:opacity-100 group-hover/badge:visible transition-all z-30">
+                                  Sistem asamblat la comandă, produs personalizat ce nu se supune returului în 14 zile cf. OUG 34/2014, art.16, lit. c.
+                              </div>
+                          </div>
+
+                          <span className="px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-widest border border-white/10">
+                            🛡️ {pc.warrantyMonths || 24} Luni
+                          </span>
+                        </div>
+
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleWishlist(pc.id);
+                          }}
+                          className={`absolute top-5 right-5 z-30 h-10 w-10 rounded-xl backdrop-blur-xl border flex items-center justify-center transition-all duration-300 shadow-2xl active:scale-90 ${
+                            isFavorite(pc.id) 
+                              ? 'bg-rose-500/20 border-rose-500/40 text-rose-400' 
+                              : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          <span className="text-lg leading-none transition-transform duration-300 group-active:scale-125">
+                            {isFavorite(pc.id) ? '❤️' : '🤍'}
+                          </span>
+                        </button>
+
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleCompare(pc);
+                          }}
+                          className={`absolute top-16 right-5 z-30 h-10 w-10 rounded-xl backdrop-blur-xl border flex items-center justify-center transition-all duration-300 shadow-2xl active:scale-90 ${
+                            isCompared
+                              ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400' 
+                              : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          <span className="text-lg leading-none">⚖️</span>
+                        </button>
+
+                        {/* 👉 IMAGINEA DINAMICĂ */}
+                        <img 
+                          src={getImageUrl(displayImage)} 
+                          alt={pc.name} 
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0b1020] via-black/40 to-transparent opacity-90" />
+                      </div>
+
+                      <div className="p-8 flex-1 flex flex-col">
+                        <div className="mb-6 relative z-10 -mt-12">
+                          <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 drop-shadow-md">{pc.cpuBrand?.split(' ')[0] || 'Custom'} Edition</p>
+                          <h3 className="text-2xl font-black text-white tracking-tight italic uppercase drop-shadow-2xl">{pc.name}</h3>
+                        </div>
+
+                        {/* Specificații */}
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-4 mb-6">
+                          <div className="flex items-center gap-3">
+                            <span className="text-indigo-400 text-base">⚡</span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">CPU</span>
+                              <span className="font-bold text-white/90 text-[11px] leading-tight line-clamp-1">{pc.cpuBrand || 'N/A'}</span>
                             </div>
-                        </div>
-
-                        <span className="px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-widest border border-white/10">
-                          🛡️ {pc.warrantyMonths || 24} Luni
-                        </span>
-                      </div>
-
-                      <button 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleWishlist(pc.id);
-                        }}
-                        className={`absolute top-5 right-5 z-30 h-10 w-10 rounded-xl backdrop-blur-xl border flex items-center justify-center transition-all duration-300 shadow-2xl active:scale-90 ${
-                          isFavorite(pc.id) 
-                            ? 'bg-rose-500/20 border-rose-500/40 text-rose-400' 
-                            : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10'
-                        }`}
-                      >
-                        <span className="text-lg leading-none transition-transform duration-300 group-active:scale-125">
-                          {isFavorite(pc.id) ? '❤️' : '🤍'}
-                        </span>
-                      </button>
-
-                      <button 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleCompare(pc);
-                        }}
-                        className={`absolute top-16 right-5 z-30 h-10 w-10 rounded-xl backdrop-blur-xl border flex items-center justify-center transition-all duration-300 shadow-2xl active:scale-90 ${
-                          isCompared
-                            ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400' 
-                            : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10'
-                        }`}
-                        title="Adaugă la Comparare"
-                      >
-                        <span className="text-lg leading-none transition-transform duration-300 group-active:scale-125">
-                          ⚖️
-                        </span>
-                      </button>
-
-                      <img 
-                        // 👉 AICI se folosește imaginea selectată dinamic
-                        src={getImageUrl(displayImage)} 
-                        alt={pc.name} 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#0b1020] via-black/40 to-transparent opacity-90" />
-                    </div>
-
-                    <div className="p-8 flex-1 flex flex-col">
-                      <div className="mb-6 relative z-10 -mt-12">
-                        <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 drop-shadow-md">{pc.cpuBrand?.split(' ')[0] || 'Custom'} Edition</p>
-                        <h3 className="text-2xl font-black text-white tracking-tight italic uppercase drop-shadow-2xl">{pc.name}</h3>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-4 mb-6">
-                        <div className="flex items-center gap-3">
-                          <span className="text-indigo-400 text-base">⚡</span>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">CPU</span>
-                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.cpuBrand || 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-indigo-400 text-base">🎮</span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">GPU</span>
+                              <span className="font-bold text-white/90 text-[11px] leading-tight line-clamp-1">{pc.gpuBrand || 'N/A'}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-indigo-400 text-base">📟</span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">RAM</span>
+                              <span className="font-bold text-white/90 text-[11px] leading-tight line-clamp-1">{pc.ramGb || 'N/A'}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-indigo-400 text-base">❄️</span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Cooler</span>
+                              <span className="font-bold text-white/90 text-[11px] leading-tight line-clamp-1">{pc.cooler || 'N/A'}</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-indigo-400 text-base">🎮</span>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">GPU</span>
-                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.gpuBrand || 'N/A'}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-indigo-400 text-base">📟</span>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">RAM</span>
-                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.ramGb || 'N/A'}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-indigo-400 text-base">🧩</span>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Placă Bază</span>
-                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.motherboard || 'N/A'}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-indigo-400 text-base">❄️</span>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Cooler</span>
-                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.cooler || 'N/A'}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-indigo-400 text-base">🔌</span>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Sursă</span>
-                            <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{pc.psu || 'N/A'}</span>
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="flex flex-col gap-3 mb-6 mt-4">
-                        {/* Selector Carcase */}
-                        {pcCompatibleCases.length > 0 && (
-                          <div className="flex flex-col">
-                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
-                              <span className="text-indigo-400 text-[10px]">📦</span> Alege Carcasa
-                            </label>
-                            <div className="relative">
-                              <select 
-                                value={selectedCaseId || ''} 
-                                onChange={(e) => updateSelection(pc.id, 'caseId', e.target.value)}
-                                className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
-                              >
-                                {pcCompatibleCases.map(caseOpt => (
-                                  <option key={caseOpt.id} value={caseOpt.id}>
-                                    {caseOpt.name} {caseOpt.price > 0 ? `(+${formatRON(caseOpt.price)})` : ''}
-                                  </option>
-                                ))}
-                              </select>
-                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
-                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                        <div className="flex flex-col gap-3 mb-6 mt-4">
+                          {/* Selector Carcase */}
+                          {pcCompatibleCases.length > 0 && (
+                            <div className="flex flex-col">
+                              <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
+                                <span className="text-indigo-400 text-[10px]">📦</span> Alege Carcasa
+                              </label>
+                              <div className="relative">
+                                <select 
+                                  value={selectedCaseId || ''} 
+                                  onChange={(e) => updateSelection(pc.id, 'caseId', e.target.value)}
+                                  className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                                >
+                                  {pcCompatibleCases.map(caseOpt => (
+                                    <option key={caseOpt.id} value={caseOpt.id}>
+                                      {caseOpt.name} {caseOpt.price > 0 ? `(+${formatRON(caseOpt.price)})` : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {dynamicStorageOptions.length > 0 && (
-                          <div className="flex flex-col">
-                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
-                              <span className="text-indigo-400 text-[10px]">💾</span> Memorie Stocare
-                            </label>
-                            <div className="relative">
-                              <select 
-                                value={selectedStorage} 
-                                onChange={(e) => updateSelection(pc.id, 'storage', e.target.value)}
-                                className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
-                              >
-                                {dynamicStorageOptions.map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label} {option.extraText ? `(${option.extraText})` : ''}
-                                  </option>
-                                ))}
-                              </select>
-                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
-                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                          {/* Selector Stocare */}
+                          {dynamicStorageOptions.length > 0 && (
+                            <div className="flex flex-col">
+                              <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
+                                <span className="text-indigo-400 text-[10px]">💾</span> Memorie Stocare
+                              </label>
+                              <div className="relative">
+                                <select 
+                                  value={selectedStorage} 
+                                  onChange={(e) => updateSelection(pc.id, 'storage', e.target.value)}
+                                  className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                                >
+                                  {dynamicStorageOptions.map(option => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label} {option.extraText ? `(${option.extraText})` : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
 
-                      <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-4">
-                        <div className="flex items-center justify-center"> 
+                        <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-4">
                           <div className="flex flex-col items-center text-center"> 
-                            <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">
-                              Preț Sistem
-                            </span>
-                            <span className="text-2xl font-black text-white italic">
-                              {formatRON(currentPriceCents)}
-                            </span>
+                            <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Preț Sistem</span>
+                            <span className="text-2xl font-black text-white italic">{formatRON(currentPriceCents)}</span>
                           </div>
-                        </div>
-                        
-                        <div className="flex gap-2">
-                          <Link 
-                            to={`/product/${pc.id}`}
-                            className="flex-1 h-12 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/20 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg"
-                          >
-                            Detalii
-                          </Link>
-                          <button 
-                            // 👉 Trimitem displayImage către funcția de adăugare în coș
-                            onClick={() => handleAddToCart(pc, currentPriceCents, finalStorageText, finalCaseText, displayImage)} 
-                            className="flex-1 h-12 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg shadow-indigo-600/20"
-                          >
-                            Adaugă
-                          </button>
+                          
+                          <div className="flex gap-2">
+                            <Link to={`/product/${pc.id}`} className="flex-1 h-12 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/20 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg">Detalii</Link>
+                            <button 
+                              onClick={() => handleAddToCart(pc, currentPriceCents, finalStorageText, finalCaseText, displayImage)} 
+                              className="flex-1 h-12 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg shadow-indigo-600/20"
+                            >
+                              Adaugă
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )})}
+                  );
+                })}
               </div>
             )
           )}
         </div>
 
-        {/* --- BARĂ PLUTITOARE COMPARARE --- */}
+        {/* Bară Plutitoare Comparare */}
         {compareList.length > 0 && !isReordering && (
           <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-6 bg-[#0b1020]/95 backdrop-blur-2xl border border-indigo-500/30 p-4 rounded-[28px] shadow-[0_0_40px_rgba(99,102,241,0.2)] animate-in slide-in-from-bottom-10">
             <div className="flex -space-x-4 pl-2">
@@ -794,57 +757,36 @@ const getImageUrl = (img) => {
               >
                 Compară Acum
               </button>
-              <button 
-                onClick={() => setCompareList([])} 
-                className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 border border-white/10 hover:border-rose-500/30 rounded-2xl transition-all active:scale-95"
-              >
-                ✕
-              </button>
+              <button onClick={() => setCompareList([])} className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 border border-white/10 hover:border-rose-500/30 rounded-2xl transition-all active:scale-95">✕</button>
             </div>
           </div>
         )}
 
-        {/* --- MODAL FULLSCREEN COMPARARE --- */}
+        {/* Modal Comparare */}
         {showCompareModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-10 backdrop-blur-md bg-black/40 animate-in fade-in duration-300">
             <div className="relative w-full max-w-7xl h-full max-h-[90vh] bg-[#0b1020]/95 border border-white/10 p-6 md:p-10 rounded-[40px] shadow-2xl flex flex-col backdrop-blur-2xl">
-              
-              <button 
-                onClick={() => setShowCompareModal(false)} 
-                className="absolute top-6 right-6 h-12 w-12 flex items-center justify-center rounded-2xl bg-white/5 text-gray-400 hover:text-white hover:bg-rose-500 hover:border-rose-500 border border-white/10 transition-all z-10 text-xl"
-              >
-                ✕
-              </button>
-              
-              <h2 className="text-center text-3xl md:text-5xl font-black text-white uppercase italic tracking-tighter mb-8 drop-shadow-lg shrink-0">
-                Comparare <span className="text-indigo-400">Sisteme</span>
-              </h2>
+              <button onClick={() => setShowCompareModal(false)} className="absolute top-6 right-6 h-12 w-12 flex items-center justify-center rounded-2xl bg-white/5 text-gray-400 hover:text-white hover:bg-rose-500 border border-white/10 transition-all z-10">✕</button>
+              <h2 className="text-center text-3xl md:text-5xl font-black text-white uppercase italic tracking-tighter mb-8 shrink-0">Comparare <span className="text-indigo-400">Sisteme</span></h2>
               
               <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory flex-1 items-start md:justify-center no-scrollbar custom-scrollbar">
                 {compareList.map((pc, index) => (
-                  <div key={pc.id} className="min-w-[300px] w-[300px] md:w-[350px] h-full flex flex-col bg-white/[0.03] border border-white/10 rounded-[30px] p-6 snap-center hover:border-indigo-500/40 transition-colors shadow-2xl relative text-left">
-                    
+                  <div key={pc.id} className="min-w-[300px] w-[300px] md:w-[350px] h-full flex flex-col bg-white/[0.03] border border-white/10 rounded-[30px] p-6 snap-center relative">
                     <button onClick={() => {
                       const newList = compareList.filter(c => c.id !== pc.id);
                       setCompareList(newList);
                       if (newList.length === 0) setShowCompareModal(false);
-                    }} className="absolute top-4 right-4 text-gray-500 hover:text-rose-500 h-8 w-8 rounded-full flex items-center justify-center hover:bg-rose-500/10 transition-colors z-20">
-                      ✕
-                    </button>
+                    }} className="absolute top-4 right-4 text-gray-500 hover:text-rose-500 h-8 w-8 rounded-full flex items-center justify-center hover:bg-rose-500/10 transition-colors z-20">✕</button>
 
-                    <img src={getImageUrl(pc.images?.[0])} alt="" className="w-full h-40 object-contain rounded-2xl mb-4 drop-shadow-2xl shrink-0" />
+                    <img src={getImageUrl(pc.images?.[0])} alt="" className="w-full h-40 object-contain rounded-2xl mb-4 shrink-0" />
                     
                     <div className="shrink-0 mb-4">
-                      <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] mb-1">{pc.cpuBrand?.split(' ')[0] || 'Custom'}</p>
+                      <p className="text-[10px] text-indigo-400 font-black uppercase mb-1">{pc.cpuBrand?.split(' ')[0] || 'Custom'}</p>
                       <h3 className="text-2xl font-black text-white italic uppercase tracking-tight leading-tight line-clamp-2 min-h-[3rem]">{pc.name}</h3>
-                      <p className="text-2xl font-black text-white drop-shadow-xl italic mt-2">{formatRON(pc.priceCents)}</p>
+                      <p className="text-2xl font-black text-white italic mt-2">{formatRON(pc.priceCents)}</p>
                     </div>
                     
-                    <div 
-                      ref={el => specRefs.current[index] = el}
-                      onScroll={handleSyncScroll}
-                      className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2 no-scrollbar"
-                    >
+                    <div ref={el => specRefs.current[index] = el} onScroll={handleSyncScroll} className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2 no-scrollbar">
                       {renderCompareSpec("⚡", "Procesor", pc.cpuBrand)}
                       {renderCompareSpec("🎮", "Placă Video", pc.gpuBrand)}
                       {renderCompareSpec("📟", "Memorie RAM", pc.ramGb)}
@@ -855,8 +797,7 @@ const getImageUrl = (img) => {
                       {renderCompareSpec("📦", "Carcasă", pc.case)}
                     </div>
                     
-                    <button 
-                      onClick={() => { 
+                    <button onClick={() => {
                         const dynamicStorageOptions = getStorageOptions(pc.storageGb);
                         const selectedStorage = customSelections[pc.id]?.storage || pc.storageGb || "1TB";
                         const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
@@ -864,38 +805,17 @@ const getImageUrl = (img) => {
                         
                         const pcCompatibleCases = availableCases.filter(c => pc.compatibleCases?.includes(c.id));
                         const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
-                        let caseAddedPriceCents = 0;
-                        let selectedCaseObj = null;
+                        const selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId);
 
-                        if (selectedCaseId && pcCompatibleCases.length > 0) {
-                            selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId);
-                            if (selectedCaseObj) {
-                                caseAddedPriceCents = selectedCaseObj.price || 0; 
-                            } else {
-                                selectedCaseObj = pcCompatibleCases[0];
-                                caseAddedPriceCents = selectedCaseObj.price || 0;
-                            }
-                        }
-
-                        // Imaginea dinamică și pentru butonul de coș din modal
-                        const displayImg = (selectedCaseObj && selectedCaseObj.image) 
-                          ? selectedCaseObj.image 
-                          : pc.images?.[0];
-
+                        const displayImg = (selectedCaseObj && selectedCaseObj.image) ? selectedCaseObj.image : pc.images?.[0];
                         const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
-                        
-                        let finalCaseText = pc.case || "N/A";
-                        if (selectedCaseObj) finalCaseText = selectedCaseObj.name;
-
-                        const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
+                        const finalCaseText = selectedCaseObj ? selectedCaseObj.name : (pc.case || "N/A");
+                        const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + (selectedCaseObj?.price || 0);
 
                         handleAddToCart(pc, currentPriceCents, finalStorageText, finalCaseText, displayImg);
-                        
                         setCompareList(compareList.filter(c => c.id !== pc.id));
                         if (compareList.length === 1) setShowCompareModal(false);
-                      }} 
-                      className="w-full py-4 mt-6 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-indigo-500 transition-all shadow-lg shrink-0 active:scale-95"
-                    >
+                      }} className="w-full py-4 mt-6 bg-indigo-600 text-white rounded-2xl font-black uppercase text-[10px] hover:bg-indigo-500 transition-all shadow-lg active:scale-95">
                       Adaugă în coș
                     </button>
                   </div>
@@ -904,7 +824,6 @@ const getImageUrl = (img) => {
             </div>
           </div>
         )}
-
       </div>
     </>
   ); 
