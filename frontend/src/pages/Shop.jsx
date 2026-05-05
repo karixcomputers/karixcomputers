@@ -549,15 +549,18 @@ const getImageUrl = (img) => {
                   const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
                   const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
                   
-                  const pcCompatibleCases = availableCases.filter(c => pc.compatibleCases?.includes(c.id));
+                  // Folosim String() pentru a ne asigura că id-urile se potrivesc indiferent de tip
+const pcCompatibleCases = availableCases.filter(c => 
+  pc.compatibleCases?.some(compatId => String(compatId) === String(c.id))
+);
 
-// 1. Determinăm ID-ul selectat (din state sau prima carcasă compatibilă)
+// 1. Determinăm ID-ul selectat
 const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
 
-// 2. Găsim obiectul carcasei (folosim String() pentru a fi siguri că ID-urile se potrivesc)
+// 2. Găsim obiectul carcasei (AICI am adăugat String() pe ambele părți)
 const selectedCaseObj = pcCompatibleCases.find(c => String(c.id) === String(selectedCaseId));
 
-// 3. Alegem imaginea: Dacă avem carcasă cu poză, o folosim. Altfel, poza PC-ului.
+// 3. Alegem imaginea
 const displayImage = (selectedCaseObj && selectedCaseObj.image) 
   ? selectedCaseObj.image 
   : pc.images?.[0];
