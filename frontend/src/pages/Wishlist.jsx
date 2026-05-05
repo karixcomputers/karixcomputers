@@ -24,7 +24,8 @@ export default function Wishlist() {
           <div className="absolute bottom-1/4 -left-20 w-[500px] h-[500px] bg-pink-500/10 blur-[120px] rounded-full animate-blob animation-delay-2000" />
         </div>
         
-        <div className="max-w-6xl mx-auto relative z-10">
+        {/* AM MĂRIT CONTAINERUL LA max-w-7xl (sau max-w-[1400px]) PENTRU A FACE LOC CARDURILOR CUSTOMIZABILE LATE */}
+        <div className="max-w-[1400px] mx-auto relative z-10">
           <header className="mb-12">
             <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter mb-2 italic uppercase drop-shadow-2xl text-left leading-none">
               Sisteme <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500">Favorite</span>
@@ -35,14 +36,15 @@ export default function Wishlist() {
           </header>
 
           {wishlist && wishlist.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            /* GRILĂ ACTUALIZATĂ: Cardurile customizabile sunt mari, deci trecem la 2 coloane pe desktop și 3 pe ecrane foarte mari (xl/2xl) */
+            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-8 lg:gap-10">
               {wishlist.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
           ) : (
             /* EMPTY STATE CU INIMĂ ❤️ */
-            <div className="p-16 md:p-24 rounded-[45px] bg-white/[0.02] border border-white/10 backdrop-blur-xl text-center shadow-2xl border-dashed">
+            <div className="p-16 md:p-24 rounded-[45px] bg-white/[0.02] border border-white/10 backdrop-blur-xl text-center shadow-2xl border-dashed max-w-4xl mx-auto">
               <div className="text-7xl mb-6 opacity-20 animate-pulse">❤️</div>
               <h2 className="text-2xl font-black text-white mb-2 italic uppercase tracking-tighter">
                 Momentan nu ai favorite.
