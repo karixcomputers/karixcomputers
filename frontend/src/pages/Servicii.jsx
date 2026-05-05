@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx"; 
 import { useAuth } from "../context/AuthContext.jsx"; 
 import { formatRON } from "../utils/money"; 
@@ -10,13 +10,14 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 export default function Servicii() {
   const { addItem } = useCart(); 
   const { user, accessToken } = useAuth(); 
+  const nav = useNavigate(); // 👉 NOU: Pentru navigarea către detalii
   
   const [services, setServices] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
-  // 👉 NOU: State pentru filtru de locație
-  const [locationFilter, setLocationFilter] = useState("all"); // 'all', 'oradea', 'national'
+  // State pentru filtru de locație
+  const [locationFilter, setLocationFilter] = useState("all"); 
 
   const [isReordering, setIsReordering] = useState(false);
   const [reorderList, setReorderList] = useState([]);
@@ -52,23 +53,29 @@ export default function Servicii() {
     fetchServices();
   }, []);
 
-  // 👉 NOU: Filtrarea serviciilor pe baza selecției (pentru modul normal, nu drag&drop)
   const filteredServices = services.filter(service => {
       if (locationFilter === 'all') return true;
       if (locationFilter === 'national') return service.isNationalService === true;
-      if (locationFilter === 'oradea') return !service.isNationalService; // false sau undefined
+      if (locationFilter === 'oradea') return !service.isNationalService; 
       return true;
   });
 
-  const handleAddToCart = (service) => {
-    const success = addItem({
+  const handleAddToCart = (e, service) => {
+    e.preventDefault(); // Oprește navigarea dacă cumva e într-un link
+    e.stopPropagation();
+    
+    addItem({
       id: service.id,
       productName: service.name, 
       priceCents: service.priceCents, 
       image: getImageUrl(service.images?.[0]), 
       category: 'service',
-      isNationalService: service.isNationalService // Transmitem asta și în coș, poate va fi util mai târziu
+      isNationalService: service.isNationalService 
     });
+
+    const toastId = Date.now();
+    setToasts((prev) => [...prev, { id: toastId, message: "Serviciul a fost adăugat în coș!" }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toastId)), 3000);
   };
 
   const handleDragEnd = (result) => {
@@ -81,7 +88,7 @@ export default function Servicii() {
 
   const toggleReorderMode = () => {
     if (!isReordering) {
-      setLocationFilter("all"); // Resetăm filtrul când intrăm în reorder ca să le vedem pe toate
+      setLocationFilter("all"); 
       setReorderList([...services]); 
     }
     setIsReordering(!isReordering);
@@ -146,7 +153,6 @@ export default function Servicii() {
               Sistemul tău merită tratament de top. Alege serviciul dorit.
             </p>
 
-            {/* 👉 NOU: BUTOANE FILTRARE LOCAȚIE */}
             {!isReordering && services.length > 0 && (
                 <div className="flex flex-wrap items-center justify-center gap-3">
                     <button 
@@ -254,9 +260,9 @@ export default function Servicii() {
                 {filteredServices.map((service) => (
                   <div 
                     key={service.id}
+                    // 👉 NOU: Am scos Link-ul wrapper global pentru că interfera cu butoanele
                     className="flex flex-col p-8 rounded-[32px] bg-white/5 border border-white/10 hover:border-indigo-500/40 transition-all duration-500 group backdrop-blur-md relative overflow-hidden text-center shadow-2xl"
                   >
-                    {/* 👉 NOU: BADGE LOCAȚIE */}
                     <div className="absolute top-4 left-4 z-20">
                         {service.isNationalService ? (
                             <span className="px-3 py-1.5 rounded-xl bg-pink-500/20 backdrop-blur-md text-pink-400 text-[8px] font-black uppercase tracking-widest border border-pink-500/30 flex items-center gap-1 shadow-lg">
@@ -269,35 +275,54 @@ export default function Servicii() {
                         )}
                     </div>
 
-                    <div className="h-32 w-32 rounded-2xl flex items-center justify-center mb-6 border bg-white/5 border-white/10 overflow-hidden transition-transform duration-300 group-hover:scale-110 mx-auto shadow-inner mt-4">
-                      {service.images && service.images[0] ? (
-                        <img 
-                          src={getImageUrl(service.images[0])} 
-                          alt={service.name} 
-                          className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                        />
-                      ) : (
-                        <span className="text-5xl">🛠️</span>
-                      )}
+                    {/* Dăm click pe poză sau titlu ca să mergem la detalii */}
+                    <div 
+                      onClick={() => nav(`/service/${service.id}`)}
+                      className="cursor-pointer"
+                    >
+                      <div className="h-32 w-32 rounded-2xl flex items-center justify-center mb-6 border bg-white/5 border-white/10 overflow-hidden transition-transform duration-300 group-hover:scale-110 mx-auto shadow-inner mt-4">
+                        {service.images && service.images[0] ? (
+                          <img 
+                            src={getImageUrl(service.images[0])} 
+                            alt={service.name} 
+                            className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                          />
+                        ) : (
+                          <span className="text-5xl">🛠️</span>
+                        )}
+                      </div>
+                      
+                      <h3 className="text-2xl font-black text-white mb-3 tracking-tight italic uppercase drop-shadow-md group-hover:text-indigo-400 transition-colors">
+                        {service.name}
+                      </h3>
                     </div>
-                    
-                    <h3 className="text-2xl font-black text-white mb-3 tracking-tight italic uppercase drop-shadow-md">{service.name}</h3>
-                    <p className="text-gray-300 text-[14px] leading-relaxed mb-6 font-medium">
+
+                    <p className="text-gray-300 text-[14px] leading-relaxed mb-6 font-medium line-clamp-3">
                       {service.description || "Asigurăm asistență și reparații profesionale la standarde înalte."}
                     </p>
                     
-                    <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between">
-                      <div className="flex flex-col text-left">
-                         <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Preț Serviciu</span>
+                    <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-4">
+                      <div className="flex justify-between items-center w-full px-2">
+                         <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Preț:</span>
                          <span className="text-2xl font-black text-white italic">{formatRON(service.priceCents)}</span>
                       </div>
                       
-                      <button 
-                        onClick={() => handleAddToCart(service)}
-                        className="px-6 py-3 rounded-2xl bg-indigo-500 text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:scale-105 transition-all active:scale-95"
-                      >
-                        Adaugă
-                      </button>
+                      {/* 👉 NOU: BUTOANELE LÂNGĂ UNUL ALTUL */}
+                      <div className="flex items-center gap-3 w-full">
+                          <button 
+                            onClick={() => nav(`/service/${service.id}`)}
+                            className="flex-1 px-4 py-3 rounded-2xl bg-white/5 text-white border border-white/10 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 hover:border-white/20 transition-all active:scale-95"
+                          >
+                            Detalii
+                          </button>
+                          
+                          <button 
+                            onClick={(e) => handleAddToCart(e, service)}
+                            className="flex-1 px-4 py-3 rounded-2xl bg-indigo-500 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-400 hover:shadow-indigo-500/40 transition-all active:scale-95"
+                          >
+                            Adaugă
+                          </button>
+                      </div>
                     </div>
                   </div>
                 ))}
