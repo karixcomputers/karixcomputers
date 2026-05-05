@@ -192,7 +192,7 @@ export default function Terms() {
                 <li className="flex items-start gap-3">
                   <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 mt-2"/>
                   <span>
-                    <strong>Echipamente nerevendicate:</strong> Echipamentele lăsate în service și neridicate în termen de 30 de zile de la notificarea finalizării (prin SMS/Telefon/Email) vor fi supuse unei taxe de depozitare de 5 RON/zi. După 90 de zile, echipamentul este considerat abandonat și trece în proprietatea service-ului pentru recuperarea costurilor de manoperă și piese.
+                    <strong>Echipamente nerevendicate:</strong> Echipamentele predate și neridicate în termen de 30 de zile de la notificarea finalizării (prin Telefon/Email) vor fi supuse unei taxe de depozitare de 5 RON/zi. După 90 de zile, echipamentul este considerat abandonat și trece în proprietatea service-ului pentru recuperarea costurilor de manoperă și piese.
                   </span>
                 </li>
                 <li className="flex items-start gap-3">

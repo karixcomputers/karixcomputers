@@ -22,7 +22,7 @@ const getStorageOptions = (baseStorage) => {
       value: s.value,
       label: s.value === base ? `${s.label} (Bază)` : `${s.label} (Upgrade)`,
       extraCents: diff * 100,
-      extraText: diff > 0 ? `+${diff} RON` : 0
+      extraText: diff > 0 ? `+${diff} RON` : ""
     };
   });
 };
@@ -111,7 +111,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
 
   return (
     <>
-      <div className="relative flex flex-col rounded-[35px] bg-white/5 border border-white/10 overflow-hidden group hover:border-indigo-500/40 transition-all duration-500 backdrop-blur-md shadow-2xl text-left">
+      <div className="relative flex flex-col rounded-[35px] bg-white/5 border border-white/10 overflow-hidden group hover:border-indigo-500/40 transition-all duration-500 backdrop-blur-md shadow-2xl text-left h-full">
         
         {/* ❤️ BUTON WISHLIST */}
         <button
@@ -131,7 +131,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
         </button>
 
         {/* ZONA IMAGINE (Stilizată ca în Shop) */}
-        <Link to={`/product/${data.id}`} className="block relative h-64 overflow-hidden bg-black/20">
+        <Link to={`/product/${data.id}`} className="block relative h-64 overflow-hidden bg-black/20 shrink-0">
           <div className="absolute top-5 left-5 z-20 flex flex-col gap-2">
             {!isService && (
                <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-black text-[10px] font-black uppercase tracking-widest shadow-xl">
@@ -168,7 +168,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
           {!isService && (
             <>
               {/* Grilă specificații ca în Shop */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-4 mb-8">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4 mb-6">
                 <div className="flex items-center gap-3">
                   <span className="text-indigo-400 text-base">⚡</span>
                   <div className="flex flex-col min-w-0">
@@ -213,59 +213,68 @@ export default function ProductCard({ p, product, availableCases = [] }) {
                 </div>
               </div>
 
-              {/* Selector Carcase */}
-              {pcCompatibleCases.length > 0 && (
-                <div className="mt-2 mb-4 p-4 rounded-[20px] bg-white/5 border border-white/10">
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Alege Carcasa</span>
-                  <div className="flex flex-col gap-2">
-                    {pcCompatibleCases.map(caseOpt => {
-                      const isSelected = activeCaseId === caseOpt.id;
-                      return (
-                        <button key={caseOpt.id} onClick={() => setSelectedCaseId(caseOpt.id)} className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${isSelected ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}>
-                          <div className="flex items-center gap-3">
-                            <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
-                              {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                            </div>
-                            <span>{caseOpt.name}</span>
-                          </div>
-                          {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price)}</span>}
-                        </button>
-                      );
-                    })}
+              <div className="flex flex-col gap-3 mb-6">
+                {/* 📦 SELECTOR CARCASE TIP DROPDOWN */}
+                {pcCompatibleCases.length > 0 && (
+                  <div className="flex flex-col">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
+                      <span className="text-indigo-400 text-[10px]">📦</span> Alege Carcasa
+                    </label>
+                    <div className="relative">
+                      <select 
+                        value={activeCaseId} 
+                        onChange={(e) => setSelectedCaseId(e.target.value)}
+                        className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                      >
+                        {pcCompatibleCases.map(caseOpt => (
+                          <option key={caseOpt.id} value={caseOpt.id}>
+                            {caseOpt.name} {caseOpt.price > 0 ? `(+${formatRON(caseOpt.price)})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Selector Stocare */}
-              {dynamicStorageOptions.length > 0 && (
-                <div className="mt-2 mb-6 p-4 rounded-[20px] bg-white/5 border border-white/10">
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">💾 Memorie Stocare</span>
-                  <div className="flex flex-col gap-2">
-                    {dynamicStorageOptions.map(option => (
-                      <button key={option.value} onClick={() => setSelectedStorage(option.value)} className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${selectedStorage === option.value ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedStorage === option.value ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
-                            {selectedStorage === option.value && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                          </div>
-                          <span>{option.label}</span>
-                        </div>
-                        {option.extraText !== 0 && <span className="text-indigo-300">{option.extraText}</span>}
-                      </button>
-                    ))}
+                {/* 💾 SELECTOR STOCARE TIP DROPDOWN */}
+                {dynamicStorageOptions.length > 0 && (
+                  <div className="flex flex-col">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
+                      <span className="text-indigo-400 text-[10px]">💾</span> Memorie Stocare
+                    </label>
+                    <div className="relative">
+                      <select 
+                        value={selectedStorage} 
+                        onChange={(e) => setSelectedStorage(e.target.value)}
+                        className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                      >
+                        {dynamicStorageOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label} {option.extraText ? `(${option.extraText})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </>
           )}
 
           {isService && (
-            <div className="mb-8">
+            <div className="mb-6">
               <p className="text-sm text-gray-400 italic line-clamp-4">{data.description || "Serviciu profesional pentru echipamentul tău."}</p>
             </div>
           )}
 
           {/* Preț și Butoane */}
-          <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-4">
+          <div className="mt-auto pt-5 border-t border-white/10 flex flex-col gap-4">
             <div className="flex items-center justify-center"> 
               <div className="flex flex-col items-center text-center"> 
                 <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">{isService ? 'Preț Manoperă' : 'Preț Sistem'}</span>
@@ -274,10 +283,10 @@ export default function ProductCard({ p, product, availableCases = [] }) {
             </div>
 
             <div className="flex gap-2">
-              <Link to={`/product/${data.id}`} className="flex-1 h-14 rounded-2xl bg-white/5 border border-white/10 text-white hover:bg-white/20 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg">
+              <Link to={`/product/${data.id}`} className="flex-1 h-12 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/20 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg">
                 Detalii
               </Link>
-              <button disabled={!inStock && currentPriceCents === 0} onClick={handleAddToCartClick} className="flex-1 h-14 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-500 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg shadow-indigo-600/20 disabled:opacity-20">
+              <button disabled={!inStock && currentPriceCents === 0} onClick={handleAddToCartClick} className="flex-1 h-12 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg shadow-indigo-600/20 disabled:opacity-20">
                 Adaugă
               </button>
             </div>
@@ -285,33 +294,33 @@ export default function ProductCard({ p, product, availableCases = [] }) {
         </div>
       </div>
 
-      {/* POPUP AVERTIZARE SERVICII */}
+      {/* POPUP AVERTIZARE SERVICII (A rămas neschimbat) */}
       {showServicePopup && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-xl bg-black/60">
-          <div className="relative w-full max-w-md bg-[#161e31]/95 border border-indigo-500/30 p-10 rounded-[40px] text-center shadow-2xl animate-in zoom-in">
-            <div className="w-16 h-16 mx-auto bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/20">
-              <span className="text-3xl">📍</span>
-            </div>
-            <h2 className="text-2xl font-black text-white mb-3 italic uppercase">Atenție! Serviciu Local</h2>
-            <p className="text-gray-400 text-sm mb-6 leading-relaxed">
-              Serviciile noastre de mentenanță și asamblare sunt disponibile în prezent doar pentru clienții din <strong className="text-indigo-400">Județul Bihor (Oradea)</strong>. 
-            </p>
-            <p className="text-xs text-gray-500 mb-8 italic">
-              Dacă ești din alt oraș și dorești să ne trimiți echipamentul tău prin curier pe cont propriu, te rugăm să ne contactezi înainte.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button onClick={() => { setShowServicePopup(false); executeAddToCart(); }} className="w-full py-4 rounded-2xl font-black text-white bg-indigo-600 hover:bg-indigo-500 uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95">
-                Sunt din Oradea / Adaugă în coș
-              </button>
-              <button onClick={() => { setShowServicePopup(false); navigate("/contact"); }} className="w-full py-4 rounded-2xl font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 uppercase text-[11px] tracking-widest transition-all active:scale-95">
-                Contactează-ne (Alte orașe)
-              </button>
-              <button onClick={() => setShowServicePopup(false)} className="mt-4 text-[10px] text-gray-500 font-bold uppercase hover:text-white transition-colors">
-                Anulează
-              </button>
-            </div>
-          </div>
-        </div>
+         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-xl bg-black/60">
+         <div className="relative w-full max-w-md bg-[#161e31]/95 border border-indigo-500/30 p-10 rounded-[40px] text-center shadow-2xl animate-in zoom-in">
+           <div className="w-16 h-16 mx-auto bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/20">
+             <span className="text-3xl">📍</span>
+           </div>
+           <h2 className="text-2xl font-black text-white mb-3 italic uppercase">Atenție! Serviciu Local</h2>
+           <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+             Serviciile noastre de mentenanță și asamblare sunt disponibile în prezent doar pentru clienții din <strong className="text-indigo-400">Județul Bihor (Oradea)</strong>. 
+           </p>
+           <p className="text-xs text-gray-500 mb-8 italic">
+             Dacă ești din alt oraș și dorești să ne trimiți echipamentul tău prin curier pe cont propriu, te rugăm să ne contactezi înainte.
+           </p>
+           <div className="flex flex-col gap-3">
+             <button onClick={() => { setShowServicePopup(false); executeAddToCart(); }} className="w-full py-4 rounded-2xl font-black text-white bg-indigo-600 hover:bg-indigo-500 uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95">
+               Sunt din Oradea / Adaugă în coș
+             </button>
+             <button onClick={() => { setShowServicePopup(false); navigate("/contact"); }} className="w-full py-4 rounded-2xl font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 uppercase text-[11px] tracking-widest transition-all active:scale-95">
+               Contactează-ne (Alte orașe)
+             </button>
+             <button onClick={() => setShowServicePopup(false)} className="mt-4 text-[10px] text-gray-500 font-bold uppercase hover:text-white transition-colors">
+               Anulează
+             </button>
+           </div>
+         </div>
+       </div>
       )}
     </>
   );

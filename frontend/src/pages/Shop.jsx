@@ -296,11 +296,8 @@ export default function Shop() {
 
   // 👉 FUNCȚIE AJUTĂTOARE PENTRU A GENERA OPȚIUNILE DE STOCARE DINAMIC
   const getStorageOptions = (baseStorage) => {
-      // Dacă valoarea de bază e completată aiurea (sau deloc), facem fallback
       const base = baseStorage || "1TB";
 
-      // Definim lista completă de variante și prețul lor "teoretic" ca valoare pe unitate
-      // Presupunem că salturile de cost sunt: 512->1TB (+250RON), 1TB->2TB (+500RON), 1TB->4TB (+1750RON) etc.
       const storageList = [
           { value: "512GB", label: "512 GB NVMe M.2", cost: 0 },
           { value: "1TB", label: "1 TB NVMe M.2", cost: 250 },
@@ -308,11 +305,9 @@ export default function Shop() {
           { value: "4TB", label: "4 TB NVMe M.2", cost: 2000 }
       ];
 
-      // Găsim cât "valorează" opțiunea de bază
       const baseItem = storageList.find(s => s.value === base) || storageList[1];
       const baseCost = baseItem.cost;
 
-      // Generăm lista finală: Arătăm doar opțiunea de bază și cele superioare
       return storageList
           .filter(s => s.cost >= baseCost)
           .map(s => {
@@ -320,8 +315,8 @@ export default function Shop() {
               return {
                   value: s.value,
                   label: s.value === base ? `${s.label} (Bază)` : `${s.label} (Upgrade)`,
-                  extraCents: diff * 100, // pentru calcul
-                  extraText: diff > 0 ? `+${diff} RON` : 0 // pentru afisare
+                  extraCents: diff * 100, 
+                  extraText: diff > 0 ? `+${diff} RON` : "" 
               };
           });
   };
@@ -647,7 +642,7 @@ export default function Shop() {
                         <h3 className="text-2xl font-black text-white tracking-tight italic uppercase drop-shadow-2xl">{pc.name}</h3>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-4 mb-8">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-4 mb-6">
                         <div className="flex items-center gap-3">
                           <span className="text-indigo-400 text-base">⚡</span>
                           <div className="flex flex-col min-w-0">
@@ -692,53 +687,56 @@ export default function Shop() {
                         </div>
                       </div>
 
-                      {pcCompatibleCases.length > 0 && (
-                          <div className="mt-2 mb-4 p-4 rounded-[20px] bg-white/5 border border-white/10">
-                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Alege Carcasa</span>
-                              <div className="flex flex-col gap-2">
-                                  {pcCompatibleCases.map(caseOpt => {
-                                      const isSelected = selectedCaseId === caseOpt.id || (!selectedCaseId && caseOpt.id === pcCompatibleCases[0].id);
-
-                                      return (
-                                          <button
-                                              key={caseOpt.id}
-                                              onClick={() => updateSelection(pc.id, 'caseId', caseOpt.id)}
-                                              className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${isSelected ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                                          >
-                                              <div className="flex items-center gap-3">
-                                                  <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
-                                                      {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                                  </div>
-                                                  <span>{caseOpt.name}</span>
-                                              </div>
-                                              {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price)}</span>}
-                                          </button>
-                                      );
-                                  })}
+                      <div className="flex flex-col gap-3 mb-6 mt-4">
+                        {/* Selector Carcase */}
+                        {pcCompatibleCases.length > 0 && (
+                          <div className="flex flex-col">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
+                              <span className="text-indigo-400 text-[10px]">📦</span> Alege Carcasa
+                            </label>
+                            <div className="relative">
+                              <select 
+                                value={selectedCaseId || ''} 
+                                onChange={(e) => updateSelection(pc.id, 'caseId', e.target.value)}
+                                className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                              >
+                                {pcCompatibleCases.map(caseOpt => (
+                                  <option key={caseOpt.id} value={caseOpt.id}>
+                                    {caseOpt.name} {caseOpt.price > 0 ? `(+${formatRON(caseOpt.price)})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
                               </div>
+                            </div>
                           </div>
-                      )}
+                        )}
 
-                      {/* 👉 AICI AFISĂM MEMORIILE DINAMICE */}
-                      <div className="mt-2 mb-6 p-4 rounded-[20px] bg-white/5 border border-white/10">
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">💾 Memorie Stocare</span>
-                          <div className="flex flex-col gap-2">
-                              {dynamicStorageOptions.map(option => (
-                                  <button
-                                      key={option.value}
-                                      onClick={() => updateSelection(pc.id, 'storage', option.value)}
-                                      className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${selectedStorage === option.value ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                                  >
-                                      <div className="flex items-center gap-3">
-                                          <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedStorage === option.value ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
-                                              {selectedStorage === option.value && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                          </div>
-                                          <span>{option.label}</span>
-                                      </div>
-                                      {option.extraText !== 0 && <span className="text-indigo-300">{option.extraText}</span>}
-                                  </button>
-                              ))}
+                        {/* 👉 AICI AFISĂM MEMORIILE DINAMICE */}
+                        {dynamicStorageOptions.length > 0 && (
+                          <div className="flex flex-col">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
+                              <span className="text-indigo-400 text-[10px]">💾</span> Memorie Stocare
+                            </label>
+                            <div className="relative">
+                              <select 
+                                value={selectedStorage} 
+                                onChange={(e) => updateSelection(pc.id, 'storage', e.target.value)}
+                                className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                              >
+                                {dynamicStorageOptions.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label} {option.extraText ? `(${option.extraText})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                              </div>
+                            </div>
                           </div>
+                        )}
                       </div>
 
                       <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-4">
