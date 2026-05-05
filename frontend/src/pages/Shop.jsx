@@ -564,10 +564,6 @@ const displayImage = (selectedCaseObj && selectedCaseObj.image)
 
 // 4. Calculăm prețul suplimentar
 const caseAddedPriceCents = selectedCaseObj?.price || 0;
-                  // 👉 NOU: Logica pentru a alege ce imagine afișăm (Carcasa selectată SAU sistemul de bază)
-                  const displayImage = (selectedCaseObj && selectedCaseObj.image) 
-                    ? selectedCaseObj.image 
-                    : pc.images?.[0];
 
                   const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
 
