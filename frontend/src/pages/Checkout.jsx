@@ -161,7 +161,6 @@ export default function Checkout() {
     let hasService = false;
     let requiresLocalPickup = false; 
     let hasNationalService = false; 
-    let serviceMainCategory = "other";
     
     items.forEach(item => {
       const nameStr = (item.productName || item.name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -177,11 +176,6 @@ export default function Checkout() {
             hasNationalService = true;
         }
 
-        if (nameStr.includes('consola') || nameStr.includes('playstation') || nameStr.includes('xbox')) {
-            serviceMainCategory = "console";
-        } else if (nameStr.includes('stick') || nameStr.includes('drift') || nameStr.includes('controller') || nameStr.includes('maneta')) {
-            if (serviceMainCategory !== "console") serviceMainCategory = "controller"; 
-        }
       } else {
         hasPC = true;
         const basePrice = item.basePriceCents || item.priceCentsAtBuy || item.priceCents || 0;
@@ -193,7 +187,7 @@ export default function Checkout() {
       }
     });
 
-    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart, requiresLocalPickup, hasNationalService, serviceMainCategory };
+    return { hasPC, hasService, hardwareSubtotal, totalServicesInCart, requiresLocalPickup, hasNationalService };
   }, [items]);
 
   const showLocalUI = cartAnalysis.requiresLocalPickup || isOradeaLocal;
@@ -255,7 +249,6 @@ export default function Checkout() {
 
   const shippingBreakdown = useMemo(() => {
     let baseShippingCost = 0;
-    let insuranceCost = 0;
     let sendCost = 0;
     let returnCost = 0;
     
@@ -268,17 +261,11 @@ export default function Checkout() {
     if (cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && !isOradeaLocal) {
         sendCost = 2500;
         returnCost = 2500;
-        
-        if (cartAnalysis.serviceMainCategory === "console") {
-            insuranceCost = 2000; 
-        } else if (cartAnalysis.serviceMainCategory === "controller") {
-            insuranceCost = 500; 
-        }
     }
     
-    const finalShippingCost = baseShippingCost + sendCost + returnCost + insuranceCost;
+    const finalShippingCost = baseShippingCost + sendCost + returnCost;
 
-    return { finalShippingCost, sendCost, returnCost, insuranceCost };
+    return { finalShippingCost, sendCost, returnCost };
   }, [cartAnalysis, isOradeaLocal, showLocalUI]);
 
   const finalTotalCents = Math.max(0, totalCents - discountCents + shippingBreakdown.finalShippingCost);
@@ -751,12 +738,9 @@ export default function Checkout() {
                               </h4>
                               <div className="p-4 rounded-xl border bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20 text-left">
                                   <div className="font-bold text-sm text-white">Curier Rapid la Ușa Ta</div>
-                                  <div className="text-[10px] text-indigo-200 mt-1 uppercase tracking-widest">Curierul va prelua dispozitivul defect și îl va returna reparat la aceeași adresă (+50 RON total).</div>
+                                  <div className="text-[10px] text-indigo-200 mt-1 uppercase tracking-widest">Curierul va prelua dispozitivul defect și îl va returna la aceeași adresă (+50 RON total).</div>
                               </div>
                           </div>
-                          <p className="text-gray-400 text-[10px] mt-4 border-t border-indigo-500/10 pt-3">
-                              🛡️ <strong className="text-white">Siguranță:</strong> Dispozitivul va fi asigurat pe parcursul ambelor transporturi (Coletul tău spre Karix și înapoi spre tine).
-                          </p>
                       </div>
                     )}
 
@@ -899,10 +883,6 @@ export default function Checkout() {
                          <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
                             <span>Retur (Către Tine)</span>
                             <span>{formatRON(shippingBreakdown.returnCost)}</span>
-                         </div>
-                         <div className="flex justify-between text-indigo-400/70 text-[10px] uppercase font-bold tracking-widest pt-2 border-t border-white/5">
-                            <span>Asigurare Colete ({cartAnalysis.serviceMainCategory === 'console' ? 'Val: 2000 RON' : 'Val: Standard'})</span>
-                            <span>{formatRON(shippingBreakdown.insuranceCost)}</span>
                          </div>
                       </div>
                   )}
