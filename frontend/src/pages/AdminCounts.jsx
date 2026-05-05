@@ -16,7 +16,7 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       // Construim URL-ul cu parametrii de date, dacă există
-      let url = "/admin/stats"; // Modifică dacă ruta ta de backend este diferită (ex: /orders/stats)
+      let url = "/orders/stats"; // Modifică dacă ruta ta de backend este diferită (ex: /orders/stats)
       if (startDate && endDate) {
         url += `?startDate=${startDate}&endDate=${endDate}`;
       }
