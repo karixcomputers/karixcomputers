@@ -60,6 +60,7 @@ import Failed from "./pages/Failed";
 import AdminUsers from "./pages/AdminUsers";
 import AdminAnnouncements from "./pages/AdminAnnouncements";
 import ServiceDetails from "./pages/ServiceDetails.jsx";
+import AdminCounts from "./pages/ServiceDetails.jsx";
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
@@ -145,6 +146,7 @@ export default function App() {
                   <Route path="/admin/configurator" element={<ProtectedRoute requireAdmin><AdminConfigurator /></ProtectedRoute>} />
                   <Route path="/admin/users" element={<AdminUsers />} />
                   <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+                  <Route path="/admin/counts" element={<AdminCounts />} />
 
                   <Route path="/order-canceled" element={<OrderCanceled />} />
 

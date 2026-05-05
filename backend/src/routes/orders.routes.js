@@ -632,4 +632,57 @@ router.get("/:id/status", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/stats
+ * Primește opțional ?startDate=YYYY-MM-DD și ?endDate=YYYY-MM-DD
+ */
+router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Construim filtrul pentru date (Where Clause)
+    let dateFilter = {};
+    
+    if (startDate && endDate) {
+      // Setăm ora la începutul zilei pentru startDate și sfârșitul zilei pentru endDate
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      dateFilter = {
+        createdAt: {
+          gte: start,
+          lte: end,
+        },
+      };
+    }
+
+    // 1. Calculăm numărul total de comenzi din acea perioadă
+    const totalOrders = await prisma.order.count({
+      where: dateFilter,
+    });
+
+    // 2. Calculăm suma totală (presupunem că în DB ai câmpul `totalCents`)
+    const revenueAggregation = await prisma.order.aggregate({
+      _sum: {
+        totalCents: true, 
+      },
+      where: dateFilter,
+    });
+
+    // Dacă nu există comenzi, Prisma returnează null pentru sumă, așa că punem 0 fallback
+    const totalRevenueCents = revenueAggregation._sum.totalCents || 0;
+
+    res.json({
+      totalOrders,
+      totalRevenueCents,
+    });
+  } catch (error) {
+    console.error("EROARE STATISTICI ADMIN:", error);
+    res.status(500).json({ error: "Eroare la calcularea statisticilor." });
+  }
+});
+
 export default router;
