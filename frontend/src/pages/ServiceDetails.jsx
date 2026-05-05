@@ -131,7 +131,7 @@ export default function ServiceDetails() {
 
               <div className="prose prose-invert prose-p:text-gray-300 prose-p:leading-relaxed prose-strong:text-white max-w-none mb-8">
                 <p className="whitespace-pre-line text-sm sm:text-base">
-                  {service.description || "Acest serviciu este executat de tehnicienii noștri cu experiență, folosind echipamente profesionale și materiale premium."}
+                {service.longDescription || service.description || "Acest serviciu este executat de tehnicienii noștri cu experiență, folosind echipamente profesionale și materiale premium."}
                 </p>
               </div>
 

@@ -14,7 +14,7 @@ export default function AdminInventory() {
 
   const [form, setForm] = useState({ 
     name: "", priceRon: "", description: "", longDescription: "", category: "pc",
-    imageUrl: "", cpuBrand: "", gpuBrand: "", ramGb: "", storageGb: "1TB", // Setăm o valoare default
+    imageUrl: "", cpuBrand: "", gpuBrand: "", ramGb: "", storageGb: "1TB",
     motherboard: "", case: "", cooler: "", psu: "", 
     warrantyMonths: "24",
     benchmarks: [],
@@ -186,7 +186,7 @@ export default function AdminInventory() {
       cpuBrand: p.cpuBrand || "",
       gpuBrand: p.gpuBrand || "",
       ramGb: p.ramGb || "",
-      storageGb: p.storageGb || "1TB", // Preluăm din DB sau punem default
+      storageGb: p.storageGb || "1TB", 
       motherboard: p.motherboard || "", 
       case: p.case || "", 
       cooler: p.cooler || "", 
@@ -232,11 +232,11 @@ export default function AdminInventory() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
             <div className="md:col-span-3 flex items-center justify-between border-b border-white/5 pb-4 mb-2">
-               <h3 className="text-white font-black uppercase text-xs tracking-widest italic">{editingId ? "⚡ Editare Produs" : "➕ Adăugare Produs Nou"}</h3>
+               <h3 className="text-white font-black uppercase text-xs tracking-widest italic">{editingId ? "⚡ Editare Produs / Serviciu" : "➕ Adăugare Produs / Serviciu Nou"}</h3>
                {editingId && <button type="button" onClick={resetForm} className="text-[9px] font-black uppercase text-pink-500 hover:underline">Renunță la editare</button>}
             </div>
 
-            <input type="text" placeholder="Nume Produs" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500 transition-all" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
+            <input type="text" placeholder="Nume Produs / Serviciu" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-indigo-500 transition-all" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
             
             <select className="bg-[#0b1020] border border-white/10 p-4 rounded-2xl outline-none text-sm font-bold" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
               <option value="pc">Sistem PC</option>
@@ -321,7 +321,6 @@ export default function AdminInventory() {
                 <input type="text" placeholder="Placă de bază" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.motherboard} onChange={e => setForm({...form, motherboard: e.target.value})} />
                 <input type="text" placeholder="Memorie RAM" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-sm" value={form.ramGb} onChange={e => setForm({...form, ramGb: e.target.value})} />
                 
-                {/* 👉 AICI ESTE NOUL SELECT PENTRU STOCARE DE BAZĂ */}
                 <select 
                   className="bg-[#0b1020] border border-white/10 p-4 rounded-2xl outline-none text-sm text-gray-300 focus:border-indigo-500" 
                   value={form.storageGb} 
@@ -383,10 +382,32 @@ export default function AdminInventory() {
               </>
             )}
 
-            <textarea placeholder="Rezumat scurt..." className="md:col-span-3 bg-white/5 border border-white/10 p-4 rounded-2xl h-20 outline-none text-sm italic" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
-            <textarea placeholder="Descriere detaliată produs..." className="md:col-span-3 bg-white/5 border border-white/10 p-4 rounded-3xl h-40 outline-none text-sm italic" value={form.longDescription} onChange={e => setForm({...form, longDescription: e.target.value})} />
+            {/* 👉 ZONELE CLARE PENTRU DESCRIERI */}
+            <div className="md:col-span-3 space-y-2 mt-4">
+               <label className="text-[10px] font-black text-gray-400 uppercase ml-1 italic tracking-widest">
+                 📝 Scurtă Descriere (Apare pe cardurile din listă)
+               </label>
+               <textarea 
+                 placeholder="Ex: Serviciu complet de mentenanță hardware..." 
+                 className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl h-20 outline-none text-sm italic focus:border-indigo-500 transition-all" 
+                 value={form.description} 
+                 onChange={e => setForm({...form, description: e.target.value})} 
+               />
+            </div>
 
-            <button type="submit" className="md:col-span-3 py-5 bg-gradient-to-r from-indigo-600 to-pink-600 rounded-3xl font-black uppercase tracking-widest text-xs shadow-2xl hover:scale-[1.01] active:scale-95 transition-all">
+            <div className="md:col-span-3 space-y-2">
+               <label className="text-[10px] font-black text-indigo-400 uppercase ml-1 italic tracking-widest flex items-center gap-2">
+                 <span>📄</span> Descriere Detaliată (Apare DOAR pe pagina de Detalii a Produsului/Serviciului)
+               </label>
+               <textarea 
+                 placeholder="Scrie aici toate detaliile, ce include serviciul, termeni, condiții etc. Poți folosi tasta Enter pentru a crea paragrafe noi pe pagina dedicată." 
+                 className="w-full bg-indigo-500/5 border border-indigo-500/30 p-5 rounded-3xl h-48 outline-none text-sm transition-all focus:border-indigo-500 focus:bg-indigo-500/10 placeholder:text-indigo-200/30 text-indigo-100" 
+                 value={form.longDescription} 
+                 onChange={e => setForm({...form, longDescription: e.target.value})} 
+               />
+            </div>
+
+            <button type="submit" className="md:col-span-3 mt-4 py-5 bg-gradient-to-r from-indigo-600 to-pink-600 rounded-3xl font-black uppercase tracking-widest text-xs shadow-2xl hover:scale-[1.01] active:scale-95 transition-all">
               {editingId ? "Salvează Modificările" : "Lansează în Catalog"}
             </button>
           </div>
