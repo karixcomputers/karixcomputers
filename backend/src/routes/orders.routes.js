@@ -633,52 +633,101 @@ router.get("/:id/status", async (req, res) => {
 });
 
 /**
- * GET /api/admin/stats
- * Primește opțional ?startDate=YYYY-MM-DD și ?endDate=YYYY-MM-DD
+ * GET /api/orders/stats
  */
 router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
-    // Construim filtrul pentru date (Where Clause)
     let dateFilter = {};
-    
     if (startDate && endDate) {
-      // Setăm ora la începutul zilei pentru startDate și sfârșitul zilei pentru endDate
       const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
-
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
-
       dateFilter = {
-        createdAt: {
-          gte: start,
-          lte: end,
-        },
+        createdAt: { gte: start, lte: end },
       };
     }
 
-    // 1. Calculăm numărul total de comenzi din acea perioadă
-    const totalOrders = await prisma.order.count({
+    // 1. Aducem toate comenzile pentru calculele globale și grafic
+    const orders = await prisma.order.findMany({
       where: dateFilter,
+      select: {
+        id: true,
+        status: true,
+        totalCents: true,
+        createdAt: true,
+      }
     });
 
-    // 2. Calculăm suma totală (presupunem că în DB ai câmpul `totalCents`)
-    const revenueAggregation = await prisma.order.aggregate({
-      _sum: {
-        totalCents: true, 
+    const totalOrders = orders.length;
+    const totalRevenueCents = orders.reduce((acc, order) => acc + order.totalCents, 0);
+
+    // 2. Calculăm mini-cardurile de status
+    const statusCounts = {
+      inProcess: orders.filter(o => ["in_asteptare", "in_asteptare_plata", "in_procesare", "in_asteptare_ridicare"].includes(o.status)).length,
+      delivered: orders.filter(o => o.status === "livrat").length,
+      canceled: orders.filter(o => o.status === "anulat").length,
+    };
+
+    // 3. Generăm datele pentru Grafic (Grupăm veniturile pe zile)
+    // Creăm un obiect unde cheia este data (ex: '2024-05-20') și valoarea este suma totală pe acea zi
+    const chartMap = {};
+    orders.forEach(order => {
+      // Ignorăm comenzile anulate din graficul de încasări
+      if (order.status === "anulat") return; 
+
+      const dateStr = order.createdAt.toISOString().split('T')[0]; // Extragem doar YYYY-MM-DD
+      if (!chartMap[dateStr]) chartMap[dateStr] = 0;
+      chartMap[dateStr] += order.totalCents;
+    });
+
+    // Transformăm obiectul într-un array sortat cronologic pentru Recharts
+    const chartData = Object.keys(chartMap)
+      .sort() // Sortare cronologică implicită pt stringuri YYYY-MM-DD
+      .map(date => ({
+        date,
+        revenue: chartMap[date]
+      }));
+
+    // 4. Calculăm Top 5 Produse cele mai vândute
+    const allItems = await prisma.orderItem.findMany({
+      where: { 
+        order: dateFilter,
+        status: { not: "anulat" } // Nu punem în top piesele anulate
       },
-      where: dateFilter,
+      select: {
+        productName: true,
+        priceCentsAtBuy: true,
+        qty: true
+      }
     });
 
-    // Dacă nu există comenzi, Prisma returnează null pentru sumă, așa că punem 0 fallback
-    const totalRevenueCents = revenueAggregation._sum.totalCents || 0;
+    const productMap = {};
+    allItems.forEach(item => {
+      const name = item.productName || "Produs Necunoscut";
+      if (!productMap[name]) {
+        productMap[name] = { name, count: 0, revenue: 0 };
+      }
+      productMap[name].count += item.qty;
+      productMap[name].revenue += (item.priceCentsAtBuy * item.qty);
+    });
 
+    // Transformăm în array, sortăm după numărul de bucăți vândute și luăm primele 5
+    const topProducts = Object.values(productMap)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // Trimitem tot pachetul către frontend
     res.json({
       totalOrders,
       totalRevenueCents,
+      statusCounts,
+      chartData,
+      topProducts
     });
+
   } catch (error) {
     console.error("EROARE STATISTICI ADMIN:", error);
     res.status(500).json({ error: "Eroare la calcularea statisticilor." });
