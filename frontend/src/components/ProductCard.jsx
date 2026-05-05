@@ -1,18 +1,71 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom"; // <-- Am adăugat useNavigate
+import { Link, useNavigate } from "react-router-dom";
 import { formatRON } from "../utils/money";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 
-export default function ProductCard({ p, product }) {
+// 👉 FUNCȚIE AJUTĂTOARE MUTATĂ AICI PENTRU A GENERA OPȚIUNILE DE STOCARE
+const getStorageOptions = (baseStorage) => {
+  const base = baseStorage || "1TB";
+  const storageList = [
+    { value: "512GB", label: "512 GB NVMe M.2", cost: 0 },
+    { value: "1TB", label: "1 TB NVMe M.2", cost: 250 },
+    { value: "2TB", label: "2 TB NVMe M.2", cost: 750 },
+    { value: "4TB", label: "4 TB NVMe M.2", cost: 2000 }
+  ];
+  const baseItem = storageList.find(s => s.value === base) || storageList[1];
+  const baseCost = baseItem.cost;
+
+  return storageList.filter(s => s.cost >= baseCost).map(s => {
+    const diff = s.cost - baseCost;
+    return {
+      value: s.value,
+      label: s.value === base ? `${s.label} (Bază)` : `${s.label} (Upgrade)`,
+      extraCents: diff * 100,
+      extraText: diff > 0 ? `+${diff} RON` : 0
+    };
+  });
+};
+
+export default function ProductCard({ p, product, availableCases = [] }) {
   const { addToCart } = useCart();
   const { toggleWishlist, isFavorite } = useWishlist();
-  const navigate = useNavigate(); // <-- Hook pentru redirecționare
+  const navigate = useNavigate();
 
   const data = p || product;
 
-  // --- STATE PENTRU POP-UP (ADĂUGAT) ---
+  // State-uri
   const [showServicePopup, setShowServicePopup] = useState(false);
+  const [selectedStorage, setSelectedStorage] = useState(data?.storageGb || "1TB");
+  const [selectedCaseId, setSelectedCaseId] = useState(null);
+
+  if (!data) return null;
+
+  const inStock = (data.stock || 0) > 0;
+  const isService = data.category === "service" || 
+                    ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => (data.name || "").toLowerCase().includes(kw));
+
+  // 👉 LOGICĂ PENTRU CARCASE
+  const pcCompatibleCases = availableCases.filter(c => data.compatibleCases?.includes(c.id));
+  const activeCaseId = selectedCaseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
+  let selectedCaseObj = null;
+  let caseAddedPriceCents = 0;
+
+  if (activeCaseId && pcCompatibleCases.length > 0) {
+    selectedCaseObj = pcCompatibleCases.find(c => c.id === activeCaseId) || pcCompatibleCases[0];
+    caseAddedPriceCents = selectedCaseObj.price || 0;
+  }
+
+  // 👉 LOGICĂ PENTRU STOCARE
+  const dynamicStorageOptions = getStorageOptions(data.storageGb);
+  const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
+  const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
+
+  // 👉 CALCUL PREȚ TOTAL
+  const currentPriceCents = (data.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
+  const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
+  let finalCaseText = data.case || "N/A";
+  if (selectedCaseObj) finalCaseText = selectedCaseObj.name;
 
   const getImageUrl = (img) => {
     if (!img) return "https://placehold.co/800x500/0b1020/ffffff?text=Karix+PC";
@@ -20,23 +73,16 @@ export default function ProductCard({ p, product }) {
     return `https://karixcomputers.ro/uploads/${img}`;
   };
 
-  if (!data) return null;
-
-  const inStock = (data.stock || 0) > 0;
-  
-  // Determinăm dacă este serviciu
-  const isService = data.category === "service" || 
-                    ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => (data.name || "").toLowerCase().includes(kw));
-
   const executeAddToCart = () => {
     let finalWarranty = data.warrantyMonths;
     if (finalWarranty === undefined || finalWarranty === null) {
-        finalWarranty = isService ? 0 : 24;
+      finalWarranty = isService ? 0 : 24;
     }
 
     const productToCart = {
       ...data,
       productName: data.name,
+      priceCents: currentPriceCents,
       warrantyMonths: Number(finalWarranty),
       image: getImageUrl(data.images?.[0]),
       specs: {
@@ -44,8 +90,8 @@ export default function ProductCard({ p, product }) {
         gpu: data.gpuBrand,
         motherboard: data.motherboard,
         ram: data.ramGb,
-        storage: data.storageGb,
-        case: data.case,
+        storage: finalStorageText,
+        case: finalCaseText,
         cooler: data.cooler,
         psu: data.psu
       }
@@ -56,24 +102,11 @@ export default function ProductCard({ p, product }) {
 
   const handleAddToCartClick = (e) => {
     e.preventDefault(); 
-    
-    // Dacă e serviciu, oprim adăugarea și deschidem pop-up-ul
     if (isService) {
       setShowServicePopup(true);
     } else {
-      // Dacă e PC, adaugă direct
       executeAddToCart();
     }
-  };
-
-  const handleConfirmService = () => {
-    setShowServicePopup(false);
-    executeAddToCart();
-  };
-
-  const handleContactRedirect = () => {
-    setShowServicePopup(false);
-    navigate("/contact"); // Te duce pe pagina de contact
   };
 
   return (
@@ -86,26 +119,29 @@ export default function ProductCard({ p, product }) {
             e.preventDefault();
             toggleWishlist(data.id);
           }}
-          className={`absolute top-4 right-4 z-30 h-10 w-10 rounded-xl backdrop-blur-xl border flex items-center justify-center transition-all duration-300 active:scale-90 shadow-2xl ${
+          className={`absolute top-5 right-5 z-30 h-10 w-10 rounded-xl backdrop-blur-xl border flex items-center justify-center transition-all duration-300 active:scale-90 shadow-2xl ${
             isFavorite(data.id)
               ? 'bg-rose-500/20 border-rose-500/40 text-rose-400' 
               : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10'
           }`}
         >
-          <span className="text-lg leading-none transition-transform duration-300">
+          <span className="text-lg leading-none transition-transform duration-300 group-active:scale-125">
             {isFavorite(data.id) ? '❤️' : '🤍'}
           </span>
         </button>
 
-        {/* ZONA IMAGINE */}
-        <Link to={`/product/${data.id}`} className="block relative h-64 overflow-hidden">
-          <div className="absolute top-5 left-5 z-20">
-            <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl border ${
-              inStock 
-                ? 'bg-indigo-500 border-indigo-400 text-white' 
-                : 'bg-white/5 border border-white/10 text-gray-400'
+        {/* ZONA IMAGINE (Stilizată ca în Shop) */}
+        <Link to={`/product/${data.id}`} className="block relative h-64 overflow-hidden bg-black/20">
+          <div className="absolute top-5 left-5 z-20 flex flex-col gap-2">
+            {!isService && (
+               <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-black text-[10px] font-black uppercase tracking-widest shadow-xl">
+                 Asamblat la Comandă
+               </span>
+            )}
+            <span className={`px-3 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-widest border ${
+              inStock ? 'bg-white/10 backdrop-blur-md text-white border-white/10' : 'bg-white/5 border-white/10 text-gray-400'
             }`}>
-              {inStock ? 'În Stoc' : 'La Comandă'}
+              {isService ? (inStock ? 'Disponibil' : 'Indisponibil') : `🛡️ ${data.warrantyMonths || 24} Luni`}
             </span>
           </div>
 
@@ -115,65 +151,133 @@ export default function ProductCard({ p, product }) {
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-80" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0b1020] via-black/40 to-transparent opacity-90" />
         </Link>
 
         <div className="p-8 flex-1 flex flex-col">
-          <Link to={`/product/${data.id}`} className="block mb-6 group/title">
-            <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">
+          <Link to={`/product/${data.id}`} className="block mb-6 relative z-10 -mt-12 group/title">
+            <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 drop-shadow-md">
               {isService ? 'Serviciu Profesional' : `${data.cpuBrand?.split(' ')[0] || 'Custom'} Edition`}
             </p>
-            <h3 className="text-2xl font-black text-white tracking-tight italic uppercase line-clamp-2 group-hover/title:text-indigo-400 transition-colors leading-tight">
+            <h3 className="text-2xl font-black text-white tracking-tight italic uppercase drop-shadow-2xl group-hover/title:text-indigo-400 transition-colors leading-tight line-clamp-2">
               {data.name}
             </h3>
           </Link>
 
-          {/* SPECIFICAȚII (Afișate doar dacă nu e serviciu) */}
+          {/* SPECIFICAȚII ȘI OPȚIUNI (Doar dacă nu e serviciu) */}
           {!isService && (
-            <div className="grid grid-cols-1 gap-2.5 mb-8">
-              <div className="text-[11px] font-medium text-gray-400 italic">⚡ CPU: <span className="text-white not-italic">{data.cpuBrand || 'N/A'}</span></div>
-              <div className="text-[11px] font-medium text-gray-400 italic">🎮 GPU: <span className="text-white not-italic">{data.gpuBrand || 'N/A'}</span></div>
-              <div className="text-[11px] font-medium text-gray-400 italic">🧩 PLACA DE BAZA: <span className="text-white not-italic">{data.motherboard || 'N/A'}</span></div>
-              <div className="text-[11px] font-medium text-gray-400 italic">📟 RAM: <span className="text-white not-italic">{data.ramGb || '0'}GB</span></div>
-              <div className="text-[11px] font-medium text-gray-400 italic">💾 SSD: <span className="text-white not-italic">{data.storageGb || '0'}GB</span></div>
-              <div className="text-[11px] font-medium text-gray-400 italic">📦 CARCASA: <span className="text-white not-italic">{data.case || 'N/A'}</span></div>
-              <div className="text-[11px] font-medium text-gray-400 italic">❄️ COOLER: <span className="text-white not-italic">{data.cooler || 'N/A'}</span></div>
-              <div className="text-[11px] font-medium text-gray-400 italic">🔌 PSU: <span className="text-white not-italic">{data.psu || 'N/A'}</span></div>
-              
-              {data.warrantyMonths !== undefined && (
-                <div className="text-[10px] text-indigo-300 font-bold uppercase mt-2 flex items-center gap-2">
-                  <span className="w-4 h-4 bg-indigo-500/20 rounded flex items-center justify-center">🛡️</span>
-                  {data.warrantyMonths} Luni Garanție
+            <>
+              {/* Grilă specificații ca în Shop */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4 mb-8">
+                <div className="flex items-center gap-3">
+                  <span className="text-indigo-400 text-base">⚡</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">CPU</span>
+                    <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{data.cpuBrand || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-indigo-400 text-base">🎮</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">GPU</span>
+                    <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{data.gpuBrand || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-indigo-400 text-base">📟</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">RAM</span>
+                    <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{data.ramGb || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-indigo-400 text-base">🧩</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Placă Bază</span>
+                    <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{data.motherboard || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-indigo-400 text-base">❄️</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Cooler</span>
+                    <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{data.cooler || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-indigo-400 text-base">🔌</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Sursă</span>
+                    <span className="font-bold text-white/90 whitespace-normal break-words text-[11px] leading-tight">{data.psu || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Selector Carcase */}
+              {pcCompatibleCases.length > 0 && (
+                <div className="mt-2 mb-4 p-4 rounded-[20px] bg-white/5 border border-white/10">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Alege Carcasa</span>
+                  <div className="flex flex-col gap-2">
+                    {pcCompatibleCases.map(caseOpt => {
+                      const isSelected = activeCaseId === caseOpt.id;
+                      return (
+                        <button key={caseOpt.id} onClick={() => setSelectedCaseId(caseOpt.id)} className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${isSelected ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
+                              {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                            </div>
+                            <span>{caseOpt.name}</span>
+                          </div>
+                          {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price)}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
-            </div>
+
+              {/* Selector Stocare */}
+              {dynamicStorageOptions.length > 0 && (
+                <div className="mt-2 mb-6 p-4 rounded-[20px] bg-white/5 border border-white/10">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">💾 Memorie Stocare</span>
+                  <div className="flex flex-col gap-2">
+                    {dynamicStorageOptions.map(option => (
+                      <button key={option.value} onClick={() => setSelectedStorage(option.value)} className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${selectedStorage === option.value ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedStorage === option.value ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
+                            {selectedStorage === option.value && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                          </div>
+                          <span>{option.label}</span>
+                        </div>
+                        {option.extraText !== 0 && <span className="text-indigo-300">{option.extraText}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {/* DACĂ ESTE SERVICIU: Afișăm un scurt text descriptiv în loc de piese */}
           {isService && (
-             <div className="mb-8">
-               <p className="text-sm text-gray-400 italic line-clamp-4">{data.description || "Serviciu profesional pentru echipamentul tău."}</p>
-             </div>
+            <div className="mb-8">
+              <p className="text-sm text-gray-400 italic line-clamp-4">{data.description || "Serviciu profesional pentru echipamentul tău."}</p>
+            </div>
           )}
 
-          <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between gap-4">
-            <div className="flex flex-col">
-              <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{isService ? 'Preț Manoperă' : 'Preț Sistem'}</span>
-              <span className="text-2xl font-black text-white italic">{formatRON(data.priceCents)}</span>
+          {/* Preț și Butoane */}
+          <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-4">
+            <div className="flex items-center justify-center"> 
+              <div className="flex flex-col items-center text-center"> 
+                <span className="text-[10px] text-gray-400 uppercase font-black tracking-widest">{isService ? 'Preț Manoperă' : 'Preț Sistem'}</span>
+                <span className="text-2xl font-black text-white italic">{formatRON(currentPriceCents)}</span>
+              </div>
             </div>
 
-            <div className="flex gap-2 flex-1">
-              <Link 
-                to={`/product/${data.id}`}
-                className="flex-1 h-14 rounded-2xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg"
-              >
+            <div className="flex gap-2">
+              <Link to={`/product/${data.id}`} className="flex-1 h-14 rounded-2xl bg-white/5 border border-white/10 text-white hover:bg-white/20 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg">
                 Detalii
               </Link>
-              <button
-                disabled={!inStock && data.priceCents === 0}
-                onClick={handleAddToCartClick} // <-- Apelăm noua funcție
-                className="flex-1 h-14 rounded-2xl bg-white text-black hover:bg-indigo-500 hover:text-white transition-all duration-300 flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg disabled:opacity-20"
-              >
+              <button disabled={!inStock && currentPriceCents === 0} onClick={handleAddToCartClick} className="flex-1 h-14 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-500 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg shadow-indigo-600/20 disabled:opacity-20">
                 Adaugă
               </button>
             </div>
@@ -181,44 +285,28 @@ export default function ProductCard({ p, product }) {
         </div>
       </div>
 
-      {/* --- POPUP AVERTIZARE SERVICII (ADĂUGAT) --- */}
+      {/* POPUP AVERTIZARE SERVICII */}
       {showServicePopup && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-xl bg-black/60">
           <div className="relative w-full max-w-md bg-[#161e31]/95 border border-indigo-500/30 p-10 rounded-[40px] text-center shadow-2xl animate-in zoom-in">
-            
             <div className="w-16 h-16 mx-auto bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/20">
               <span className="text-3xl">📍</span>
             </div>
-
             <h2 className="text-2xl font-black text-white mb-3 italic uppercase">Atenție! Serviciu Local</h2>
-            
             <p className="text-gray-400 text-sm mb-6 leading-relaxed">
               Serviciile noastre de mentenanță și asamblare sunt disponibile în prezent doar pentru clienții din <strong className="text-indigo-400">Județul Bihor (Oradea)</strong>. 
             </p>
-            
             <p className="text-xs text-gray-500 mb-8 italic">
               Dacă ești din alt oraș și dorești să ne trimiți echipamentul tău prin curier pe cont propriu, te rugăm să ne contactezi înainte.
             </p>
-
             <div className="flex flex-col gap-3">
-              <button 
-                onClick={handleConfirmService} 
-                className="w-full py-4 rounded-2xl font-black text-white bg-indigo-600 hover:bg-indigo-500 uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95"
-              >
+              <button onClick={() => { setShowServicePopup(false); executeAddToCart(); }} className="w-full py-4 rounded-2xl font-black text-white bg-indigo-600 hover:bg-indigo-500 uppercase text-[11px] tracking-widest transition-all shadow-lg active:scale-95">
                 Sunt din Oradea / Adaugă în coș
               </button>
-              
-              <button 
-                onClick={handleContactRedirect} 
-                className="w-full py-4 rounded-2xl font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 uppercase text-[11px] tracking-widest transition-all active:scale-95"
-              >
+              <button onClick={() => { setShowServicePopup(false); navigate("/contact"); }} className="w-full py-4 rounded-2xl font-black text-white bg-white/5 border border-white/10 hover:bg-white/10 uppercase text-[11px] tracking-widest transition-all active:scale-95">
                 Contactează-ne (Alte orașe)
               </button>
-
-              <button 
-                onClick={() => setShowServicePopup(false)} 
-                className="mt-4 text-[10px] text-gray-500 font-bold uppercase hover:text-white transition-colors"
-              >
+              <button onClick={() => setShowServicePopup(false)} className="mt-4 text-[10px] text-gray-500 font-bold uppercase hover:text-white transition-colors">
                 Anulează
               </button>
             </div>

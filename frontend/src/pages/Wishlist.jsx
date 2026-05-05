@@ -1,16 +1,35 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useWishlist } from "../context/WishlistContext"; 
 import ProductCard from "../components/ProductCard"; 
-// IMPORTĂM COMPONENTA SEO
 import SEO from "../components/SEO";
+// 👉 IMPORT NOU: Folosim apiFetch pentru a aduce lista de carcase de pe server
+import { apiFetch } from "../api/client"; 
 
 export default function Wishlist() {
   const { wishlist } = useWishlist();
+  
+  // 👉 STATE NOU: Păstrăm carcasele compatibile aici
+  const [availableCases, setAvailableCases] = useState([]);
+
+  // 👉 EFECT NOU: Preluăm carcasele când se deschide pagina de favorite
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        const casesRes = await apiFetch("/adminconfigurator");
+        if (casesRes.ok) {
+          const items = await casesRes.json();
+          setAvailableCases(items.filter(item => item.category === 'case'));
+        }
+      } catch (err) {
+        console.error("Eroare la preluarea carcaselor în Wishlist:", err);
+      }
+    };
+    fetchCases();
+  }, []);
 
   return (
     <>
-      {/* SEO: CONFIGURARE PENTRU PAGINA DE FAVORITE */}
       <SEO 
         title="Sisteme Favorite" 
         description="Salvează configurațiile care îți plac și compară-le mai târziu. Lista ta de dorințe pentru setup-ul perfect la Karix Computers."
@@ -18,13 +37,11 @@ export default function Wishlist() {
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-transparent">
         
-        {/* GLOW-URI DE FUNDAL ANIMATE (Stil Karix Consistent) */}
         <div className="absolute inset-0 pointer-events-none z-0">
           <div className="absolute top-1/4 -right-20 w-[600px] h-[600px] bg-indigo-500/10 blur-[120px] rounded-full animate-blob" />
           <div className="absolute bottom-1/4 -left-20 w-[500px] h-[500px] bg-pink-500/10 blur-[120px] rounded-full animate-blob animation-delay-2000" />
         </div>
         
-        {/* AM MĂRIT CONTAINERUL LA max-w-7xl (sau max-w-[1400px]) PENTRU A FACE LOC CARDURILOR CUSTOMIZABILE LATE */}
         <div className="max-w-[1400px] mx-auto relative z-10">
           <header className="mb-12">
             <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter mb-2 italic uppercase drop-shadow-2xl text-left leading-none">
@@ -36,14 +53,17 @@ export default function Wishlist() {
           </header>
 
           {wishlist && wishlist.length > 0 ? (
-            /* GRILĂ ACTUALIZATĂ: Cardurile customizabile sunt mari, deci trecem la 2 coloane pe desktop și 3 pe ecrane foarte mari (xl/2xl) */
             <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-8 lg:gap-10">
               {wishlist.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                // 👉 TRIMITEM CARCASELE CĂTRE CARD:
+                <ProductCard 
+                  key={product.id} 
+                  product={product} 
+                  availableCases={availableCases} 
+                />
               ))}
             </div>
           ) : (
-            /* EMPTY STATE CU INIMĂ ❤️ */
             <div className="p-16 md:p-24 rounded-[45px] bg-white/[0.02] border border-white/10 backdrop-blur-xl text-center shadow-2xl border-dashed max-w-4xl mx-auto">
               <div className="text-7xl mb-6 opacity-20 animate-pulse">❤️</div>
               <h2 className="text-2xl font-black text-white mb-2 italic uppercase tracking-tighter">
@@ -62,7 +82,6 @@ export default function Wishlist() {
           )}
         </div>
 
-        {/* CSS PENTRU ANIMAȚIA DE FUNDAL */}
         <style dangerouslySetInnerHTML={{ __html: `
           @keyframes blob {
             0% { transform: translate(0px, 0px) scale(1); }
