@@ -337,23 +337,41 @@ router.post("/:id/reviews", requireAuth, async (req, res, next) => {
  */
 router.post("/update-pc-price", async (req, res, next) => {
   try {
-    const { wishlistId, rawPrice, secretKey } = req.body;
+    // 👉 NOU: Am adăugat isOutOfStock aici pentru a fi extras din cerere
+    const { wishlistId, rawPrice, isOutOfStock, secretKey } = req.body;
 
     if (secretKey !== (process.env.SCRAPER_SECRET || "karix_secret_123")) {
       return res.status(401).json({ error: "Parolă secretă incorectă!" });
     }
 
+    // 👉 NOU: Logica pentru lipsă stoc
+    if (isOutOfStock) {
+      await prisma.product.update({
+        where: { pcgarageWishlistId: wishlistId },
+        data: { isVisible: false } // Ascundem produsul de pe site
+      });
+
+      console.log(`🔒 [SYNC] Wishlist ${wishlistId} marcat ca LIPSĂ STOC (ascuns de pe site).`);
+      return res.json({ success: true, message: "PC ascuns din cauza lipsei de stoc." });
+    }
+
+    // Dacă este în stoc, continuăm cu calculul normal al prețului
     const manopera = 300;
     const adaosPercent = 1.03; 
     let calculated = (rawPrice * adaosPercent) + manopera;
     let finalPrice = Math.ceil(calculated / 10) * 10 - 1;
 
+    // Actualizăm prețul ȘI ne asigurăm că produsul este din nou vizibil
+    // (în caz că a fost ascuns anterior, iar acum piesele au revenit în stoc)
     await prisma.product.update({
       where: { pcgarageWishlistId: wishlistId },
-      data: { priceCents: finalPrice * 100 } 
+      data: { 
+        priceCents: finalPrice * 100,
+        isVisible: true // Îl facem din nou vizibil
+      } 
     });
 
-    console.log(`✅ [SYNC] Wishlist ${wishlistId} actualizat la ${finalPrice} RON`);
+    console.log(`✅ [SYNC] Wishlist ${wishlistId} actualizat la ${finalPrice} RON și marcat ca VIZIBIL.`);
     res.json({ success: true, newPrice: finalPrice });
   } catch (e) {
     console.error("SYNC ERROR:", e);
