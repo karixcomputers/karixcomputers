@@ -868,24 +868,11 @@ export default function Checkout() {
                   )}
 
                   <div className="flex justify-between text-gray-400 font-medium text-sm items-center">
-                    <span>{showLocalUI ? "Deplasare Locală" : "Transport Logistică"}</span>
+                    <span>{showLocalUI ? "Deplasare Locală" : "Transport"}</span>
                     <span className={`font-black text-[10px] uppercase tracking-widest ${shippingBreakdown.finalShippingCost === 0 ? "text-emerald-400" : "text-white"}`}>
                       {shippingBreakdown.finalShippingCost === 0 ? "Gratuit" : `+ ${formatRON(shippingBreakdown.finalShippingCost)}`}
                     </span>
                   </div>
-
-                  {cartAnalysis.hasService && cartAnalysis.hasNationalService && !showLocalUI && (
-                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2 mt-2">
-                         <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                            <span>Tur (Către Karix)</span>
-                            <span>{formatRON(shippingBreakdown.sendCost)}</span>
-                         </div>
-                         <div className="flex justify-between text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                            <span>Retur (Către Tine)</span>
-                            <span>{formatRON(shippingBreakdown.returnCost)}</span>
-                         </div>
-                      </div>
-                  )}
 
                   <div className="h-px bg-white/10 w-full my-6" />
                   
