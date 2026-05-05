@@ -13,26 +13,30 @@ router.get("/", requireAuth, async (req, res) => {
     const items = await prisma.wishlistItem.findMany({
       where: { userId },
       include: { 
-        product: true // Aduce obiectul product cu toate câmpurile (inclusiv compatibleCases)
+        product: true 
       }
     });
     
-    // MAPĂM datele pentru a ne asigura că "compatibleCases" este prezent și corect
     const formattedProducts = items.map(i => {
       const p = i.product;
+      
+      // Transformăm lista de string-uri în obiecte pe care frontend-ul le poate randa
+      const caseOptions = (p.compatibleCases || []).map(name => ({
+        id: name,
+        name: name,
+        price: 0
+      }));
+
       return {
         ...p,
-        // Ne asigurăm că dacă compatibleCases lipsește, trimitem un array gol, nu null
-        compatibleCases: p.compatibleCases || [],
-        // Dacă ProductCard caută "carcase", mapăm array-ul de stringuri în obiecte cu preț 0
-        // (deoarece în schema ta nu ai prețuri per carcasă, le trimitem ca incluse în prețul PC-ului)
-        carcase: (p.compatibleCases || []).map(name => ({
-          id: name,
-          name: name,
-          price: 0 // Preț implicit 0 (deja inclus în prețul total al sistemului)
-        })),
-        // Adăugăm un array de memorii implicit dacă ProductCard îl caută
-        memorii: p.ramGb ? [{ id: "def", name: p.ramGb, price: 0 }] : []
+        // Trimitem sub toate denumirile posibile ca să fim siguri că ProductCard o găsește pe cea corectă
+        carcase: caseOptions,
+        carcaseOptions: caseOptions,
+        cases: caseOptions,
+        
+        // Trimitem și pentru RAM/Memorii
+        memorii: p.ramGb ? [{ id: "def", name: p.ramGb, price: 0 }] : [],
+        memoriiOptions: p.ramGb ? [{ id: "def", name: p.ramGb, price: 0 }] : []
       };
     });
     
