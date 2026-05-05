@@ -142,7 +142,7 @@ export default function ServiceDetails() {
                 </h4>
                 {service.isNationalService ? (
                   <p className="text-xs text-gray-300 font-medium leading-relaxed">
-                    Dacă nu ești din Oradea, vei trimite echipamentul defect prin curier (tur-retur). Adaugi serviciul în coș, alegi curierul, iar de restul ne ocupăm noi! Plata se face după diagnosticare sau în avans, în funcție de preferințe.
+                    Dacă nu ești din Oradea, vei trimite echipamentul prin curier (tur-retur). Adaugi serviciul în coș, completezi adresa de ridicare & livrare, iar de restul ne ocupăm noi!
                   </p>
                 ) : (
                   <p className="text-xs text-gray-300 font-medium leading-relaxed">

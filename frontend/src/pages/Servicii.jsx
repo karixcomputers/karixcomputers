@@ -10,7 +10,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 export default function Servicii() {
   const { addItem } = useCart(); 
   const { user, accessToken } = useAuth(); 
-  const nav = useNavigate(); // 👉 NOU: Pentru navigarea către detalii
+  const nav = useNavigate(); 
   
   const [services, setServices] = useState([]); 
   const [loading, setLoading] = useState(true);
@@ -61,7 +61,7 @@ export default function Servicii() {
   });
 
   const handleAddToCart = (e, service) => {
-    e.preventDefault(); // Oprește navigarea dacă cumva e într-un link
+    e.preventDefault(); 
     e.stopPropagation();
     
     addItem({
@@ -260,7 +260,6 @@ export default function Servicii() {
                 {filteredServices.map((service) => (
                   <div 
                     key={service.id}
-                    // 👉 NOU: Am scos Link-ul wrapper global pentru că interfera cu butoanele
                     className="flex flex-col p-8 rounded-[32px] bg-white/5 border border-white/10 hover:border-indigo-500/40 transition-all duration-500 group backdrop-blur-md relative overflow-hidden text-center shadow-2xl"
                   >
                     <div className="absolute top-4 left-4 z-20">
@@ -297,7 +296,8 @@ export default function Servicii() {
                       </h3>
                     </div>
 
-                    <p className="text-gray-300 text-[14px] leading-relaxed mb-6 font-medium line-clamp-3">
+                    {/* 👉 AM SCOS CLASA line-clamp-3 AICI CA SĂ SE VADĂ TOATĂ DESCRIEREA SCURTĂ */}
+                    <p className="text-gray-300 text-[14px] leading-relaxed mb-6 font-medium">
                       {service.description || "Asigurăm asistență și reparații profesionale la standarde înalte."}
                     </p>
                     
@@ -307,7 +307,6 @@ export default function Servicii() {
                          <span className="text-2xl font-black text-white italic">{formatRON(service.priceCents)}</span>
                       </div>
                       
-                      {/* 👉 NOU: BUTOANELE LÂNGĂ UNUL ALTUL */}
                       <div className="flex items-center gap-3 w-full">
                           <button 
                             onClick={() => nav(`/service/${service.id}`)}
