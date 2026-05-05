@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { formatRON } from "../utils/money";
 import { apiFetch } from "../api/client";
 import SEO from "../components/SEO";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+// Funcție locală DOAR pentru acest dashboard, ca să arate numerele mari frumos (ex: 1.500.000,00 RON)
+const formatLocalRON = (cents) => {
+  if (!cents) return "0,00 RON";
+  return new Intl.NumberFormat('ro-RO', { 
+    style: 'currency', 
+    currency: 'RON' 
+  }).format(cents / 100);
+};
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ 
@@ -56,7 +64,7 @@ export default function AdminDashboard() {
       return (
         <div className="bg-[#0b1020]/95 border border-indigo-500/30 p-4 rounded-xl shadow-xl backdrop-blur-xl">
           <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">{label}</p>
-          <p className="text-indigo-400 font-bold italic">{formatRON(payload[0].value)}</p>
+          <p className="text-indigo-400 font-bold italic">{formatLocalRON(payload[0].value)}</p>
         </div>
       );
     }
@@ -109,12 +117,12 @@ export default function AdminDashboard() {
 
                 <div className="bg-gradient-to-br from-pink-900/40 to-[#0b1020] border border-pink-500/30 p-8 rounded-[30px] shadow-2xl relative overflow-hidden">
                   <p className="text-pink-400 text-xs font-black uppercase tracking-[0.2em] mb-4">Total Încasări</p>
-                  <div className="text-4xl font-black text-white italic tracking-tighter drop-shadow-lg">{formatRON(stats.totalRevenueCents)}</div>
+                  <div className="text-4xl font-black text-white italic tracking-tighter drop-shadow-lg">{formatLocalRON(stats.totalRevenueCents)}</div>
                 </div>
 
                 <div className="bg-gradient-to-br from-emerald-900/20 to-[#0b1020] border border-emerald-500/30 p-8 rounded-[30px] shadow-2xl relative overflow-hidden">
                   <p className="text-emerald-400 text-xs font-black uppercase tracking-[0.2em] mb-4">Media / Comandă (AOV)</p>
-                  <div className="text-4xl font-black text-white italic tracking-tighter drop-shadow-lg">{formatRON(averageOrderValue)}</div>
+                  <div className="text-4xl font-black text-white italic tracking-tighter drop-shadow-lg">{formatLocalRON(averageOrderValue)}</div>
                 </div>
               </div>
 
@@ -179,7 +187,7 @@ export default function AdminDashboard() {
                             <p className="text-gray-400 text-[10px] mt-0.5">{prod.count} {prod.count === 1 ? 'bucată' : 'bucăți'}</p>
                           </div>
                           <div className="text-indigo-400 text-xs font-black italic shrink-0">
-                            {formatRON(prod.revenue)}
+                            {formatLocalRON(prod.revenue)}
                           </div>
                         </div>
                       ))}

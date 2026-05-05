@@ -115,8 +115,8 @@ export default function Header() {
                 <Link to="/admin/reviews" className="text-[9px] font-bold uppercase tracking-widest text-indigo-100 hover:text-white transition-colors whitespace-nowrap">💬 Review-uri</Link>
                 <Link to="/admin/configurator" className="text-[9px] font-bold uppercase tracking-widest text-indigo-100 hover:text-white transition-colors whitespace-nowrap">🛠️ Configurator</Link>
                 <Link to="/admin/users" className="text-[9px] font-bold uppercase tracking-widest text-indigo-100 hover:text-white transition-colors whitespace-nowrap">👥 Gestiune Clienți</Link>
-                <Link to="/admin/announcements" className="text-[9px] font-bold uppercase tracking-widest text-indigo-100 hover:text-white transition-colors whitespace-nowrap">Anunturi</Link>
-                <Link to="/admin/counts" className="text-[9px] font-bold uppercase tracking-widest text-indigo-100 hover:text-white transition-colors whitespace-nowrap">Statistici Site</Link>
+                <Link to="/admin/announcements" className="text-[9px] font-bold uppercase tracking-widest text-indigo-100 hover:text-white transition-colors whitespace-nowrap">📢 Anunturi</Link>
+                <Link to="/admin/counts" className="text-[9px] font-bold uppercase tracking-widest text-indigo-100 hover:text-white transition-colors whitespace-nowrap">📈 Statistici Site</Link>
               </div>
             </div>
           </div>
