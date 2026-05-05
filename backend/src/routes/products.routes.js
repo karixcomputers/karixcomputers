@@ -337,14 +337,13 @@ router.post("/:id/reviews", requireAuth, async (req, res, next) => {
  */
 router.post("/update-pc-price", async (req, res, next) => {
   try {
-    // 👉 NOU: Am adăugat isOutOfStock aici pentru a fi extras din cerere
     const { wishlistId, rawPrice, isOutOfStock, secretKey } = req.body;
 
     if (secretKey !== (process.env.SCRAPER_SECRET || "karix_secret_123")) {
       return res.status(401).json({ error: "Parolă secretă incorectă!" });
     }
 
-    // 👉 NOU: Logica pentru lipsă stoc
+    // Logica pentru lipsă stoc
     if (isOutOfStock) {
       await prisma.product.update({
         where: { pcgarageWishlistId: wishlistId },
@@ -355,14 +354,26 @@ router.post("/update-pc-price", async (req, res, next) => {
       return res.json({ success: true, message: "PC ascuns din cauza lipsei de stoc." });
     }
 
-    // Dacă este în stoc, continuăm cu calculul normal al prețului
-    const manopera = 300;
-    const adaosPercent = 1.03; 
+    // Stabilirea adaosului comercial în funcție de prețul brut
+    let adaosPercent;
+    if (rawPrice <= 7500) {
+      adaosPercent = 1.05; // 5%
+    } else if (rawPrice <= 12500) {
+      adaosPercent = 1.04; // 4%
+    } else if (rawPrice <= 20000) {
+      adaosPercent = 1.03; // 3%
+    } else {
+      adaosPercent = 1.02; // 2% pentru peste 20000
+    }
+
+    // Manopera fixă
+    const manopera = 400;
+    
+    // Calculul final
     let calculated = (rawPrice * adaosPercent) + manopera;
     let finalPrice = Math.ceil(calculated / 10) * 10 - 1;
 
     // Actualizăm prețul ȘI ne asigurăm că produsul este din nou vizibil
-    // (în caz că a fost ascuns anterior, iar acum piesele au revenit în stoc)
     await prisma.product.update({
       where: { pcgarageWishlistId: wishlistId },
       data: { 
@@ -371,7 +382,7 @@ router.post("/update-pc-price", async (req, res, next) => {
       } 
     });
 
-    console.log(`✅ [SYNC] Wishlist ${wishlistId} actualizat la ${finalPrice} RON și marcat ca VIZIBIL.`);
+    console.log(`✅ [SYNC] Wishlist ${wishlistId} actualizat la ${finalPrice} RON (Adaos aplicat: ${((adaosPercent - 1) * 100).toFixed(0)}%) și marcat ca VIZIBIL.`);
     res.json({ success: true, newPrice: finalPrice });
   } catch (e) {
     console.error("SYNC ERROR:", e);
