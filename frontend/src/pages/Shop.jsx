@@ -77,7 +77,7 @@ export default function Shop() {
         const items = await casesRes.json();
         fetchedCases = items
           .filter(item => item.category === 'case')
-          .sort((a, b) => a.name.localeCompare(b.name)); // 👉 NOU: Sortare alfabetică A-Z
+          .sort((a, b) => a.name.localeCompare(b.name)); 
         setAvailableCases(fetchedCases);
       }
 
@@ -101,7 +101,6 @@ export default function Shop() {
                 if(firstValidCase) defaultCaseId = firstValidCase.id;
             }
 
-            // 👉 NOU: Preluăm valoarea default din baza de date pentru memorie (sau 1TB fallback)
             const baseStorage = pc.storageGb || "1TB";
 
             initialSelections[pc.id] = { 
@@ -222,14 +221,14 @@ export default function Shop() {
     }
   };
 
-  const handleAddToCart = (pc, currentPriceCents, finalStorage, finalCase) => {
+  const handleAddToCart = (pc, currentPriceCents, finalStorage, finalCase, displayImg) => {
     const success = addItem({
       id: pc.id,
       name: pc.name,
       category: pc.category,
       priceCents: currentPriceCents, 
       warrantyMonths: pc.warrantyMonths || 24,
-      image: getImageUrl(pc.images?.[0]), 
+      image: getImageUrl(displayImg), 
       specs: {
         cpu: pc.cpuBrand,
         gpu: pc.gpuBrand,
@@ -296,10 +295,8 @@ export default function Shop() {
       }));
   };
 
-  // 👉 FUNCȚIE AJUTĂTOARE PENTRU A GENERA OPȚIUNILE DE STOCARE DINAMIC
   const getStorageOptions = (baseStorage) => {
       const base = baseStorage || "1TB";
-
       const storageList = [
           { value: "512GB", label: "512 GB NVMe M.2", cost: 0 },
           { value: "1TB", label: "1 TB NVMe M.2", cost: 250 },
@@ -544,15 +541,12 @@ export default function Shop() {
                 {filteredAndSortedPcs.map((pc) => {
                   const isCompared = compareList.find(c => c.id === pc.id);
                   
-                  // 👉 NOU: Preluăm opțiunile dinamice de stocare pe baza PC-ului curent
                   const dynamicStorageOptions = getStorageOptions(pc.storageGb);
                   const selectedStorage = customSelections[pc.id]?.storage || pc.storageGb || "1TB";
                   
-                  // Găsim prețul suplimentar din lista noastră calculată
                   const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
                   const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
                   
-                  // FILTRARE: DOAR CARCASELE COMPATIBILE PENTRU ACEST PC
                   const pcCompatibleCases = availableCases.filter(c => pc.compatibleCases?.includes(c.id));
 
                   const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
@@ -569,10 +563,13 @@ export default function Shop() {
                       }
                   }
 
-                  // CALCUL PREȚ TOTAL
+                  // 👉 NOU: Logica pentru a alege ce imagine afișăm (Carcasa selectată SAU sistemul de bază)
+                  const displayImage = (selectedCaseObj && selectedCaseObj.image) 
+                    ? selectedCaseObj.image 
+                    : pc.images?.[0];
+
                   const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
 
-                  // Textul final de stocare care ajunge în coș
                   const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
 
                   let finalCaseText = pc.case || "N/A";
@@ -631,7 +628,8 @@ export default function Shop() {
                       </button>
 
                       <img 
-                        src={getImageUrl(pc.images?.[0])} 
+                        // 👉 AICI se folosește imaginea selectată dinamic
+                        src={getImageUrl(displayImage)} 
                         alt={pc.name} 
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
                       />
@@ -715,7 +713,6 @@ export default function Shop() {
                           </div>
                         )}
 
-                        {/* 👉 AICI AFISĂM MEMORIILE DINAMICE */}
                         {dynamicStorageOptions.length > 0 && (
                           <div className="flex flex-col">
                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
@@ -761,7 +758,8 @@ export default function Shop() {
                             Detalii
                           </Link>
                           <button 
-                            onClick={() => handleAddToCart(pc, currentPriceCents, finalStorageText, finalCaseText)} 
+                            // 👉 Trimitem displayImage către funcția de adăugare în coș
+                            onClick={() => handleAddToCart(pc, currentPriceCents, finalStorageText, finalCaseText, displayImage)} 
                             className="flex-1 h-12 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition-all flex items-center justify-center font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-lg shadow-indigo-600/20"
                           >
                             Adaugă
@@ -858,7 +856,6 @@ export default function Shop() {
                     
                     <button 
                       onClick={() => { 
-                        // Când adaugi din modalul de comparare, luăm iar selecțiile dinamice
                         const dynamicStorageOptions = getStorageOptions(pc.storageGb);
                         const selectedStorage = customSelections[pc.id]?.storage || pc.storageGb || "1TB";
                         const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
@@ -879,6 +876,11 @@ export default function Shop() {
                             }
                         }
 
+                        // Imaginea dinamică și pentru butonul de coș din modal
+                        const displayImg = (selectedCaseObj && selectedCaseObj.image) 
+                          ? selectedCaseObj.image 
+                          : pc.images?.[0];
+
                         const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
                         
                         let finalCaseText = pc.case || "N/A";
@@ -886,35 +888,10 @@ export default function Shop() {
 
                         const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
 
-                        const success = addItem({
-                          id: pc.id,
-                          name: pc.name,
-                          category: pc.category,
-                          priceCents: currentPriceCents, 
-                          warrantyMonths: pc.warrantyMonths || 24,
-                          image: getImageUrl(pc.images?.[0]),
-                          specs: {
-                            cpu: pc.cpuBrand,
-                            gpu: pc.gpuBrand,
-                            ram: pc.ramGb, 
-                            storage: finalStorageText,
-                            motherboard: pc.motherboard, 
-                            case: finalCaseText, 
-                            cooler: pc.cooler,
-                            psu: pc.psu
-                          }
-                        });
+                        handleAddToCart(pc, currentPriceCents, finalStorageText, finalCaseText, displayImg);
                         
-                        if (success !== false) {
-                          setCompareList(compareList.filter(c => c.id !== pc.id));
-                          if (compareList.length === 1) setShowCompareModal(false);
-                          
-                          const toastId = Date.now();
-                          setToasts((prev) => [...prev, { id: toastId, message: `Sistemul "${pc.name}" a fost adăugat!` }]);
-                          setTimeout(() => {
-                            setToasts((prev) => prev.filter((t) => t.id !== toastId));
-                          }, 3000);
-                        }
+                        setCompareList(compareList.filter(c => c.id !== pc.id));
+                        if (compareList.length === 1) setShowCompareModal(false);
                       }} 
                       className="w-full py-4 mt-6 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-indigo-500 transition-all shadow-lg shrink-0 active:scale-95"
                     >

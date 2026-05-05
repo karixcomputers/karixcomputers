@@ -1,9 +1,25 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
+import multer from "multer"; // 👉 NOU: Importăm multer
+import path from "path";     // 👉 NOU: Importăm path
 
 const prisma = new PrismaClient();
 const router = express.Router();
+
+// 👉 NOU: Configurare Multer pentru a salva imaginile în folderul "uploads"
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); // Asigură-te că folderul 'uploads/' există în rădăcina backend-ului
+  },
+  filename: function (req, file, cb) {
+    // Generăm un nume unic pentru poză: timestamp + extensia originală
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'config-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage: storage });
+
 
 const requireAdmin = (req, res, next) => {
   if (req.user && req.user.role === "admin") next();
@@ -40,10 +56,18 @@ router.get("/all", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// 👉 MODIFICAT: Am adăugat middleware-ul `upload.single('image')`
 // POST: Adaugă o componentă nouă
-router.post("/", requireAuth, requireAdmin, async (req, res) => {
+router.post("/", requireAuth, requireAdmin, upload.single('image'), async (req, res) => {
   try {
+    // Multer ne pune câmpurile text în req.body
     const { category, brand, name, spec, price } = req.body;
+
+    // Multer ne pune fișierul în req.file
+    let imageName = null;
+    if (req.file) {
+      imageName = req.file.filename; // Salvăm doar numele fișierului în DB
+    }
 
     // Validare minimală
     if (!category || !name) {
@@ -56,8 +80,8 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
         brand: brand || null, 
         name, 
         spec: spec || null,
-        // Convertim prețul în număr întreg (cents) pentru siguranță
         price: price ? parseInt(price) : 0,
+        image: imageName, // 👉 NOU: Salvăm numele imaginii în baza de date
         isActive: true
       }
     });
@@ -81,7 +105,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// PATCH: Activează/Dezactivează o componentă (Opțional, dar util)
+// PATCH: Activează/Dezactivează o componentă
 router.patch("/:id/toggle", requireAuth, requireAdmin, async (req, res) => {
     try {
         const component = await prisma.configuratorComponent.findUnique({

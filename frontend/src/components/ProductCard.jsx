@@ -56,6 +56,11 @@ export default function ProductCard({ p, product, availableCases = [] }) {
     caseAddedPriceCents = selectedCaseObj.price || 0;
   }
 
+  // 👉 NOU: Logica pentru a alege ce imagine afișăm (Carcasa selectată SAU sistemul de bază)
+  const displayImage = (selectedCaseObj && selectedCaseObj.image) 
+    ? selectedCaseObj.image 
+    : data.images?.[0];
+
   // 👉 LOGICĂ PENTRU STOCARE
   const dynamicStorageOptions = getStorageOptions(data.storageGb);
   const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
@@ -84,7 +89,8 @@ export default function ProductCard({ p, product, availableCases = [] }) {
       productName: data.name,
       priceCents: currentPriceCents,
       warrantyMonths: Number(finalWarranty),
-      image: getImageUrl(data.images?.[0]),
+      // Trimitem și imaginea carcasei în coș, ca să vadă clientul la checkout exact ce a ales
+      image: getImageUrl(displayImage),
       specs: {
         cpu: data.cpuBrand,
         gpu: data.gpuBrand,
@@ -146,7 +152,8 @@ export default function ProductCard({ p, product, availableCases = [] }) {
           </div>
 
           <img
-            src={getImageUrl(data.images?.[0])}
+            // 👉 AICI se folosește imaginea selectată dinamic
+            src={getImageUrl(displayImage)}
             alt={data.name}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
             loading="lazy"
