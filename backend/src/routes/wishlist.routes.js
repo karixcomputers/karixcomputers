@@ -10,13 +10,33 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user.id || req.user.sub;
     
-    // REVENIM la varianta simplă care nu dă eroare
     const items = await prisma.wishlistItem.findMany({
       where: { userId },
-      include: { product: true }
+      include: { 
+        product: true // Aduce obiectul product cu toate câmpurile (inclusiv compatibleCases)
+      }
     });
     
-    res.json(items.map(i => i.product));
+    // MAPĂM datele pentru a ne asigura că "compatibleCases" este prezent și corect
+    const formattedProducts = items.map(i => {
+      const p = i.product;
+      return {
+        ...p,
+        // Ne asigurăm că dacă compatibleCases lipsește, trimitem un array gol, nu null
+        compatibleCases: p.compatibleCases || [],
+        // Dacă ProductCard caută "carcase", mapăm array-ul de stringuri în obiecte cu preț 0
+        // (deoarece în schema ta nu ai prețuri per carcasă, le trimitem ca incluse în prețul PC-ului)
+        carcase: (p.compatibleCases || []).map(name => ({
+          id: name,
+          name: name,
+          price: 0 // Preț implicit 0 (deja inclus în prețul total al sistemului)
+        })),
+        // Adăugăm un array de memorii implicit dacă ProductCard îl caută
+        memorii: p.ramGb ? [{ id: "def", name: p.ramGb, price: 0 }] : []
+      };
+    });
+    
+    res.json(formattedProducts);
   } catch (error) {
     console.error("❌ ERROR FETCH WISHLIST:", error);
     res.status(500).json({ error: "Eroare la preluarea listei de favorite." });
