@@ -60,7 +60,7 @@ import Failed from "./pages/Failed";
 import AdminUsers from "./pages/AdminUsers";
 import AdminAnnouncements from "./pages/AdminAnnouncements";
 import ServiceDetails from "./pages/ServiceDetails.jsx";
-import AdminCounts from "./pages/ServiceDetails.jsx";
+import AdminCounts from "./pages/AdminCounts.jsx";
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
