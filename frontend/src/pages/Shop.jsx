@@ -75,7 +75,9 @@ export default function Shop() {
       let fetchedCases = [];
       if (casesRes.ok) {
         const items = await casesRes.json();
-        fetchedCases = items.filter(item => item.category === 'case');
+        fetchedCases = items
+          .filter(item => item.category === 'case')
+          .sort((a, b) => a.name.localeCompare(b.name)); // 👉 NOU: Sortare alfabetică A-Z
         setAvailableCases(fetchedCases);
       }
 
