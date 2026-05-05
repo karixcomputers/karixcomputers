@@ -5,11 +5,11 @@ export default function AdminConfigurator() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingId, setEditingId] = useState(null); // 👉 NOU: Track pentru ID-ul editat
+  const [editingId, setEditingId] = useState(null); 
   
   const [formData, setFormData] = useState({
-    category: "cpu",
-    brand: "Intel", 
+    category: "case", // Schimbat default pe case pentru că e prima
+    brand: "", 
     name: "",
     spec: "",
     price: "0", 
@@ -17,6 +17,14 @@ export default function AdminConfigurator() {
   });
 
   const [imagePreview, setImagePreview] = useState(null);
+
+  // 👉 FUNCȚIE AJUTĂTOARE PENTRU URL IMAGINE (Sincronizată cu backend-ul tău)
+  const getImageUrl = (img) => {
+    if (!img) return null;
+    if (img.startsWith('http')) return img;
+    // Adăugăm /api/ înainte de /uploads conform configurării din app.js
+    return `https://karixcomputers.ro/api/uploads/${img}`;
+  };
 
   const fetchItems = async () => {
     try {
@@ -29,7 +37,6 @@ export default function AdminConfigurator() {
   useEffect(() => { fetchItems(); }, []);
 
   useEffect(() => {
-    // Resetăm brand-ul doar dacă NU suntem în mod editare (ca să nu suprascriem datele vechi)
     if (!editingId) {
       if (formData.category === "cpu") {
         setFormData(prev => ({ ...prev, brand: "Intel" }));
@@ -52,7 +59,6 @@ export default function AdminConfigurator() {
     }
   };
 
-  // 👉 NOU: Funcția pentru a intra în modul de editare
   const startEdit = (item) => {
     setEditingId(item.id);
     setFormData({
@@ -63,19 +69,21 @@ export default function AdminConfigurator() {
       price: (item.price / 100).toString(),
       imageFile: null
     });
+    
+    // Folosim funcția de URL corectă pentru preview
     if (item.image) {
-      setImagePreview(`https://karixcomputers.ro/uploads/${item.image}`);
+      setImagePreview(getImageUrl(item.image));
     } else {
       setImagePreview(null);
     }
-    // Scroll sus la formular
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setFormData({ category: "cpu", brand: "Intel", name: "", spec: "", price: "0", imageFile: null });
+    setFormData({ category: "case", brand: "", name: "", spec: "", price: "0", imageFile: null });
     setImagePreview(null);
+    if (document.getElementById('imageInput')) document.getElementById('imageInput').value = '';
   };
 
   const handleSubmit = async (e) => {
@@ -83,7 +91,7 @@ export default function AdminConfigurator() {
     setIsSubmitting(true);
     
     try {
-      const priceToSave = parseInt(formData.price || 0) * 100;
+      const priceToSave = Math.round(parseFloat(formData.price || 0) * 100);
 
       const submitData = new FormData();
       submitData.append('category', formData.category);
@@ -96,7 +104,6 @@ export default function AdminConfigurator() {
         submitData.append('image', formData.imageFile);
       }
 
-      // Dacă avem editingId folosim PUT/PATCH, altfel POST
       const method = editingId ? "PUT" : "POST";
       const url = editingId ? `/adminconfigurator/${editingId}` : "/adminconfigurator";
 
@@ -115,10 +122,10 @@ export default function AdminConfigurator() {
         cancelEdit();
       } else {
          const errData = await res.json();
-         alert("Eroare: " + errData.error);
+         alert("Eroare: " + (errData.error || "Eroare la salvare"));
       }
     } catch (err) { 
-        alert("Eroare la salvare."); 
+        alert("Eroare la conexiunea cu serverul."); 
     } finally {
         setIsSubmitting(false);
     }
@@ -135,7 +142,7 @@ export default function AdminConfigurator() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-transparent"><div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" /></div>;
 
   const categories = {
-    case: "Carcase (Pentru Shop)", // 👉 Mutat sus
+    case: "Carcase (Pentru Shop)", 
     cpu: "Procesoare", 
     gpu: "Plăci Video", 
     motherboard: "Plăci de Bază",
@@ -145,7 +152,6 @@ export default function AdminConfigurator() {
     psu: "Surse"
   };
 
-  // 👉 NOU: Definim ordinea cheilor pentru a forța "case" să fie prima
   const orderedCategoryKeys = Object.keys(categories);
 
   return (
@@ -174,7 +180,8 @@ export default function AdminConfigurator() {
               </select>
             </div>
 
-            {(formData.category === "cpu" || formData.brand === "Intel" || formData.brand === "AMD") && (
+            {/* Brand selectiv bazat pe categorie */}
+            {(formData.category === "cpu" || formData.category === "gpu") ? (
               <div>
                 <label className="text-[10px] uppercase font-bold text-gray-500">Brand / Arhitectură</label>
                 <select 
@@ -182,10 +189,15 @@ export default function AdminConfigurator() {
                   onChange={e => setFormData({...formData, brand: e.target.value})} 
                   className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs mt-1 outline-none text-white"
                 >
-                  <option value="Intel">Intel / Nvidia</option>
+                  <option value="Intel">{formData.category === "cpu" ? "Intel" : "Nvidia"}</option>
                   <option value="AMD">AMD</option>
                   <option value="">Altul</option>
                 </select>
+              </div>
+            ) : (
+              <div>
+                <label className="text-[10px] uppercase font-bold text-gray-500">Producător (Brand)</label>
+                <input type="text" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} placeholder="Ex: Corsair, ASUS, NZXT" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-xs mt-1 outline-none text-white" />
               </div>
             )}
 
@@ -204,6 +216,7 @@ export default function AdminConfigurator() {
                 <input 
                   required 
                   type="number" 
+                  step="0.01"
                   value={formData.price} 
                   onChange={e => setFormData({...formData, price: e.target.value})} 
                   placeholder="Ex: 300" 
@@ -255,7 +268,7 @@ export default function AdminConfigurator() {
                       <div className="flex items-center gap-4">
                         {item.image && (
                           <div className="w-10 h-10 rounded-lg bg-black/50 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
-                            <img src={item.image.startsWith('http') ? item.image : `https://karixcomputers.ro/uploads/${item.image}`} alt={item.name} className="w-full h-full object-cover" />
+                            <img src={getImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
                           </div>
                         )}
                         
