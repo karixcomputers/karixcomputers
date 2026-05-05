@@ -540,40 +540,41 @@ const getImageUrl = (img) => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {filteredAndSortedPcs.map((pc) => {
-                  const isCompared = compareList.find(c => c.id === pc.id);
-                  
-                  const dynamicStorageOptions = getStorageOptions(pc.storageGb);
-                  const selectedStorage = customSelections[pc.id]?.storage || pc.storageGb || "1TB";
-                  
-                  const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
-                  const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
-                  
-                  // Folosim String() pentru a ne asigura că id-urile se potrivesc indiferent de tip
-const pcCompatibleCases = availableCases.filter(c => 
-  pc.compatibleCases?.some(compatId => String(compatId) === String(c.id))
-);
+{filteredAndSortedPcs.map((pc) => {
+  const isCompared = compareList.find(c => c.id === pc.id);
+  
+  // 1. Logica Stocare
+  const dynamicStorageOptions = getStorageOptions(pc.storageGb);
+  const selectedStorage = customSelections[pc.id]?.storage || pc.storageGb || "1TB";
+  const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
+  const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
+  
+  // 2. Filtrare Carcase (Folosim String().trim() pentru a curăța ID-urile)
+  const pcCompatibleCases = availableCases.filter(c => 
+    pc.compatibleCases?.some(compatId => String(compatId).trim() === String(c.id).trim())
+  );
 
-// 1. Determinăm ID-ul selectat
-const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
+  // 3. Identificare Carcasă Selectată
+  const selectedCaseIdFromState = customSelections[pc.id]?.caseId;
+  const activeCaseId = selectedCaseIdFromState || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
+  
+  // 4. Găsim obiectul carcasei
+  const selectedCaseObj = pcCompatibleCases.find(c => String(c.id).trim() === String(activeCaseId).trim());
+  
+  // 5. STABILIM IMAGINEA (Aici e magia)
+  // Verificăm dacă obiectul există și are imagine. Dacă nu, punem poza default a PC-ului.
+  const displayImage = (selectedCaseObj && selectedCaseObj.image && selectedCaseObj.image !== "") 
+    ? selectedCaseObj.image 
+    : (pc.images && pc.images.length > 0 ? pc.images[0] : null);
 
-// 2. Găsim obiectul carcasei (AICI am adăugat String() pe ambele părți)
-const selectedCaseObj = pcCompatibleCases.find(c => String(c.id) === String(selectedCaseId));
+  const caseAddedPriceCents = selectedCaseObj?.price || 0;
+  const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
 
-// 3. Alegem imaginea
-const displayImage = (selectedCaseObj && selectedCaseObj.image) 
-  ? selectedCaseObj.image 
-  : pc.images?.[0];
+  const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
+  const finalCaseText = selectedCaseObj ? selectedCaseObj.name : (pc.case || "N/A");
 
-// 4. Calculăm prețul suplimentar
-const caseAddedPriceCents = selectedCaseObj?.price || 0;
-
-                  const currentPriceCents = (pc.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
-
-                  const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
-
-                  let finalCaseText = pc.case || "N/A";
-                  if (selectedCaseObj) finalCaseText = selectedCaseObj.name;
+  // Debug (Șterge-l după ce funcționează):
+  // console.log(`PC: ${pc.name}, Case: ${selectedCaseObj?.name}, Img: ${displayImage}`);
 
                   return (
                   <div key={pc.id} className="flex flex-col rounded-[35px] bg-white/5 border border-white/10 overflow-hidden group hover:border-indigo-500/40 transition-all duration-500 backdrop-blur-md shadow-2xl relative">
