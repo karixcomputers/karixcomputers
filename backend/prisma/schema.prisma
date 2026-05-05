@@ -240,6 +240,7 @@ model ConfiguratorComponent {
   price     Int      @default(0) // Preț în cents (ex: 10000 pentru 100 RON) - util pentru viitor
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+  image     String?
 }
 
 model Announcement {
