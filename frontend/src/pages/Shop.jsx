@@ -38,11 +38,13 @@ export default function Shop() {
   
   const specRefs = useRef([]);
 
-  const getImageUrl = (img) => {
-    if (!img) return "https://placehold.co/600x400/0b1020/ffffff?text=Karix+PC";
-    if (img.startsWith("http")) return img;
-    return `https://karixcomputers.ro/uploads/${img}`;
-  };
+// MODIFICĂ ASTA:
+const getImageUrl = (img) => {
+  if (!img) return "https://placehold.co/600x400/0b1020/ffffff?text=Karix+PC";
+  if (img.startsWith("http")) return img;
+  // Adaugă /api în URL:
+  return `https://karixcomputers.ro/api/uploads/${img}`; 
+};
 
   useEffect(() => {
     if (showCompareModal) {
@@ -553,15 +555,19 @@ export default function Shop() {
                   let caseAddedPriceCents = 0;
                   let selectedCaseObj = null;
 
-                  if (selectedCaseId && pcCompatibleCases.length > 0) {
-                      selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId);
-                      if (selectedCaseObj) {
-                          caseAddedPriceCents = selectedCaseObj.price || 0; 
-                      } else {
-                          selectedCaseObj = pcCompatibleCases[0];
-                          caseAddedPriceCents = selectedCaseObj.price || 0;
-                      }
-                  }
+// MODIFICĂ LINIA ASTA (în interiorul return-ului de la filteredAndSortedPcs.map):
+if (selectedCaseId && pcCompatibleCases.length > 0) {
+    // Folosește == (două egale) în loc de === pentru a ignora diferența string/number
+    // SAU transformă-le pe ambele în String:
+    selectedCaseObj = pcCompatibleCases.find(c => String(c.id) === String(selectedCaseId));
+    
+    if (selectedCaseObj) {
+        caseAddedPriceCents = selectedCaseObj.price || 0; 
+    } else {
+        selectedCaseObj = pcCompatibleCases[0];
+        caseAddedPriceCents = selectedCaseObj.price || 0;
+    }
+}
 
                   // 👉 NOU: Logica pentru a alege ce imagine afișăm (Carcasa selectată SAU sistemul de bază)
                   const displayImage = (selectedCaseObj && selectedCaseObj.image) 
