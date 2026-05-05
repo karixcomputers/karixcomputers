@@ -10,9 +10,18 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user.id || req.user.sub;
     
+    // 👉 AICI ESTE MODIFICAREA: Includem și opțiunile pentru fiecare produs
     const items = await prisma.wishlistItem.findMany({
       where: { userId },
-      include: { product: true }
+      include: { 
+        product: {
+          include: {
+            carcase: true,
+            memorii: true
+            // Dacă ai și stocare sau alte opțiuni în Prisma schema, le poți adăuga aici (ex: stocare: true)
+          }
+        } 
+      }
     });
     
     // Returnăm doar obiectele de tip produs, curățate de metadatele tabelei de wishlist
