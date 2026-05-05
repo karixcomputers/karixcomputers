@@ -42,7 +42,7 @@ export default function Shop() {
 const getImageUrl = (img) => {
   if (!img) return "https://placehold.co/600x400/0b1020/ffffff?text=Karix+PC";
   if (img.startsWith("http")) return img;
-  // Adaugă /api în URL:
+  // Trebuie să fie /api/uploads/ pentru a se potrivi cu setările din app.js
   return `https://karixcomputers.ro/api/uploads/${img}`; 
 };
 
@@ -551,24 +551,19 @@ const getImageUrl = (img) => {
                   
                   const pcCompatibleCases = availableCases.filter(c => pc.compatibleCases?.includes(c.id));
 
-                  const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
-                  let caseAddedPriceCents = 0;
-                  let selectedCaseObj = null;
+// 1. Determinăm ID-ul selectat (din state sau prima carcasă compatibilă)
+const selectedCaseId = customSelections[pc.id]?.caseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
 
-// MODIFICĂ LINIA ASTA (în interiorul return-ului de la filteredAndSortedPcs.map):
-if (selectedCaseId && pcCompatibleCases.length > 0) {
-    // Folosește == (două egale) în loc de === pentru a ignora diferența string/number
-    // SAU transformă-le pe ambele în String:
-    selectedCaseObj = pcCompatibleCases.find(c => String(c.id) === String(selectedCaseId));
-    
-    if (selectedCaseObj) {
-        caseAddedPriceCents = selectedCaseObj.price || 0; 
-    } else {
-        selectedCaseObj = pcCompatibleCases[0];
-        caseAddedPriceCents = selectedCaseObj.price || 0;
-    }
-}
+// 2. Găsim obiectul carcasei (folosim String() pentru a fi siguri că ID-urile se potrivesc)
+const selectedCaseObj = pcCompatibleCases.find(c => String(c.id) === String(selectedCaseId));
 
+// 3. Alegem imaginea: Dacă avem carcasă cu poză, o folosim. Altfel, poza PC-ului.
+const displayImage = (selectedCaseObj && selectedCaseObj.image) 
+  ? selectedCaseObj.image 
+  : pc.images?.[0];
+
+// 4. Calculăm prețul suplimentar
+const caseAddedPriceCents = selectedCaseObj?.price || 0;
                   // 👉 NOU: Logica pentru a alege ce imagine afișăm (Carcasa selectată SAU sistemul de bază)
                   const displayImage = (selectedCaseObj && selectedCaseObj.image) 
                     ? selectedCaseObj.image 
