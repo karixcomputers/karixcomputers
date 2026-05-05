@@ -29,7 +29,7 @@ export default function Terms() {
       {/* SEO: CONFIGURARE ACORD DE UTILIZARE */}
       <SEO 
         title="Termeni și Condiții" 
-        description="Regulamentul oficial de utilizare a platformei Karix Computers. Detalii despre contractul de vânzare-cumpărare, modalități de plată, livrare și politici de garanție."
+        description="Regulamentul oficial de utilizare a platformei Karix Computers. Detalii despre contractul de vânzare-cumpărare, modalități de plată, livrare, politici de garanție și reparații service."
       />
 
       <div className="relative isolate min-h-screen pt-32 pb-24 px-4 sm:px-6 overflow-hidden bg-transparent text-left">
@@ -95,11 +95,26 @@ export default function Terms() {
               </p>
 
               <ul className="space-y-3">
-                <li>Procesare comandă: aproximativ 3-5 zile lucrătoare</li>
-                <li>Livrarea se realizează prin curier rapid pe teritoriul României</li>
-                <li>Plata se poate efectua online cu cardul bancar</li>
-                <li>Plata online se realizează prin intermediul serviciilor <strong>Netopia Payments</strong></li>
-                <li>Pentru comenzile plătite cu cardul, restituirea banilor se va efectua prin intermediul aceluiași sistem de plată, direct pe cardul de pe care s-a efectuat tranzacția</li>
+                <li className="flex items-center gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0"/>
+                  <span>Procesare comandă: aproximativ 3-5 zile lucrătoare</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0"/>
+                  <span>Livrarea se realizează prin curier rapid pe teritoriul României</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0"/>
+                  <span>Plata se poate efectua online cu cardul bancar</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0"/>
+                  <span>Plata online se realizează prin intermediul serviciilor <strong>Netopia Payments</strong></span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 mt-1.5"/>
+                  <span>Pentru comenzile plătite cu cardul, restituirea banilor se va efectua prin intermediul aceluiași sistem de plată, direct pe cardul de pe care s-a efectuat tranzacția</span>
+                </li>
               </ul>
             </TermsSection>
 
@@ -138,8 +153,8 @@ export default function Terms() {
                   <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0"/>
                   <span><strong>Persoane juridice:</strong> 12 luni garanție standard (cu excepția componentelor cu garanție specificată de producător).</span>
                 </li>
-                <li className="flex items-center gap-3">
-                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0"/>
+                <li className="flex items-start gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 mt-1.5"/>
                   <span>Garanția acoperă defectele de fabricație, nu și daunele cauzate de utilizarea improprie, șocuri electrice sau intervenții neautorizate.</span>
                 </li>
               </ul>
@@ -153,7 +168,43 @@ export default function Terms() {
               </p>
             </TermsSection>
 
-            <TermsSection number="08" title="Legea Aplicabilă">
+            {/* SECȚIUNEA NOUĂ PENTRU SERVICE */}
+            <TermsSection number="08" title="Condiții pentru Service și Reparații">
+              <ul className="space-y-4">
+                <li className="flex items-start gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 mt-2"/>
+                  <span>
+                    <strong>Salvarea datelor (Backup):</strong> Clientul este singurul responsabil pentru salvarea datelor personale de pe echipament înainte de a-l lăsa în service. Karix Computers <strong>NU</strong> își asumă răspunderea pentru pierderea, coruperea sau ștergerea datelor, software-ului sau a fișierelor în timpul procesului de diagnosticare sau reparație.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 mt-2"/>
+                  <span>
+                    <strong>Taxa de diagnosticare:</strong> În cazul în care echipamentul este diagnosticat, dar clientul refuză reparația (sau reparația depășește bugetul agreat), se va percepe o taxă de diagnosticare în valoare de <strong>100 RON</strong>.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 mt-2"/>
+                  <span>
+                    <strong>Defecte ascunse:</strong> Karix Computers nu este responsabilă pentru defectele ascunse ale echipamentului care pot apărea sau se pot manifesta în timpul procesului de diagnosticare/desfacere (ex: plastice casante, balamale deja rupte pe interior, contacte oxidate din cauza unor lichide anterioare).
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 mt-2"/>
+                  <span>
+                    <strong>Echipamente nerevendicate:</strong> Echipamentele lăsate în service și neridicate în termen de 30 de zile de la notificarea finalizării (prin SMS/Telefon/Email) vor fi supuse unei taxe de depozitare de 5 RON/zi. După 90 de zile, echipamentul este considerat abandonat și trece în proprietatea service-ului pentru recuperarea costurilor de manoperă și piese.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 mt-2"/>
+                  <span>
+                    <strong>Garanția reparației:</strong> Garanția oferită pentru manopera de service este de <strong>6 luni</strong>, iar pentru piesele înlocuite se aplică garanția oferită de producător.
+                  </span>
+                </li>
+              </ul>
+            </TermsSection>
+
+            <TermsSection number="09" title="Legea Aplicabilă">
               <p>
                 Prezentul contract este guvernat de legislația română. Orice
                 litigiu apărut între părți va fi soluționat de instanțele
