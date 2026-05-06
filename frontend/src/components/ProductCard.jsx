@@ -4,7 +4,7 @@ import { formatRON } from "../utils/money";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 
-// 👉 FUNCȚIE AJUTĂTOARE MUTATĂ AICI PENTRU A GENERA OPȚIUNILE DE STOCARE
+// Funcție ajutătoare pentru a genera opțiunile de stocare
 const getStorageOptions = (baseStorage) => {
   const base = baseStorage || "1TB";
   const storageList = [
@@ -34,7 +34,6 @@ export default function ProductCard({ p, product, availableCases = [] }) {
 
   const data = p || product;
 
-  // State-uri
   const [showServicePopup, setShowServicePopup] = useState(false);
   const [selectedStorage, setSelectedStorage] = useState(data?.storageGb || "1TB");
   const [selectedCaseId, setSelectedCaseId] = useState(null);
@@ -45,7 +44,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
   const isService = data.category === "service" || 
                     ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => (data.name || "").toLowerCase().includes(kw));
 
-  // 👉 LOGICĂ ROBUSTĂ PENTRU CARCASE
+  // 👉 1. EXTRAGERE CARCASE COMPATIBILE
   let compatArray = [];
   try {
      compatArray = Array.isArray(data.compatibleCases) ? data.compatibleCases : JSON.parse(data.compatibleCases || "[]");
@@ -55,38 +54,29 @@ export default function ProductCard({ p, product, availableCases = [] }) {
     compatArray.some(compatId => String(compatId).trim() === String(c.id).trim())
   );
   
-  const activeCaseId = selectedCaseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
-  
-  let selectedCaseObj = null;
-  let caseAddedPriceCents = 0;
+  // 👉 2. DETERMINĂM CARCASA CURENTĂ
+  const activeCaseId = selectedCaseId !== null ? selectedCaseId : (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
+  const selectedCaseObj = pcCompatibleCases.find(c => String(c.id) === String(activeCaseId));
+  const caseAddedPriceCents = selectedCaseObj?.price || 0;
 
-  // Căutare bazată exclusiv pe String pentru a preveni erorile dropdown-ului
-  if (activeCaseId && pcCompatibleCases.length > 0) {
-    selectedCaseObj = pcCompatibleCases.find(c => String(c.id).trim() === String(activeCaseId).trim()) || pcCompatibleCases[0];
-    caseAddedPriceCents = selectedCaseObj.price || 0;
-  }
+  // 👉 3. SETĂM IMAGINEA - INSTANT (Aici se face magia vizuală)
+  const displayImage = selectedCaseObj?.image ? selectedCaseObj.image : data.images?.[0];
 
-  // 👉 NOU: Logica pentru a alege ce imagine afișăm (Carcasa selectată SAU sistemul de bază)
-  const displayImage = (selectedCaseObj && selectedCaseObj.image && selectedCaseObj.image.trim() !== "") 
-    ? selectedCaseObj.image 
-    : data.images?.[0];
-
-  // 👉 LOGICĂ PENTRU STOCARE
+  // 👉 4. CALCUL STOCARE
   const dynamicStorageOptions = getStorageOptions(data.storageGb);
   const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
   const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
 
-  // 👉 CALCUL PREȚ TOTAL
+  // 👉 5. TOTALURI
   const currentPriceCents = (data.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
   const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
-  
-  let finalCaseText = data.case || "N/A";
-  if (selectedCaseObj) finalCaseText = selectedCaseObj.name;
+  const finalCaseText = selectedCaseObj ? selectedCaseObj.name : (data.case || "N/A");
 
+  // 👉 FIX CRITIC: Adăugat /api/ la path pentru a randa corect imaginile în shop
   const getImageUrl = (img) => {
     if (!img) return "https://placehold.co/800x500/0b1020/ffffff?text=Karix+PC";
-    if (img.startsWith("http")) return img;
-    return `https://karixcomputers.ro/uploads/${img}`; // Sau cu api/uploads/ dacă e la fel ca în rest
+    if (img.startsWith("http") || img.startsWith("data:")) return img;
+    return `https://karixcomputers.ro/api/uploads/${img}`;
   };
 
   const executeAddToCart = () => {
@@ -100,8 +90,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
       productName: data.name,
       priceCents: currentPriceCents,
       warrantyMonths: Number(finalWarranty),
-      // Trimitem și imaginea carcasei în coș, ca să vadă clientul la checkout exact ce a ales
-      image: getImageUrl(displayImage),
+      image: getImageUrl(displayImage), // Către checkout pleacă imaginea corectă
       specs: {
         cpu: data.cpuBrand,
         gpu: data.gpuBrand,
@@ -147,7 +136,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
           </span>
         </button>
 
-        {/* ZONA IMAGINE (Stilizată ca în Shop) */}
+        {/* ZONA IMAGINE */}
         <Link to={`/product/${data.id}`} className="block relative h-64 overflow-hidden bg-black/20 shrink-0">
           <div className="absolute top-5 left-5 z-20 flex flex-col gap-2">
             {!isService && (
@@ -163,8 +152,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
           </div>
 
           <img
-            // 👉 Cheia forțează re-randarea instantanee când se schimbă displayImage
-            key={displayImage}
+            key={displayImage} // 👈 Cheia forțează re-randarea elementului <img> în DOM
             src={getImageUrl(displayImage)}
             alt={data.name}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100 animate-in zoom-in-95"
@@ -186,7 +174,6 @@ export default function ProductCard({ p, product, availableCases = [] }) {
           {/* SPECIFICAȚII ȘI OPȚIUNI (Doar dacă nu e serviciu) */}
           {!isService && (
             <>
-              {/* Grilă specificații ca în Shop */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-4 mb-6">
                 <div className="flex items-center gap-3">
                   <span className="text-indigo-400 text-base">⚡</span>
@@ -233,7 +220,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
               </div>
 
               <div className="flex flex-col gap-3 mb-6">
-                {/* 📦 SELECTOR CARCASE TIP DROPDOWN */}
+                {/* 📦 SELECTOR CARCASE */}
                 {pcCompatibleCases.length > 0 && (
                   <div className="flex flex-col">
                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
@@ -258,7 +245,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
                   </div>
                 )}
 
-                {/* 💾 SELECTOR STOCARE TIP DROPDOWN */}
+                {/* 💾 SELECTOR STOCARE */}
                 {dynamicStorageOptions.length > 0 && (
                   <div className="flex flex-col">
                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 ml-1 flex items-center gap-1.5">
@@ -313,7 +300,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
         </div>
       </div>
 
-      {/* POPUP AVERTIZARE SERVICII (A rămas neschimbat) */}
+      {/* POPUP AVERTIZARE SERVICII */}
       {showServicePopup && (
          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-xl bg-black/60">
          <div className="relative w-full max-w-md bg-[#161e31]/95 border border-indigo-500/30 p-10 rounded-[40px] text-center shadow-2xl animate-in zoom-in">
