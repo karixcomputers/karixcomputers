@@ -521,7 +521,7 @@ export default function Shop() {
                             >
                               <div className="text-gray-500 text-2xl cursor-grab active:cursor-grabbing px-2">≡</div>
                               <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center font-black text-white/50">{index + 1}</div>
-                              <img src={getImageUrl(pc.images?.[0])} alt="" className="w-16 h-16 rounded-xl object-cover bg-white/5" />
+                              <img src={getImageUrl(pc.images?.[0])} alt="" className="w-16 h-16 rounded-xl object-contain p-2 bg-white/5" />
                               <div className="flex-1">
                                 <h3 className="font-bold text-white uppercase italic tracking-tight">{pc.name}</h3>
                                 <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">{formatRON(pc.priceCents)}</p>
@@ -645,7 +645,7 @@ export default function Shop() {
                         key={displayImage}
                         src={getImageUrl(displayImage)} 
                         alt={pc.name} 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
+                        className="w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#0b1020] via-black/40 to-transparent opacity-90" />
                     </div>
