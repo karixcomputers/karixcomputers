@@ -1,25 +1,22 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
-import multer from "multer"; // 👉 NOU: Importăm multer
-import path from "path";     // 👉 NOU: Importăm path
+import multer from "multer"; 
+import path from "path";     
 
 const prisma = new PrismaClient();
 const router = express.Router();
 
-// 👉 NOU: Configurare Multer pentru a salva imaginile în folderul "uploads"
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/'); // Asigură-te că folderul 'uploads/' există în rădăcina backend-ului
+    cb(null, 'uploads/'); 
   },
   filename: function (req, file, cb) {
-    // Generăm un nume unic pentru poză: timestamp + extensia originală
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, 'config-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 const upload = multer({ storage: storage });
-
 
 const requireAdmin = (req, res, next) => {
   if (req.user && req.user.role === "admin") next();
@@ -56,20 +53,16 @@ router.get("/all", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// 👉 MODIFICAT: Am adăugat middleware-ul `upload.single('image')`
 // POST: Adaugă o componentă nouă
 router.post("/", requireAuth, requireAdmin, upload.single('image'), async (req, res) => {
   try {
-    // Multer ne pune câmpurile text în req.body
     const { category, brand, name, spec, price } = req.body;
 
-    // Multer ne pune fișierul în req.file
     let imageName = null;
     if (req.file) {
-      imageName = req.file.filename; // Salvăm doar numele fișierului în DB
+      imageName = req.file.filename; 
     }
 
-    // Validare minimală
     if (!category || !name) {
       return res.status(400).json({ error: "Categoria și numele sunt obligatorii." });
     }
@@ -81,7 +74,7 @@ router.post("/", requireAuth, requireAdmin, upload.single('image'), async (req, 
         name, 
         spec: spec || null,
         price: price ? parseInt(price) : 0,
-        image: imageName, // 👉 NOU: Salvăm numele imaginii în baza de date
+        image: imageName,
         isActive: true
       }
     });
@@ -90,6 +83,46 @@ router.post("/", requireAuth, requireAdmin, upload.single('image'), async (req, 
     console.error("POST CONFIG ERROR:", err);
     res.status(500).json({ error: "Eroare la creare." });
   }
+});
+
+// 👉 RUTA NOUĂ ADĂUGATĂ AICI: UPDATE pentru o componentă existentă (PENTRU POZE)
+router.put("/:id", requireAuth, requireAdmin, upload.single('image'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { category, brand, name, spec, price } = req.body;
+        
+        // Căutăm dacă există componenta
+        const existingComponent = await prisma.configuratorComponent.findUnique({
+            where: { id }
+        });
+
+        if (!existingComponent) {
+            return res.status(404).json({ error: "Componenta nu a fost găsită." });
+        }
+
+        // Pregătim datele pentru update
+        const updateData = {};
+        if (category !== undefined) updateData.category = category;
+        if (brand !== undefined) updateData.brand = brand || null;
+        if (name !== undefined) updateData.name = name;
+        if (spec !== undefined) updateData.spec = spec || null;
+        if (price !== undefined) updateData.price = parseInt(price);
+        
+        // Dacă s-a încărcat o imagine nouă, o suprascriem pe cea veche
+        if (req.file) {
+            updateData.image = req.file.filename;
+        }
+
+        const updatedComp = await prisma.configuratorComponent.update({
+            where: { id },
+            data: updateData
+        });
+
+        res.json(updatedComp);
+    } catch (err) {
+        console.error("PUT CONFIG ERROR:", err);
+        res.status(500).json({ error: "Eroare la actualizare." });
+    }
 });
 
 // DELETE: Șterge o componentă definitiv
