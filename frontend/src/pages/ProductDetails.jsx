@@ -5,6 +5,7 @@ import { formatRON } from "../utils/money";
 import { useCart } from "../context/CartContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import SEO from "../components/SEO";
+import ProductCard from "../components/ProductCard";
 
 // Funcție pentru a extrage numărul din "512GB" sau "2TB" pentru a le compara
 const extractStorageCapacity = (str) => {
@@ -37,6 +38,9 @@ export default function ProductDetails() {
   const [reviewImages, setReviewImages] = useState([]);
   const [fullscreenImage, setFullscreenImage] = useState(null);
   const [isSticky, setIsSticky] = useState(false);
+
+  // --- STATE PENTRU PRODUSE SIMILARE ---
+  const [similarProducts, setSimilarProducts] = useState([]);
 
   const detailsRef = useRef(null);
   const benchmarkRef = useRef(null);
@@ -115,7 +119,7 @@ export default function ProductDetails() {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // --- FETCH PC + CARCASE ---
+  // --- FETCH PC + CARCASE + PRODUSE SIMILARE ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -152,6 +156,23 @@ export default function ProductDetails() {
             }
             setSelectedCaseId(defaultCaseId);
         }
+
+        // Fetch pentru produse similare (luăm toate produsele și filtrăm)
+        const allProductsRes = await apiFetch("/products");
+        if (allProductsRes.ok) {
+            const allProductsData = await allProductsRes.json();
+            // Filtrăm produsele: nu afișăm produsul curent, doar cele vizibile și care nu sunt servicii
+            const filteredProducts = allProductsData.filter(p => 
+                p.id !== cleanId && 
+                p.isVisible !== false &&
+                p.category !== "service" &&
+                !p.name.toLowerCase().includes("mentenanta") &&
+                !p.name.toLowerCase().includes("diagnosticare")
+            );
+            // Limităm la 4 produse pentru afișare
+            setSimilarProducts(filteredProducts.slice(0, 4));
+        }
+
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
     };
@@ -404,24 +425,8 @@ export default function ProductDetails() {
           
           <section ref={detailsRef} className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start mb-40 scroll-mt-64">
             
-            <div className="flex flex-col gap-8">
-              <h1 className={`text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-none drop-shadow-2xl ${product.name?.toUpperCase().includes("ZEUS") ? "text-indigo-400" : "text-white"}`}>
-                {product.name}
-              </h1>
-              <div className="relative group lg:mt-4">
-                <div className="aspect-square rounded-[60px] overflow-hidden border border-white/10 bg-white/5 backdrop-blur-2xl p-12 relative flex items-center justify-center shadow-2xl">
-                  {/* Randăm imaginea dinamică bazată pe selecție */}
-                  <img 
-                    key={displayImage} 
-                    src={getImageUrl(displayImage)} 
-                    alt={product.name} 
-                    className="w-full h-full object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]" 
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-8">
+            {/* SECȚIUNEA STÂNGA: Specificatii și Descriere */}
+            <div className="flex flex-col gap-8 order-2 lg:order-1">
               <header className="flex flex-col items-center text-center lg:pt-12">
                 <div className="inline-block px-6 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] italic mb-4">
                   Hardware Premium
@@ -441,12 +446,31 @@ export default function ProductDetails() {
               </div>
 
               {product.longDescription && (
-                <div className="p-8 rounded-[35px] bg-white/[0.02] border border-white/5 italic">
+                <div className="p-8 rounded-[35px] bg-white/[0.02] border border-white/5 italic mt-4">
                   <p className="whitespace-pre-line text-gray-400 text-sm leading-relaxed font-medium">
                     {product.longDescription}
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* SECȚIUNEA DREAPTA: Imagine, Configurator și Adaugă în Coș */}
+            <div className="flex flex-col gap-8 order-1 lg:order-2">
+              <h1 className={`text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-none drop-shadow-2xl text-center lg:text-left ${product.name?.toUpperCase().includes("ZEUS") ? "text-indigo-400" : "text-white"}`}>
+                {product.name}
+              </h1>
+              
+              <div className="relative group lg:mt-4">
+                <div className="aspect-square rounded-[60px] overflow-hidden border border-white/10 bg-white/5 backdrop-blur-2xl p-12 relative flex items-center justify-center shadow-2xl">
+                  {/* Randăm imaginea dinamică bazată pe selecție */}
+                  <img 
+                    key={displayImage} 
+                    src={getImageUrl(displayImage)} 
+                    alt={product.name} 
+                    className="w-full h-full object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]" 
+                  />
+                </div>
+              </div>
 
               {/* --- CONFIGURATOR ÎN PAGINA PRODUSULUI --- */}
               <div className="flex flex-col gap-6 pt-6 border-t border-white/5">
@@ -507,12 +531,12 @@ export default function ProductDetails() {
                   </span>
                   
                   <div className="flex gap-5 w-full">
-                      <div className="flex items-center bg-white/5 border border-white/10 backdrop-blur-md rounded-[25px] p-2 h-20">
-                          <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-14 h-full font-black text-xl hover:text-pink-500 transition-colors">-</button>
-                          <span className="w-12 text-center font-black text-xl italic">{quantity}</span>
-                          <button onClick={() => setQuantity(quantity + 1)} className="w-14 h-full font-black text-xl hover:text-indigo-400 transition-colors">+</button>
+                      <div className="flex items-center bg-white/5 border border-white/10 backdrop-blur-md rounded-[25px] p-2 h-20 w-32 shrink-0">
+                          <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-full h-full font-black text-xl hover:text-pink-500 transition-colors">-</button>
+                          <span className="w-full text-center font-black text-xl italic">{quantity}</span>
+                          <button onClick={() => setQuantity(quantity + 1)} className="w-full h-full font-black text-xl hover:text-indigo-400 transition-colors">+</button>
                       </div>
-                      <button onClick={handleAddToCart} className="flex-1 h-20 bg-gradient-to-r from-indigo-600 to-pink-600 rounded-[25px] font-black uppercase tracking-[0.3em] text-sm hover:scale-[1.02] transition-all shadow-2xl">
+                      <button onClick={handleAddToCart} className="flex-1 h-20 bg-gradient-to-r from-indigo-600 to-pink-600 rounded-[25px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-xs md:text-sm hover:scale-[1.02] transition-all shadow-2xl">
                           Adaugă în coș
                       </button>
                   </div>
@@ -567,7 +591,7 @@ export default function ProductDetails() {
           </section>
 
           {/* SECȚIUNEA REVIEWS */}
-          <section ref={reviewsRef} className="scroll-mt-72">
+          <section ref={reviewsRef} className="mb-40 scroll-mt-72">
               <div className="flex items-center gap-6 mb-12">
                   <h2 className="text-4xl font-black italic uppercase tracking-tighter"> 
                     <span className="text-indigo-400">Review-uri</span>
@@ -678,6 +702,28 @@ export default function ProductDetails() {
                   </div>
               </div>
           </section>
+
+          {/* SECȚIUNE NOUĂ: ALTE SISTEME (PRODUSE SIMILARE) */}
+          {similarProducts.length > 0 && (
+            <section className="mt-20">
+              <div className="flex items-center gap-6 mb-12">
+                  <h2 className="text-4xl font-black italic uppercase tracking-tighter">
+                    <span className="text-pink-500">Alte Sisteme</span>
+                  </h2>
+                  <div className="h-[1px] bg-white/10 flex-1" />
+              </div>
+              
+              {/* Container cu scroll orizontal */}
+              <div className="flex overflow-x-auto gap-8 pb-8 snap-x snap-mandatory no-scrollbar custom-scrollbar">
+                {similarProducts.map((simProd) => (
+                  <div key={simProd.id} className="min-w-[300px] md:min-w-[350px] snap-center shrink-0">
+                    <ProductCard product={simProd} availableCases={availableCases} />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
         </div>
 
         {/* NOTIFICARE PREMIUM ADAUGARE IN COS */}
