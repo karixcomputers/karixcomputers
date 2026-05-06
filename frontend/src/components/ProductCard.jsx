@@ -115,6 +115,11 @@ export default function ProductCard({ p, product, availableCases = [] }) {
     }
   };
 
+console.log("==== DEBUG CARCASĂ ====");
+  console.log("ID Carcasă activă:", activeCaseId);
+  console.log("Datele carcasei găsite:", selectedCaseObj);
+  console.log("Imagine finală de afișat:", displayImage);
+
   return (
     <>
       <div className="relative flex flex-col rounded-[35px] bg-white/5 border border-white/10 overflow-hidden group hover:border-indigo-500/40 transition-all duration-500 backdrop-blur-md shadow-2xl text-left h-full">
