@@ -156,7 +156,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
             key={displayImage || 'default'} 
             src={getImageUrl(displayImage)}
             alt={data.name}
-            className="w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100 animate-in zoom-in-95"
+            className="w-full h-full object-contain p-2 transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100 animate-in zoom-in-95"
             loading="lazy"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0b1020] via-black/40 to-transparent opacity-90" />
