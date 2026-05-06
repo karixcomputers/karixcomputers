@@ -47,6 +47,13 @@ export default function ProductDetails() {
   const desktopNavRef = useRef(null);
   const buttonRefs = useRef({});
 
+  // Funcție identică cu cea din Shop.jsx pentru randare imagini
+  const getImageUrl = (img) => {
+    if (!img) return "https://placehold.co/600x400/0b1020/ffffff?text=Karix+PC";
+    if (img.startsWith("http")) return img;
+    return `https://karixcomputers.ro/api/uploads/${img}`; 
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       const sections = [
@@ -127,13 +134,20 @@ export default function ProductDetails() {
             const pcData = await pcRes.json();
             setProduct(pcData);
             
-            // 👉 NOU: Preluăm valoarea de bază din produs
+            // Preluăm valoarea de bază din produs
             const baseStorage = pcData.storageGb || "1TB";
             setSelectedStorage(baseStorage);
             
             let defaultCaseId = null;
-            if (pcData.compatibleCases && pcData.compatibleCases.length > 0) {
-                const firstValidCase = fetchedCases.find(c => c.id === pcData.compatibleCases[0]);
+            let compatArray = [];
+            try {
+               compatArray = Array.isArray(pcData.compatibleCases) ? pcData.compatibleCases : JSON.parse(pcData.compatibleCases || "[]");
+            } catch(e) { compatArray = []; }
+
+            if (compatArray.length > 0) {
+                const firstValidCase = fetchedCases.find(c => 
+                    compatArray.some(compatId => String(compatId).trim() === String(c.id).trim())
+                );
                 if (firstValidCase) defaultCaseId = firstValidCase.id;
             }
             setSelectedCaseId(defaultCaseId);
@@ -170,7 +184,7 @@ export default function ProductDetails() {
                   value: s.value,
                   label: s.value === base ? `${s.label} (Bază)` : `${s.label} (Upgrade)`,
                   extraCents: diff * 100, // Cents pentru totalul din cos
-                  extraText: diff > 0 ? `+${diff} RON` : 0 // Text afisare in meniu
+                  extraText: diff > 0 ? `+${diff} RON` : "" // Text afisare in meniu
               };
           });
   }, [product]);
@@ -178,8 +192,27 @@ export default function ProductDetails() {
   // --- FILTRARE CARCASE COMPATIBILE ---
   const pcCompatibleCases = useMemo(() => {
       if (!product || !availableCases.length) return [];
-      return availableCases.filter(c => product.compatibleCases?.includes(c.id));
+      let compatArray = [];
+      try {
+         compatArray = Array.isArray(product.compatibleCases) ? product.compatibleCases : JSON.parse(product.compatibleCases || "[]");
+      } catch(e) { compatArray = []; }
+
+      return availableCases.filter(c => 
+        compatArray.some(compatId => String(compatId).trim() === String(c.id).trim())
+      );
   }, [product, availableCases]);
+
+  // --- DETERMINARE IMAGINE DINAMICĂ ---
+  const displayImage = useMemo(() => {
+    if (!product) return "https://placehold.co/800";
+    if (selectedCaseId && pcCompatibleCases.length > 0) {
+       const selectedCaseObj = pcCompatibleCases.find(c => String(c.id).trim() === String(selectedCaseId).trim());
+       if (selectedCaseObj && selectedCaseObj.image) {
+          return selectedCaseObj.image;
+       }
+    }
+    return product.images?.[0];
+  }, [product, selectedCaseId, pcCompatibleCases]);
 
   // --- CALCUL PREȚ FINAL CU TOT CU UPGRADE-URI ---
   const finalPriceCents = useMemo(() => {
@@ -193,7 +226,7 @@ export default function ProductDetails() {
 
       let caseAddedPrice = 0;
       if (selectedCaseId && pcCompatibleCases.length > 0) {
-          const selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId) || pcCompatibleCases[0];
+          const selectedCaseObj = pcCompatibleCases.find(c => String(c.id) === String(selectedCaseId)) || pcCompatibleCases[0];
           caseAddedPrice = selectedCaseObj.price || 0;
       }
 
@@ -214,7 +247,7 @@ export default function ProductDetails() {
   const finalCaseText = useMemo(() => {
       if (!product) return "N/A";
       if (selectedCaseId && pcCompatibleCases.length > 0) {
-          const selectedCaseObj = pcCompatibleCases.find(c => c.id === selectedCaseId) || pcCompatibleCases[0];
+          const selectedCaseObj = pcCompatibleCases.find(c => String(c.id) === String(selectedCaseId)) || pcCompatibleCases[0];
           return selectedCaseObj.name;
       }
       return product.case || "N/A";
@@ -228,6 +261,7 @@ export default function ProductDetails() {
       ...product,
       priceCents: finalPriceCents,
       qty: quantity,
+      image: getImageUrl(displayImage), // Trimitem imaginea carcasei selectate in cos
       specs: {
         cpu: product.cpuBrand, 
         gpu: product.gpuBrand, 
@@ -376,7 +410,13 @@ export default function ProductDetails() {
               </h1>
               <div className="relative group lg:mt-4">
                 <div className="aspect-square rounded-[60px] overflow-hidden border border-white/10 bg-white/5 backdrop-blur-2xl p-12 relative flex items-center justify-center shadow-2xl">
-                  <img src={product.images?.[0] || "https://placehold.co/800"} alt={product.name} className="w-full h-full object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]" />
+                  {/* Randăm imaginea dinamică bazată pe selecție */}
+                  <img 
+                    key={displayImage} 
+                    src={getImageUrl(displayImage)} 
+                    alt={product.name} 
+                    className="w-full h-full object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]" 
+                  />
                 </div>
               </div>
             </div>
@@ -412,54 +452,49 @@ export default function ProductDetails() {
               <div className="flex flex-col gap-6 pt-6 border-t border-white/5">
                 
                 {pcCompatibleCases.length > 0 && (
-                  <div className="p-4 rounded-[20px] bg-white/5 border border-white/10">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">📦 Schimbă Carcasa</span>
-                    <div className="flex flex-col gap-2">
-                        {pcCompatibleCases.map(caseOpt => {
-                            const isSelected = selectedCaseId === caseOpt.id || (!selectedCaseId && caseOpt.id === pcCompatibleCases[0].id);
-                            return (
-                                <button
-                                    key={caseOpt.id}
-                                    onClick={() => setSelectedCaseId(caseOpt.id)}
-                                    className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${isSelected ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
-                                            {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                        </div>
-                                        <span>{caseOpt.name}</span>
-                                    </div>
-                                    {caseOpt.price > 0 && <span className="text-indigo-300">+{formatRON(caseOpt.price)}</span>}
-                                </button>
-                            );
-                        })}
+                  <div className="p-5 rounded-[25px] bg-white/5 border border-white/10">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2.5 ml-1 flex items-center gap-1.5">
+                      <span className="text-indigo-400 text-[10px]">📦</span> Alege Carcasa
+                    </label>
+                    <div className="relative">
+                      <select 
+                        value={selectedCaseId || ''} 
+                        onChange={(e) => setSelectedCaseId(e.target.value)}
+                        className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                      >
+                        {pcCompatibleCases.map(caseOpt => (
+                          <option key={caseOpt.id} value={caseOpt.id}>
+                            {caseOpt.name} {caseOpt.price > 0 ? `(+${formatRON(caseOpt.price)})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* SELECTARE STOCARE DINAMICĂ */}
                 {storageOptions.length > 1 && (
-                  <div className="p-4 rounded-[20px] bg-white/5 border border-white/10">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">💾 Upgrade Stocare</span>
-                    <div className="flex flex-col gap-2">
-                        {storageOptions.map(option => {
-                            const isSelected = selectedStorage === option.value;
-                            return (
-                                <button
-                                    key={option.value}
-                                    onClick={() => setSelectedStorage(option.value)}
-                                    className={`flex items-center justify-between w-full p-3 rounded-xl border text-[10px] font-bold uppercase transition-all ${isSelected ? 'bg-indigo-500/20 border-indigo-500/50 text-white' : 'bg-transparent border-white/5 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-indigo-400 bg-indigo-500' : 'border-gray-500 bg-transparent'}`}>
-                                            {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                        </div>
-                                        <span>{option.label}</span>
-                                    </div>
-                                    {option.extraText !== 0 && <span className="text-indigo-300">{option.extraText}</span>}
-                                </button>
-                            );
-                        })}
+                  <div className="p-5 rounded-[25px] bg-white/5 border border-white/10">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2.5 ml-1 flex items-center gap-1.5">
+                      <span className="text-indigo-400 text-[10px]">💾</span> Memorie Stocare
+                    </label>
+                    <div className="relative">
+                      <select 
+                        value={selectedStorage} 
+                        onChange={(e) => setSelectedStorage(e.target.value)}
+                        className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                      >
+                        {storageOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label} {option.extraText ? `(${option.extraText})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                      </div>
                     </div>
                   </div>
                 )}
