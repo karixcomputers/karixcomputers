@@ -32,19 +32,20 @@ export default function ProductCard({ p, product, availableCases = [] }) {
   const { toggleWishlist, isFavorite } = useWishlist();
   const navigate = useNavigate();
 
-  const data = p || product;
+  // 👉 FIX CRITIC: Dacă vine din Wishlist, produsul e imbricat. Extragem datele reale.
+  const rawData = p || product;
+  if (!rawData) return null;
+  const data = rawData.product || rawData; 
 
   const [showServicePopup, setShowServicePopup] = useState(false);
   const [selectedStorage, setSelectedStorage] = useState(data?.storageGb || "1TB");
   const [selectedCaseId, setSelectedCaseId] = useState(null);
 
-  if (!data) return null;
-
   const inStock = (data.stock || 0) > 0;
   const isService = data.category === "service" || 
                     ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => (data.name || "").toLowerCase().includes(kw));
 
-  // 👉 1. EXTRAGERE CARCASE COMPATIBILE
+  // Extragere Carcase
   let compatArray = [];
   try {
      compatArray = Array.isArray(data.compatibleCases) ? data.compatibleCases : JSON.parse(data.compatibleCases || "[]");
@@ -54,25 +55,25 @@ export default function ProductCard({ p, product, availableCases = [] }) {
     compatArray.some(compatId => String(compatId).trim() === String(c.id).trim())
   );
   
-  // 👉 2. DETERMINĂM CARCASA CURENTĂ
   const activeCaseId = selectedCaseId !== null ? selectedCaseId : (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
   const selectedCaseObj = pcCompatibleCases.find(c => String(c.id) === String(activeCaseId));
   const caseAddedPriceCents = selectedCaseObj?.price || 0;
 
-  // 👉 3. SETĂM IMAGINEA - INSTANT (Aici se face magia vizuală)
-  const displayImage = selectedCaseObj?.image ? selectedCaseObj.image : data.images?.[0];
+  // 👉 REZOLVARE IMAGINE: Dacă nu are poză carcasa, luăm poza sistemului (care acum este extrasă corect din Wishlist)
+  let displayImage = data.images?.[0]; 
+  if (selectedCaseObj && selectedCaseObj.image && selectedCaseObj.image.trim() !== "") {
+      displayImage = selectedCaseObj.image;
+  }
 
-  // 👉 4. CALCUL STOCARE
+  // Calcul Stocare și Totaluri
   const dynamicStorageOptions = getStorageOptions(data.storageGb);
   const currentStorageOption = dynamicStorageOptions.find(opt => opt.value === selectedStorage);
   const storageAddedPriceCents = currentStorageOption ? currentStorageOption.extraCents : 0;
 
-  // 👉 5. TOTALURI
   const currentPriceCents = (data.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
   const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
   const finalCaseText = selectedCaseObj ? selectedCaseObj.name : (data.case || "N/A");
 
-  // 👉 FIX CRITIC: Adăugat /api/ la path pentru a randa corect imaginile în shop
   const getImageUrl = (img) => {
     if (!img) return "https://placehold.co/800x500/0b1020/ffffff?text=Karix+PC";
     if (img.startsWith("http") || img.startsWith("data:")) return img;
@@ -90,7 +91,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
       productName: data.name,
       priceCents: currentPriceCents,
       warrantyMonths: Number(finalWarranty),
-      image: getImageUrl(displayImage), // Către checkout pleacă imaginea corectă
+      image: getImageUrl(displayImage), 
       specs: {
         cpu: data.cpuBrand,
         gpu: data.gpuBrand,
@@ -114,11 +115,6 @@ export default function ProductCard({ p, product, availableCases = [] }) {
       executeAddToCart();
     }
   };
-
-console.log("==== DEBUG CARCASĂ ====");
-  console.log("ID Carcasă activă:", activeCaseId);
-  console.log("Datele carcasei găsite:", selectedCaseObj);
-  console.log("Imagine finală de afișat:", displayImage);
 
   return (
     <>
@@ -157,7 +153,7 @@ console.log("==== DEBUG CARCASĂ ====");
           </div>
 
           <img
-            key={displayImage} // 👈 Cheia forțează re-randarea elementului <img> în DOM
+            key={displayImage || 'default'} 
             src={getImageUrl(displayImage)}
             alt={data.name}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100 animate-in zoom-in-95"
@@ -176,7 +172,7 @@ console.log("==== DEBUG CARCASĂ ====");
             </h3>
           </Link>
 
-          {/* SPECIFICAȚII ȘI OPȚIUNI (Doar dacă nu e serviciu) */}
+          {/* SPECIFICAȚII ȘI OPȚIUNI */}
           {!isService && (
             <>
               <div className="grid grid-cols-2 gap-x-4 gap-y-4 mb-6">
