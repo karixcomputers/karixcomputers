@@ -591,8 +591,9 @@ export default function Shop() {
                   return (
                   <div key={pc.id} className="flex flex-col rounded-[35px] bg-white/5 border border-white/10 overflow-hidden group hover:border-indigo-500/40 transition-all duration-500 backdrop-blur-md shadow-2xl relative">
                     
-                    <div className="relative h-64 overflow-hidden bg-black/20">
-                      <div className="absolute top-5 left-5 z-20 flex flex-col gap-2">
+                    <div className="relative h-64 overflow-hidden bg-black/20 shrink-0">
+                      {/* 👉 FIX AICI: am adăugat "items-start" pentru a micșora lățimea etichetei de 24 luni */}
+                      <div className="absolute top-5 left-5 z-20 flex flex-col items-start gap-2">
                         <div className="group/badge relative">
                             <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-black text-[10px] font-black uppercase tracking-widest shadow-xl cursor-help block">
                                 Asamblat la Comandă
@@ -640,14 +641,15 @@ export default function Shop() {
                         </span>
                       </button>
 
+                      {/* 👉 FIX AICI: am folosit object-contain, p-6 și pt-10 pentru a nu încăleca etichetele */}
                       <img 
-                        // Fix cheie pentru randare instantanee la selectie
                         key={displayImage}
                         src={getImageUrl(displayImage)} 
                         alt={pc.name} 
-                        className="w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
+                        className="w-full h-full object-contain p-6 pt-10 transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100 animate-in zoom-in-95" 
+                        loading="lazy"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#0b1020] via-black/40 to-transparent opacity-90" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0b1020] via-black/40 to-transparent opacity-90 pointer-events-none" />
                     </div>
 
                     <div className="p-8 flex-1 flex flex-col">
