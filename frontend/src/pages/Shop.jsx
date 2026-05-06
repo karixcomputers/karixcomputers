@@ -78,7 +78,8 @@ export default function Shop() {
         const items = await casesRes.json();
         fetchedCases = items
           .filter(item => item.category === 'case')
-          .sort((a, b) => a.name.localeCompare(b.name)); 
+          // 👉 FIX AICI: Am schimbat sortarea de la nume la preț (crescător)
+          .sort((a, b) => (a.price || 0) - (b.price || 0)); 
         setAvailableCases(fetchedCases);
       }
 
@@ -837,7 +838,7 @@ export default function Shop() {
               
               <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 snap-x snap-mandatory flex-1 items-start md:justify-center no-scrollbar custom-scrollbar w-full touch-pan-x">
                 {compareList.map((pc, index) => (
-                  <div key={pc.id} className="min-w-[80%] sm:min-w-[300px] md:min-w-[350px] w-[80%] sm:w-[300px] md:w-[350px] shrink-0 h-full flex flex-col bg-white/[0.03] border border-white/10 rounded-[20px] sm:rounded-[30px] p-4 sm:p-6 snap-center hover:border-indigo-500/40 transition-colors shadow-2xl relative text-left">
+                  <div key={pc.id} className="min-w-[80%] sm:min-w-[280px] md:min-w-[320px] max-w-[400px] w-full shrink-0 h-full flex flex-col bg-white/[0.03] border border-white/10 rounded-[20px] sm:rounded-[30px] p-4 sm:p-6 snap-center hover:border-indigo-500/40 transition-colors shadow-2xl relative text-left">
                     
                     <button onClick={() => {
                       const newList = compareList.filter(c => c.id !== pc.id);
