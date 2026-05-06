@@ -713,10 +713,10 @@ export default function ProductDetails() {
                   <div className="h-[1px] bg-white/10 flex-1" />
               </div>
               
-              {/* Container cu scroll orizontal */}
-              <div className="flex overflow-x-auto gap-8 pb-8 snap-x snap-mandatory no-scrollbar custom-scrollbar">
+              {/* 👉 FIX: Container cu scroll orizontal și carduri mai înguste */}
+              <div className="flex overflow-x-auto gap-6 md:gap-8 pb-8 snap-x snap-mandatory no-scrollbar custom-scrollbar items-stretch">
                 {similarProducts.map((simProd) => (
-                  <div key={simProd.id} className="min-w-[300px] md:min-w-[350px] snap-center shrink-0">
+                  <div key={simProd.id} className="min-w-[280px] md:min-w-[320px] max-w-[400px] w-full snap-center shrink-0">
                     <ProductCard product={simProd} availableCases={availableCases} />
                   </div>
                 ))}
