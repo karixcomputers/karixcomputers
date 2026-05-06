@@ -45,19 +45,29 @@ export default function ProductCard({ p, product, availableCases = [] }) {
   const isService = data.category === "service" || 
                     ['mentenanta', 'service', 'curatare', 'reparatie'].some(kw => (data.name || "").toLowerCase().includes(kw));
 
-  // 👉 LOGICĂ PENTRU CARCASE
-  const pcCompatibleCases = availableCases.filter(c => data.compatibleCases?.includes(c.id));
+  // 👉 LOGICĂ ROBUSTĂ PENTRU CARCASE
+  let compatArray = [];
+  try {
+     compatArray = Array.isArray(data.compatibleCases) ? data.compatibleCases : JSON.parse(data.compatibleCases || "[]");
+  } catch(e) { compatArray = []; }
+
+  const pcCompatibleCases = availableCases.filter(c => 
+    compatArray.some(compatId => String(compatId).trim() === String(c.id).trim())
+  );
+  
   const activeCaseId = selectedCaseId || (pcCompatibleCases.length > 0 ? pcCompatibleCases[0].id : null);
+  
   let selectedCaseObj = null;
   let caseAddedPriceCents = 0;
 
+  // Căutare bazată exclusiv pe String pentru a preveni erorile dropdown-ului
   if (activeCaseId && pcCompatibleCases.length > 0) {
-    selectedCaseObj = pcCompatibleCases.find(c => c.id === activeCaseId) || pcCompatibleCases[0];
+    selectedCaseObj = pcCompatibleCases.find(c => String(c.id).trim() === String(activeCaseId).trim()) || pcCompatibleCases[0];
     caseAddedPriceCents = selectedCaseObj.price || 0;
   }
 
   // 👉 NOU: Logica pentru a alege ce imagine afișăm (Carcasa selectată SAU sistemul de bază)
-  const displayImage = (selectedCaseObj && selectedCaseObj.image) 
+  const displayImage = (selectedCaseObj && selectedCaseObj.image && selectedCaseObj.image.trim() !== "") 
     ? selectedCaseObj.image 
     : data.images?.[0];
 
@@ -69,13 +79,14 @@ export default function ProductCard({ p, product, availableCases = [] }) {
   // 👉 CALCUL PREȚ TOTAL
   const currentPriceCents = (data.priceCents || 0) + storageAddedPriceCents + caseAddedPriceCents;
   const finalStorageText = currentStorageOption ? currentStorageOption.label : selectedStorage;
+  
   let finalCaseText = data.case || "N/A";
   if (selectedCaseObj) finalCaseText = selectedCaseObj.name;
 
   const getImageUrl = (img) => {
     if (!img) return "https://placehold.co/800x500/0b1020/ffffff?text=Karix+PC";
     if (img.startsWith("http")) return img;
-    return `https://karixcomputers.ro/uploads/${img}`;
+    return `https://karixcomputers.ro/uploads/${img}`; // Sau cu api/uploads/ dacă e la fel ca în rest
   };
 
   const executeAddToCart = () => {
@@ -152,10 +163,11 @@ export default function ProductCard({ p, product, availableCases = [] }) {
           </div>
 
           <img
-            // 👉 AICI se folosește imaginea selectată dinamic
+            // 👉 Cheia forțează re-randarea instantanee când se schimbă displayImage
+            key={displayImage}
             src={getImageUrl(displayImage)}
             alt={data.name}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100 animate-in zoom-in-95"
             loading="lazy"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0b1020] via-black/40 to-transparent opacity-90" />
@@ -229,7 +241,7 @@ export default function ProductCard({ p, product, availableCases = [] }) {
                     </label>
                     <div className="relative">
                       <select 
-                        value={activeCaseId} 
+                        value={activeCaseId || ''} 
                         onChange={(e) => setSelectedCaseId(e.target.value)}
                         className="w-full appearance-none bg-[#0b1020] border border-white/10 text-white text-[11px] font-bold py-3 pl-4 pr-10 rounded-xl outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                       >
