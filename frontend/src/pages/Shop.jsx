@@ -821,44 +821,44 @@ export default function Shop() {
 
         {/* --- MODAL FULLSCREEN COMPARARE --- */}
         {showCompareModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-10 backdrop-blur-md bg-black/40 animate-in fade-in duration-300">
-            <div className="relative w-full max-w-7xl h-full max-h-[90vh] bg-[#0b1020]/95 border border-white/10 p-6 md:p-10 rounded-[40px] shadow-2xl flex flex-col backdrop-blur-2xl">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 sm:p-4 md:p-10 backdrop-blur-md bg-black/60 animate-in fade-in duration-300">
+            <div className="relative w-full max-w-7xl h-full max-h-[95vh] sm:max-h-[90vh] bg-[#0b1020]/95 border border-white/10 p-4 pt-12 sm:p-6 sm:pt-6 md:p-10 rounded-[24px] sm:rounded-[40px] shadow-2xl flex flex-col backdrop-blur-2xl">
               
               <button 
                 onClick={() => setShowCompareModal(false)} 
-                className="absolute top-6 right-6 h-12 w-12 flex items-center justify-center rounded-2xl bg-white/5 text-gray-400 hover:text-white hover:bg-rose-500 hover:border-rose-500 border border-white/10 transition-all z-10 text-xl"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 h-8 w-8 sm:h-12 sm:w-12 flex items-center justify-center rounded-xl sm:rounded-2xl bg-white/5 text-gray-400 hover:text-white hover:bg-rose-500 hover:border-rose-500 border border-white/10 transition-all z-[210] text-lg sm:text-xl"
               >
                 ✕
               </button>
               
-              <h2 className="text-center text-3xl md:text-5xl font-black text-white uppercase italic tracking-tighter mb-8 drop-shadow-lg shrink-0">
+              <h2 className="text-center text-2xl sm:text-3xl md:text-5xl font-black text-white uppercase italic tracking-tighter mb-4 sm:mb-8 drop-shadow-lg shrink-0 pr-8 sm:pr-0">
                 Comparare <span className="text-indigo-400">Sisteme</span>
               </h2>
               
-              <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory flex-1 items-start md:justify-center no-scrollbar custom-scrollbar">
+              <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 snap-x snap-mandatory flex-1 items-start md:justify-center no-scrollbar custom-scrollbar w-full touch-pan-x">
                 {compareList.map((pc, index) => (
-                  <div key={pc.id} className="min-w-[300px] w-[300px] md:w-[350px] h-full flex flex-col bg-white/[0.03] border border-white/10 rounded-[30px] p-6 snap-center hover:border-indigo-500/40 transition-colors shadow-2xl relative text-left">
+                  <div key={pc.id} className="min-w-[80%] sm:min-w-[300px] md:min-w-[350px] w-[80%] sm:w-[300px] md:w-[350px] shrink-0 h-full flex flex-col bg-white/[0.03] border border-white/10 rounded-[20px] sm:rounded-[30px] p-4 sm:p-6 snap-center hover:border-indigo-500/40 transition-colors shadow-2xl relative text-left">
                     
                     <button onClick={() => {
                       const newList = compareList.filter(c => c.id !== pc.id);
                       setCompareList(newList);
                       if (newList.length === 0) setShowCompareModal(false);
-                    }} className="absolute top-4 right-4 text-gray-500 hover:text-rose-500 h-8 w-8 rounded-full flex items-center justify-center hover:bg-rose-500/10 transition-colors z-20">
+                    }} className="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-500 hover:text-rose-500 h-8 w-8 rounded-full flex items-center justify-center hover:bg-rose-500/10 transition-colors z-20">
                       ✕
                     </button>
 
-                    <img src={getImageUrl(pc.images?.[0])} alt="" className="w-full h-40 object-contain rounded-2xl mb-4 drop-shadow-2xl shrink-0" />
+                    <img src={getImageUrl(pc.images?.[0])} alt="" className="w-full h-32 sm:h-40 object-contain rounded-2xl mb-4 drop-shadow-2xl shrink-0" />
                     
                     <div className="shrink-0 mb-4">
-                      <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] mb-1">{pc.cpuBrand?.split(' ')[0] || 'Custom'}</p>
-                      <h3 className="text-2xl font-black text-white italic uppercase tracking-tight leading-tight line-clamp-2 min-h-[3rem]">{pc.name}</h3>
-                      <p className="text-2xl font-black text-white drop-shadow-xl italic mt-2">{formatRON(pc.priceCents)}</p>
+                      <p className="text-[9px] sm:text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] mb-1">{pc.cpuBrand?.split(' ')[0] || 'Custom'}</p>
+                      <h3 className="text-xl sm:text-2xl font-black text-white italic uppercase tracking-tight leading-tight line-clamp-2 min-h-[3rem]">{pc.name}</h3>
+                      <p className="text-xl sm:text-2xl font-black text-white drop-shadow-xl italic mt-2">{formatRON(pc.priceCents)}</p>
                     </div>
                     
                     <div 
                       ref={el => specRefs.current[index] = el}
                       onScroll={handleSyncScroll}
-                      className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2 no-scrollbar"
+                      className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2 no-scrollbar touch-pan-y"
                     >
                       {renderCompareSpec("⚡", "Procesor", pc.cpuBrand)}
                       {renderCompareSpec("🎮", "Placă Video", pc.gpuBrand)}
@@ -917,7 +917,7 @@ export default function Shop() {
                         setCompareList(compareList.filter(c => c.id !== pc.id));
                         if (compareList.length === 1) setShowCompareModal(false);
                       }} 
-                      className="w-full py-4 mt-6 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-indigo-500 transition-all shadow-lg shrink-0 active:scale-95"
+                      className="w-full py-3 sm:py-4 mt-4 sm:mt-6 bg-indigo-600 text-white rounded-xl sm:rounded-2xl font-black uppercase tracking-[0.2em] text-[9px] sm:text-[10px] hover:bg-indigo-500 transition-all shadow-lg shrink-0 active:scale-95"
                     >
                       Adaugă în coș
                     </button>
