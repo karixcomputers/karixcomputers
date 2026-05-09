@@ -448,7 +448,7 @@ export default function Orders() {
                     <span>💡</span>
                     {req.status === 'pending' && "Așteptăm pachetul tău. Imediat ce ajunge la noi, îl verificăm și procesăm rambursarea."}
                     {req.status === 'received_ok' && "Produsul a fost recepționat cu succes. Plata este în curs de procesare către contul tău IBAN."}
-                    {req.status === 'completat' && "Tranzacție finalizată. Fondurile ar trebui să apară în contul tău în 1-3 zile lucrătoare."}
+                    {req.status === 'completat' && "Tranzacție finalizată. Fondurile ar trebui să apară în contul tău în 3-5 zile lucrătoare."}
                     {req.status === 'received_issues' && "Am depistat probleme la recepție. Verifică e-mail-ul pentru detalii despre stadiul returului."}
                   </div>
                 </div>
