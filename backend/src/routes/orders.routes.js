@@ -335,7 +335,6 @@ router.post("/", requireAuth, async (req, res, next) => {
         paymentMethod: paymentMethod,
         status: initialStatus,
 
-        // 👉 AICI: Salvăm datele noi de facturare primite din frontend
         invoiceCounty: client.invoiceCounty || null,
         invoiceCity: client.invoiceCity || null,
         invoiceAddress: client.invoiceAddress || null,
@@ -661,10 +660,13 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
       }
     });
 
-    const totalOrders = orders.length;
-    const totalRevenueCents = orders.reduce((acc, order) => acc + order.totalCents, 0);
+    // 👉 FIX: Ignorăm comenzile anulate când calculăm totalurile financiare
+    const validOrders = orders.filter(o => o.status !== "anulat");
 
-    // 2. Calculăm mini-cardurile de status
+    const totalOrders = validOrders.length;
+    const totalRevenueCents = validOrders.reduce((acc, order) => acc + order.totalCents, 0);
+
+    // 2. Calculăm mini-cardurile de status (Aici păstrăm array-ul inițial ca să putem număra și cele anulate)
     const statusCounts = {
       inProcess: orders.filter(o => ["in_asteptare", "in_asteptare_plata", "in_procesare", "in_asteptare_ridicare"].includes(o.status)).length,
       delivered: orders.filter(o => o.status === "livrat").length,
@@ -672,20 +674,15 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
     };
 
     // 3. Generăm datele pentru Grafic (Grupăm veniturile pe zile)
-    // Creăm un obiect unde cheia este data (ex: '2024-05-20') și valoarea este suma totală pe acea zi
     const chartMap = {};
-    orders.forEach(order => {
-      // Ignorăm comenzile anulate din graficul de încasări
-      if (order.status === "anulat") return; 
-
-      const dateStr = order.createdAt.toISOString().split('T')[0]; // Extragem doar YYYY-MM-DD
+    validOrders.forEach(order => {
+      const dateStr = order.createdAt.toISOString().split('T')[0]; 
       if (!chartMap[dateStr]) chartMap[dateStr] = 0;
       chartMap[dateStr] += order.totalCents;
     });
 
-    // Transformăm obiectul într-un array sortat cronologic pentru Recharts
     const chartData = Object.keys(chartMap)
-      .sort() // Sortare cronologică implicită pt stringuri YYYY-MM-DD
+      .sort() 
       .map(date => ({
         date,
         revenue: chartMap[date]
@@ -694,8 +691,8 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
     // 4. Calculăm Top 5 Produse cele mai vândute
     const allItems = await prisma.orderItem.findMany({
       where: { 
-        order: dateFilter,
-        status: { not: "anulat" } // Nu punem în top piesele anulate
+        order: { ...dateFilter, status: { not: "anulat" } }, // Excludem și aici comenzile anulate
+        status: { not: "anulat" } 
       },
       select: {
         productName: true,
@@ -714,12 +711,10 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
       productMap[name].revenue += (item.priceCentsAtBuy * item.qty);
     });
 
-    // Transformăm în array, sortăm după numărul de bucăți vândute și luăm primele 5
     const topProducts = Object.values(productMap)
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // Trimitem tot pachetul către frontend
     res.json({
       totalOrders,
       totalRevenueCents,
