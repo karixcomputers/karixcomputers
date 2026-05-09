@@ -668,7 +668,11 @@ export default function Checkout() {
                     </button>
                 </div>
 
-                {cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && (
+                {/* 👉 REZOLVAREA ESTE AICI 👈 */}
+                {/* Am modificat condiția: se afișează butoanele PENTRU TOATĂ LUMEA atâta timp cât NU este o preluare obligatorie locală.
+                  Înainte era restricționată doar pentru "National Service". Acum, inclusiv cineva care ia un PC nou vede "Din Țară" vs "Sunt din Oradea".
+                */}
+                {!cartAnalysis.requiresLocalPickup && (
                   <div className="flex flex-col sm:flex-row gap-4 mb-8">
                      <button 
                        type="button"
