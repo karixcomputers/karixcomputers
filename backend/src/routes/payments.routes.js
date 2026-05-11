@@ -148,14 +148,33 @@ const confirmPayment = async (req, res) => {
         const action = actionMatch[1];
         const orderId = parseInt(orderIdMatch[1]);
 
-        if (action === 'confirmed' || action === 'confirmed_pending') {
-            const currentOrder = await prisma.order.findUnique({
+        // Găsim comanda
+        const currentOrder = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: { items: true, user: true }
+        });
+
+        if (!currentOrder) throw new Error("Comanda nu există.");
+
+        // 👉 FIX CRITIC: Aici Netopia ne trimite diverse statusuri.
+        // Trebuie să anulăm comanda dacă plata a picat/a fost respinsă de bancă
+        if (action === 'rejected' || action === 'error') {
+            await prisma.order.update({
                 where: { id: orderId },
-                include: { items: true, user: true }
+                data: { 
+                    status: "anulat", // Dacă cardul e respins, comanda pică automat
+                    items: {
+                        updateMany: { where: {}, data: { status: "anulat" } }
+                    }
+                }
             });
+            console.log(`❌ Plata RESPINSĂ pentru comanda ${orderId}`);
+            res.set('Content-Type', 'text/xml');
+            return res.send(`<?xml version="1.0" encoding="utf-8"?><crc>Success</crc>`);
+        }
 
-            if (!currentOrder) throw new Error("Comanda nu există.");
-
+        // Dacă e confirmată, facem logica normală:
+        if (action === 'confirmed' || action === 'confirmed_pending') {
             const isService = checkIsService(currentOrder.items);
             const rawAddress = currentOrder.shippingAddress || "";
             const isFanbox = checkIsFanbox(currentOrder.serviceDeliveryMethod, rawAddress);
@@ -174,8 +193,11 @@ const confirmPayment = async (req, res) => {
             const updatedOrder = await prisma.order.update({
                 where: { id: orderId },
                 data: { 
-                    status: "in_procesare",
-                    reverseAwb: reverseAwbGenerated
+                    status: "in_procesare", // Abia ACUM devine procesată/plătită
+                    reverseAwb: reverseAwbGenerated,
+                    items: {
+                        updateMany: { where: {}, data: { status: "in_procesare" } } // Updatăm și item-urile
+                    }
                 },
                 include: { items: true, user: true }
             });
@@ -266,7 +288,6 @@ const confirmPayment = async (req, res) => {
                 
                 if (isService && isFanbox) {
                     if (updatedOrder.user?.email) {
-                        // 👉 REPARAȚIA VITALĂ: Dacă adresa conține delimitatorul "| Locker:", înseamnă clar că omul are o adresă de acasă lipită de numele lockerului. Deci NU vrea retur la locker!
                         const isReturnToLocker = !rawAddress.includes("| Locker:");
                         await sendFanboxInstructionsEmail(updatedOrder.user.email, updatedOrder, isReturnToLocker, invoicePdfBuffer).catch(e => console.error(e));
                     }
