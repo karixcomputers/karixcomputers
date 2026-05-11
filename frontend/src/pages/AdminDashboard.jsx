@@ -7,6 +7,9 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  // 👉 NOU: State pentru a schimba între vizualizarea comenzilor active și a celor abandonate
+  const [viewMode, setViewMode] = useState("active"); // poate fi "active" sau "abandoned"
+
   const [awbModal, setAwbModal] = useState({ open: false, itemId: null, orderId: null, isFanbox: false, isAssembly: false });
   const [packageWeight, setPackageWeight] = useState(1);
   const [packageCount, setPackageCount] = useState(1);
@@ -170,7 +173,6 @@ export default function AdminDashboard() {
                       
     const isBankTransfer = order.paymentMethod === 'transfer_bancar';
 
-    // 👉 FIX AICI PENTRU VIZUALIZAREA CORECTĂ A STATUSULUI CURENT AL ITEMULUI
     const initialOption = (order.paymentMethod === "online" && item.status === "in_asteptare_plata")
       ? <option value="in_asteptare_plata">⚠️ Plată Online Eșuată / Abandonată</option>
       : (isBankTransfer 
@@ -295,31 +297,68 @@ export default function AdminDashboard() {
     </div>
   );
 
+  // 👉 NOU: Împărțim comenzile în două liste
+  const abandonedOrdersList = orders.filter(o => o.paymentMethod === "online" && o.status === "in_asteptare_plata");
+  const activeOrdersList = orders.filter(o => !(o.paymentMethod === "online" && o.status === "in_asteptare_plata"));
+  
+  // Lista pe care o vom afișa efectiv
+  const displayedOrders = viewMode === "active" ? activeOrdersList : abandonedOrdersList;
+
   return (
     <div className="relative min-h-screen pt-32 pb-24 px-4 sm:px-8 bg-transparent">
       <div className="max-w-7xl mx-auto relative z-10">
         <header className="mb-16 flex flex-col lg:flex-row justify-between items-end gap-8">
           <div>
             <p className="text-indigo-500 font-black text-[10px] uppercase tracking-[0.4em] mb-2 drop-shadow-md">Control Panel</p>
-            <h1 className="text-6xl font-black italic text-white tracking-tighter drop-shadow-2xl">Karix <span className="text-indigo-400">Computers</span></h1>
+            <h1 className="text-5xl sm:text-6xl font-black italic text-white tracking-tighter drop-shadow-2xl">
+              {viewMode === "active" ? (
+                <>Karix <span className="text-indigo-400">Computers</span></>
+              ) : (
+                <>Comenzi <span className="text-rose-400">Abandonate</span></>
+              )}
+            </h1>
           </div>
-          <div className="flex gap-4">
-            <Link to="/admin/history" className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-xs uppercase tracking-widest hover:bg-white/10 backdrop-blur-md transition-all shadow-xl">Arhivă 📜</Link>
+          
+          {/* 👉 NOU: Butoanele de navigare (Active / Abandonate / Arhivă) */}
+          <div className="flex flex-wrap gap-4">
+            {viewMode === "active" ? (
+              <button 
+                onClick={() => setViewMode("abandoned")} 
+                className="px-6 py-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold text-[10px] uppercase tracking-widest hover:bg-rose-500/20 transition-all shadow-xl flex items-center gap-2"
+              >
+                Oprite la Plată 💳
+                {abandonedOrdersList.length > 0 && (
+                  <span className="bg-rose-500 text-white px-2 py-0.5 rounded-md text-[9px] ml-1">{abandonedOrdersList.length}</span>
+                )}
+              </button>
+            ) : (
+              <button 
+                onClick={() => setViewMode("active")} 
+                className="px-6 py-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-500/20 transition-all shadow-xl flex items-center gap-2"
+              >
+                ⬅ Înapoi la Active
+                <span className="bg-indigo-500 text-white px-2 py-0.5 rounded-md text-[9px] ml-1">{activeOrdersList.length}</span>
+              </button>
+            )}
+            
+            <Link to="/admin/history" className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-[10px] uppercase tracking-widest hover:bg-white/10 backdrop-blur-md transition-all shadow-xl">
+              Arhivă 📜
+            </Link>
           </div>
         </header>
 
         <div className="space-y-8">
-          {orders.length === 0 ? (
+          {displayedOrders.length === 0 ? (
             <div className="text-center py-20 border border-white/5 rounded-[40px] bg-white/5 backdrop-blur-xl shadow-2xl">
-              <p className="text-gray-500 font-black uppercase tracking-widest text-sm italic">Nu există comenzi active momentan.</p>
+              <p className="text-gray-500 font-black uppercase tracking-widest text-sm italic">
+                {viewMode === "active" ? "Nu există comenzi active momentan." : "Nu există comenzi abandonate."}
+              </p>
             </div>
           ) : (
-            orders.map((order) => {
+            displayedOrders.map((order) => {
               const isOrderOradea = order.shippingAddress?.toLowerCase().includes('oradea');
               
-              // Verificam exact daca comanda e abandonata pe plata online
               const isAbandonedOnline = order.paymentMethod === "online" && order.status === "in_asteptare_plata";
-              
               const isPendingBankTransfer = order.paymentMethod === "transfer_bancar" && order.status === "in_asteptare_plata";
 
               const rawAddress = order.shippingAddress || "";
@@ -376,9 +415,8 @@ export default function AdminDashboard() {
                             #{String(order.id).slice(-8).toUpperCase()}
                           </span>
                           
-                          {/* 👉 ADAUGĂM ETICHETA CLARĂ DE NEPLĂTIT ONLINE */}
                           {isAbandonedOnline && (
-                              <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest bg-rose-500/10 px-2 py-1 rounded-lg border border-rose-500/20 animate-pulse">
+                              <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest bg-rose-500/10 px-2 py-1 rounded-lg border border-rose-500/20">
                                ❌ Oprită la plată (Card)
                               </span>
                           )}
@@ -502,7 +540,6 @@ export default function AdminDashboard() {
                                 </p>
                                 <h5 className="text-lg font-bold text-white uppercase italic tracking-tight">{item.productName}</h5>
                                 
-                                {/* 👉 AICI SE AFIȘEAZĂ SPECIFICAȚIILE PC-ULUI PENTRU ADMIN */}
                                 {safeSpecs && Object.keys(safeSpecs).length > 0 && (
                                   <div className="mt-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 max-w-2xl">
                                     {[
