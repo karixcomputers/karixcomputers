@@ -34,16 +34,13 @@ const ReturSection = ({ title, children, number, isWarning }) => (
 export default function Retur() {
   return (
     <>
-      {/* SEO: CONFIGURARE PENTRU PAGINA DE RETUR */}
+      {/* SEO: CONFIGURARE ACTUALIZATĂ PENTRU PAGINA DE RETUR */}
       <SEO 
-        title="Politică de Retur & Rambursare" 
-        description="Află cum poți returna un produs la Karix Computers în termen de 14 zile. Informații complete despre dreptul de retur pentru persoane fizice, politica B2B și excepțiile legale."
+        title="Politică de Retur Karix Computers | Retur 14 Zile" 
+        description="Află cum poți returna un produs la Karix Computers conform OUG 34/2014. Informații complete despre returul în 14 zile pentru persoane fizice și politica pentru firme (B2B)."
       />
 
       <div className="relative isolate min-h-screen pt-32 pb-24 px-4 sm:px-6 overflow-hidden bg-transparent">
-        
-
-
         <div className="max-w-4xl mx-auto relative z-10">
           
           <header className="mb-20 text-center">
@@ -56,7 +53,6 @@ export default function Retur() {
             </p>
           </header>
 
-          {/* Notă introductivă actualizată pentru PF */}
           <div className="mb-12 p-8 rounded-[32px] bg-indigo-500/5 border border-indigo-500/10 backdrop-blur-md">
              <p className="text-indigo-300 text-center font-medium italic">
                Conform OUG 34/2014, clienții <strong>persoane fizice</strong> au dreptul de a returna produsele achiziționate online în termen de 
@@ -76,7 +72,6 @@ export default function Retur() {
               </p>
             </ReturSection>
 
-            {/* Secțiune dedicată Persoanelor Juridice (B2B) */}
             <ReturSection number="!!" title="Politica pentru Persoane Juridice" isWarning>
               <p className="text-pink-200/80">
                 Dreptul de retur în 14 zile conform OUG 34/2014 se aplică <strong>exclusiv persoanelor fizice</strong>.
