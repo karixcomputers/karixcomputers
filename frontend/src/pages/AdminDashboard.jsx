@@ -7,12 +7,11 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Am adăugat isAssembly în state-ul modalului pentru a ști când cerem valoarea asigurată manual
   const [awbModal, setAwbModal] = useState({ open: false, itemId: null, orderId: null, isFanbox: false, isAssembly: false });
   const [packageWeight, setPackageWeight] = useState(1);
   const [packageCount, setPackageCount] = useState(1);
   const [insurance, setInsurance] = useState(false);
-  const [declaredValue, setDeclaredValue] = useState(""); // 👉 NOU: Stocăm valoarea PC-ului pentru asamblare
+  const [declaredValue, setDeclaredValue] = useState(""); 
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [confirmingOpId, setConfirmingOpId] = useState(null);
@@ -171,11 +170,14 @@ export default function AdminDashboard() {
                       
     const isBankTransfer = order.paymentMethod === 'transfer_bancar';
 
-    const initialOption = isBankTransfer 
-      ? <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
-      : (order.paymentMethod === "online"
-          ? <option value="in_asteptare">✅ Plătit</option>
-          : <option value="in_asteptare">⏳ În Așteptare</option>);
+    // 👉 FIX AICI PENTRU VIZUALIZAREA CORECTĂ A STATUSULUI CURENT AL ITEMULUI
+    const initialOption = (order.paymentMethod === "online" && item.status === "in_asteptare_plata")
+      ? <option value="in_asteptare_plata">⚠️ Plată Online Eșuată / Abandonată</option>
+      : (isBankTransfer 
+          ? <option value="in_asteptare_plata">💳 Așteaptă Plata OP</option>
+          : (order.paymentMethod === "online"
+              ? <option value="in_asteptare">✅ Plătit</option>
+              : <option value="in_asteptare">⏳ În Așteptare</option>));
 
     if (isAssembly) {
       if (isOradeaF2F) {
@@ -314,6 +316,10 @@ export default function AdminDashboard() {
           ) : (
             orders.map((order) => {
               const isOrderOradea = order.shippingAddress?.toLowerCase().includes('oradea');
+              
+              // Verificam exact daca comanda e abandonata pe plata online
+              const isAbandonedOnline = order.paymentMethod === "online" && order.status === "in_asteptare_plata";
+              
               const isPendingBankTransfer = order.paymentMethod === "transfer_bancar" && order.status === "in_asteptare_plata";
 
               const rawAddress = order.shippingAddress || "";
@@ -361,7 +367,7 @@ export default function AdminDashboard() {
               }
 
               return (
-                <div key={order.id} className="p-8 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl transition-all hover:bg-white/[0.08]">
+                <div key={order.id} className={`p-8 rounded-[40px] border backdrop-blur-xl shadow-2xl transition-all hover:bg-white/[0.08] ${isAbandonedOnline ? 'bg-rose-500/5 border-rose-500/20' : 'bg-white/5 border-white/10'}`}>
                   <div className="flex flex-col lg:flex-row gap-10">
                     <div className="lg:w-1/3 lg:border-r border-white/5 lg:pr-10 flex flex-col justify-between">
                       <div>
@@ -370,12 +376,19 @@ export default function AdminDashboard() {
                             #{String(order.id).slice(-8).toUpperCase()}
                           </span>
                           
-                          {order.paymentMethod === "transfer_bancar" && (
+                          {/* 👉 ADAUGĂM ETICHETA CLARĂ DE NEPLĂTIT ONLINE */}
+                          {isAbandonedOnline && (
+                              <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest bg-rose-500/10 px-2 py-1 rounded-lg border border-rose-500/20 animate-pulse">
+                               ❌ Oprită la plată (Card)
+                              </span>
+                          )}
+
+                          {!isAbandonedOnline && order.paymentMethod === "transfer_bancar" && (
                               <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
                                🏦 OP
                               </span>
                           )}
-                          {order.paymentMethod === "online" && (
+                          {!isAbandonedOnline && order.paymentMethod === "online" && (
                               <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
                                💳 Online
                               </span>
@@ -464,7 +477,6 @@ export default function AdminDashboard() {
                          const isAssembly = itemName.includes("asamblare");
                          const isService = ['service', 'mentenanta', 'curatare', 'reparatie', 'diagnosticare', 'drift', 'hall', 'stick', 'montaj'].some(kw => itemName.includes(kw));
 
-                         // 👉 NOU: Logica pentru a asigura că specs e obiect
                          let safeSpecs = null;
                          if (item.specs) {
                            if (typeof item.specs === 'object') {
@@ -505,7 +517,6 @@ export default function AdminDashboard() {
                                     ].map((spec, idx) => spec.val ? (
                                       <div key={idx} className="flex flex-col bg-black/20 px-2.5 py-1.5 rounded-lg border border-white/5">
                                         <span className="text-[8px] text-indigo-400 font-black uppercase tracking-widest">{spec.label}</span>
-                                        {/* Am înlocuit truncate cu text care se continuă pe următorul rând */}
                                         <span className="text-[10px] text-gray-300 font-bold whitespace-normal break-words mt-0.5" title={spec.val}>{spec.val}</span>
                                       </div>
                                     ) : null)}
