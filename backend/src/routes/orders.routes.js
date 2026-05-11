@@ -649,7 +649,7 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
       };
     }
 
-    // 1. Aducem toate comenzile pentru calculele globale și grafic
+    // 1. Aducem TOATE comenzile din perioada respectivă
     const orders = await prisma.order.findMany({
       where: dateFilter,
       select: {
@@ -657,23 +657,27 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
         status: true,
         totalCents: true,
         createdAt: true,
+        paymentMethod: true // <--- NECESAR PENTRU A FILTRA PLĂȚILE ONLINE
       }
     });
 
-    // 👉 FIX: Ignorăm comenzile anulate când calculăm totalurile financiare
-    const validOrders = orders.filter(o => o.status !== "anulat");
+    // 👉 FIX EXCLUSIVITATE: Păstrăm doar comenzile valide (ignorăm anulatele și cele abandonate la card)
+    const validOrders = orders.filter(o => 
+      o.status !== "anulat" && 
+      !(o.paymentMethod === "online" && o.status === "in_asteptare_plata")
+    );
 
     const totalOrders = validOrders.length;
     const totalRevenueCents = validOrders.reduce((acc, order) => acc + order.totalCents, 0);
 
-    // 2. Calculăm mini-cardurile de status (Aici păstrăm array-ul inițial ca să putem număra și cele anulate)
+    // 2. Calculăm mini-cardurile de status (Afișăm corect în procesare)
     const statusCounts = {
-      inProcess: orders.filter(o => ["in_asteptare", "in_asteptare_plata", "in_procesare", "in_asteptare_ridicare"].includes(o.status)).length,
+      inProcess: validOrders.filter(o => ["in_asteptare", "in_asteptare_plata", "in_procesare", "in_asteptare_ridicare"].includes(o.status)).length,
       delivered: orders.filter(o => o.status === "livrat").length,
       canceled: orders.filter(o => o.status === "anulat").length,
     };
 
-    // 3. Generăm datele pentru Grafic (Grupăm veniturile pe zile)
+    // 3. Generăm datele pentru Grafic DOAR din comenzile valide
     const chartMap = {};
     validOrders.forEach(order => {
       const dateStr = order.createdAt.toISOString().split('T')[0]; 
@@ -688,21 +692,28 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
         revenue: chartMap[date]
       }));
 
-    // 4. Calculăm Top 5 Produse cele mai vândute
+    // 4. Calculăm Top 5 Produse cele mai vândute DOAR pentru comenzile valide
     const allItems = await prisma.orderItem.findMany({
       where: { 
-        order: { ...dateFilter, status: { not: "anulat" } }, // Excludem și aici comenzile anulate
+        order: dateFilter, // Filtrăm inițial după dată
         status: { not: "anulat" } 
       },
       select: {
         productName: true,
         priceCentsAtBuy: true,
-        qty: true
+        qty: true,
+        order: { select: { status: true, paymentMethod: true } } // Extragem statusul comenzii parinte
       }
     });
 
+    // Excludem din top produsele care fac parte din comenzi anulate sau abandonate la plată
+    const validItems = allItems.filter(item => 
+      item.order.status !== "anulat" && 
+      !(item.order.paymentMethod === "online" && item.order.status === "in_asteptare_plata")
+    );
+
     const productMap = {};
-    allItems.forEach(item => {
+    validItems.forEach(item => {
       const name = item.productName || "Produs Necunoscut";
       if (!productMap[name]) {
         productMap[name] = { name, count: 0, revenue: 0 };
