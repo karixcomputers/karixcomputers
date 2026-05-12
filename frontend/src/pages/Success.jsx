@@ -41,6 +41,18 @@ export default function Success() {
         if (order.status === "in_procesare" || order.status === "in_asteptare" || (order.status === "in_asteptare_plata" && order.paymentMethod === "transfer_bancar")) {
           setStatus("success");
           clearCart();
+
+          // ==========================================
+          // DECLANȘARE CONVERSIE GOOGLE ADS
+          // ==========================================
+          if (typeof window !== "undefined" && window.gtag) {
+            window.gtag('event', 'conversion', {
+                'send_to': 'AW-18063793040/M-yaCKrYj6wcEJC3vqVD',
+                'transaction_id': orderId // Previne înregistrarea dublă la refresh
+            });
+          }
+          // ==========================================
+
           return;
         }
 
