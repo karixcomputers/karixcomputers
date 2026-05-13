@@ -9,38 +9,31 @@ export default function Giveaway() {
   const [error, setError] = useState("");
   const [totalComments, setTotalComments] = useState(0);
 
-  const handlePickWinner = async (e) => {
-    e.preventDefault();
-    if (!postUrl) {
-      setError("Te rog să introduci un link.");
-      return;
-    }
+const handlePickWinner = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
+  setWinner(null);
 
-    setLoading(true);
-    setError("");
-    setWinner(null);
+  try {
+    // Schimbăm ruta să bată la ADMIN, unde știm că restul funcțiilor merg
+    const res = await apiFetch("/admin/giveaway-picker", { 
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postUrl }),
+    });
 
-    try {
-      const res = await apiFetch("/giveaway", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postUrl }),
-      });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Eroare la extragere.");
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "A apărut o eroare la extragere.");
-      }
-
-      setWinner(data.winner);
-      setTotalComments(data.totalComments);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setWinner(data.winner);
+    setTotalComments(data.totalComments);
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen pt-24 pb-12 px-4 bg-[#0b1020] text-white flex flex-col items-center">
