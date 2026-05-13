@@ -49,7 +49,7 @@ router.get("/orders", requireAuth, requireAdmin, async (req, res, next) => {
 
 // --- RUTA GIVEAWAY FINALĂ ---
 
-// Funcție care transformă literele în ID numeric (obligatoriu pentru acest API)
+// Funcție de conversie Shortcode -> ID (obligatoriu pentru acest API)
 function shortcodeToId(shortcode) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
   let id = BigInt(0);
@@ -60,9 +60,12 @@ function shortcodeToId(shortcode) {
   return id.toString();
 }
 
+// Funcție pentru a aștepta puțin între cereri
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
   console.log("-----------------------------------------");
-  console.log("🚀 [GIVEAWAY 150] Pornire extragere masivă...");
+  console.log("🚀 [GIVEAWAY 150] Pornire extragere...");
 
   try {
     const { postUrl } = req.body;
@@ -73,11 +76,11 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
     const numericId = shortcodeToId(shortcode);
     
     let allComments = [];
-    let cursor = ""; // Semnul de carte pentru pagina următoare
+    let cursor = "";
 
-    // LOOP de 10 ori pentru a strânge ~150 de comentarii
+    // Bucla pentru 10 pagini (aprox. 150 comentarii)
     for (let i = 0; i < 10; i++) {
-      console.log(`\n📄 [PAGINA ${i + 1}] Cerem date pentru cursor: ${cursor || 'START'}`);
+      console.log(`📄 [PAGINA ${i + 1}] Cerem date...`);
       
       const url = `https://instagram-api-fast-reliable-data-scraper.p.rapidapi.com/comments?id=${numericId}${cursor ? `&cursor=${cursor}` : ""}`;
       
@@ -90,46 +93,54 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
       });
 
       const data = await response.json();
-      
-      // API-ul ăsta pune datele direct în array-ul principal sau în .data
-      const items = data?.data || data?.items || [];
+
+      // Căutăm lista de comentarii în orice format posibil (Array direct, .data, .items sau .comments)
+      let items = [];
+      if (Array.isArray(data)) {
+        items = data;
+      } else {
+        items = data?.data || data?.items || data?.comments || [];
+      }
+
       if (items.length === 0) {
-        console.log("🛑 Nu mai sunt comentarii de descărcat.");
+        console.log("🛑 Nu s-au găsit comentarii pe această pagină. Oprim bucla.");
         break;
       }
 
       allComments = [...allComments, ...items];
-      console.log(`✅ Adăugate ${items.length} comentarii. Total acum: ${allComments.length}`);
+      console.log(`✅ Am strâns ${allComments.length} comentarii până acum.`);
 
-      // Luăm cursorul pentru următoarea pagină (poate fi sub diverse nume în funcție de API)
-      cursor = data?.cursor || data?.next_cursor || data?.end_cursor;
+      // Căutăm cursorul pentru pagina următoare
+      cursor = data?.next_cursor || data?.cursor || data?.pagination?.next_cursor || "";
       
       if (!cursor) {
-        console.log("🏁 Am ajuns la sfârșitul listei de comentarii.");
+        console.log("🏁 Gata! Nu mai există alte pagini.");
         break;
       }
+
+      // Așteptăm 500ms ca să nu fim blocați
+      await sleep(500);
     }
 
     if (allComments.length === 0) {
-      return res.status(400).json({ error: "Nu am găsit niciun comentariu." });
+      return res.status(400).json({ error: "Nu s-au găsit comentarii. Postarea e privată?" });
     }
 
-    // Alegem câștigătorul din tot ce am strâns (cele ~150)
     const winner = allComments[Math.floor(Math.random() * allComments.length)];
 
     res.json({
       success: true,
       winner: {
-        username: winner.user?.username || winner.author?.username || "Anonim",
-        text: winner.text || winner.comment_text || "",
+        username: winner.user?.username || winner.author?.username || winner.owner?.username || "Anonim",
+        text: winner.text || winner.comment_text || "Fără text",
         profilePic: winner.user?.profile_pic_url || winner.author?.profile_pic_url || ""
       },
       totalComments: allComments.length
     });
 
   } catch (error) {
-    console.error("🔥 Eroare fatală:", error.message);
-    res.status(500).json({ error: "Eroare la procesarea paginilor." });
+    console.error("🔥 [FATAL]:", error.message);
+    res.status(500).json({ error: "Eroare la procesarea masivă a paginilor." });
   }
 });
 
