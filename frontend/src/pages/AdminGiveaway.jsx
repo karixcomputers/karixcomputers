@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 // Asigură-te că importi corect apiFetch, exact cum ai făcut în Success.jsx
-import { apiFetch } from "../../api/client"; 
+import { apiFetch } from "../api/client";
 
 export default function Giveaway() {
   const [postUrl, setPostUrl] = useState("");
