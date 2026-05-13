@@ -61,6 +61,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminAnnouncements from "./pages/AdminAnnouncements";
 import ServiceDetails from "./pages/ServiceDetails.jsx";
 import AdminCounts from "./pages/AdminCounts.jsx";
+import AdminGiveaway from "./pages/AdminGiveaway";
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
@@ -147,6 +148,7 @@ export default function App() {
                   <Route path="/admin/users" element={<AdminUsers />} />
                   <Route path="/admin/announcements" element={<AdminAnnouncements />} />
                   <Route path="/admin/counts" element={<AdminCounts />} />
+                  <Route path="/admin/giveaway" element={<AdminGiveaway />} />
 
                   <Route path="/order-canceled" element={<OrderCanceled />} />
 

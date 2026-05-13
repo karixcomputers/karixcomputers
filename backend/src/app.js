@@ -108,6 +108,66 @@ app.use("/api/adminconfigurator", adminConfiguratorRoutes);
 app.use('/api/users', usersRoutes);
 app.use("/api/announcements", announcementsRoutes);
 
+// ==========================================
+// RUTA PENTRU GIVEAWAY INSTAGRAM
+// ==========================================
+app.post("/api/giveaway", async (req, res) => {
+  try {
+    const { postUrl } = req.body;
+
+    if (!postUrl) {
+      return res.status(400).json({ error: "Te rog introdu un link valid de Instagram." });
+    }
+
+    // Extragem codul scurt din link (suportă atât postări clasice /p/ cât și /reel/)
+    const match = postUrl.match(/\/(?:p|reel)\/([a-zA-Z0-9_-]+)/);
+    if (!match) {
+      return res.status(400).json({ error: "Linkul nu pare să fie o postare validă de Instagram." });
+    }
+    const mediaCode = match[1];
+
+    // Facem cererea către API-ul RapidAPI
+    const response = await fetch(`https://instagram-scraper-stable-api.p.rapidapi.com/get_post_comments.php?media_code=${mediaCode}&sort_order=popular`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-rapidapi-host': 'instagram-scraper-stable-api.p.rapidapi.com',
+        'x-rapidapi-key': 'f720f3bf76msh941c7cc2af72c4cp184493jsnba560431b076'
+      }
+    });
+
+    const data = await response.json();
+
+    // Adaptare la structura răspunsului de la acest API
+    const commentsList = data?.data?.items || data?.comments || data?.data; 
+
+    if (!commentsList || commentsList.length === 0) {
+      return res.status(404).json({ error: "Nu s-au găsit comentarii. Verifică dacă linkul este corect și postarea e publică." });
+    }
+
+    // ALEGEREA CÂȘTIGĂTORULUI RANDOM
+    const randomIndex = Math.floor(Math.random() * commentsList.length);
+    const winner = commentsList[randomIndex];
+
+    // Trimitem rezultatul către React
+    return res.json({
+      success: true,
+      winner: {
+        username: winner.user?.username || "Utilizator Necunoscut",
+        text: winner.text || "Fără text",
+        profilePic: winner.user?.profile_pic_url || ""
+      },
+      totalComments: commentsList.length
+    });
+
+  } catch (error) {
+    console.error("Eroare la extragerea comentariilor:", error);
+    return res.status(500).json({ error: "Eroare de server la comunicarea cu Instagram." });
+  }
+});
+// ==========================================
+
+
 // 8. SERVIRE DOSAR STATIC (Imagini/Uploads)
 app.use('/api/uploads', (req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -117,3 +177,4 @@ app.use('/api/uploads', (req, res, next) => {
 
 // 9. ERROR HANDLER (Ultimul middleware din lanț)
 app.use(errorHandler);
+
