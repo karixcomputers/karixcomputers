@@ -6,8 +6,20 @@ import { requireAdmin } from "../middleware/admin.js";
 const prisma = new PrismaClient();
 const router = express.Router();
 
-// --- RUTE EXISTENTE (PRODUSE / COMENZI) ---
+// --- 1. FUNCȚII HELPER ---
+function shortcodeToId(shortcode) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  let id = BigInt(0);
+  for (let i = 0; i < shortcode.length; i++) {
+    const char = shortcode[i];
+    id = (id * BigInt(64)) + BigInt(alphabet.indexOf(char));
+  }
+  return id.toString();
+}
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// --- 2. RUTE ADMIN EXISTENTE ---
 router.post("/products", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const data = req.body;
@@ -47,24 +59,10 @@ router.get("/orders", requireAuth, requireAdmin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// --- RUTA GIVEAWAY FINALĂ ---
-
-// Funcție de conversie Shortcode -> ID (obligatoriu pentru acest API)
-function shortcodeToId(shortcode) {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  let id = BigInt(0);
-  for (let i = 0; i < shortcode.length; i++) {
-    const char = shortcode[i];
-    id = (id * BigInt(64)) + BigInt(alphabet.indexOf(char));
-  }
-  return id.toString();
-}
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
+// --- 3. RUTA GIVEAWAY REPARATĂ ---
 router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
   console.log("-----------------------------------------");
-  console.log("🚀 [GIVEAWAY 150] Pornire extragere masivă...");
+  console.log("🚀 [GIVEAWAY] Pornire extragere masivă (10 pagini)...");
 
   try {
     const { postUrl } = req.body;
@@ -78,8 +76,9 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
     let cursor = "";
 
     for (let i = 0; i < 10; i++) {
-      console.log(`📄 [PAGINA ${i + 1}] Se caută comentarii...`);
+      console.log(`📄 [PAGINA ${i + 1}] Se caută cu cursor: ${cursor || 'START'}`);
       
+      // Folosim parametrul corect pentru acest API (cursor)
       const url = `https://instagram-api-fast-reliable-data-scraper.p.rapidapi.com/comments?id=${numericId}${cursor ? `&cursor=${cursor}` : ""}`;
       
       const response = await fetch(url, {
@@ -92,37 +91,30 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
 
       const data = await response.json();
 
-      // Extragere comentarii (foarte flexibilă)
-      const items = data?.data || data?.items || data?.comments || (Array.isArray(data) ? data : []);
+      // Extragem comentariile (din cheia 'comments' conform log-ului tău)
+      const items = data?.comments || data?.data || data?.items || (Array.isArray(data) ? data : []);
       
       if (items.length === 0) {
-        console.log("🛑 Nu s-au găsit comentarii noi. Oprim.");
+        console.log("🛑 Nu am mai primit comentarii noi.");
         break;
       }
 
       allComments = [...allComments, ...items];
-      console.log(`✅ Am strâns ${allComments.length} comentarii.`);
+      console.log(`✅ Total acumulat: ${allComments.length} comentarii.`);
 
-      // DETECTARE CURSOR (Căutăm în toate locurile posibile)
-      cursor = data?.next_cursor || 
-               data?.cursor || 
-               data?.data?.next_cursor || 
-               data?.pagination?.next_cursor || 
-               data?.next_max_id || 
-               "";
+      // FIX-UL CRITIC: Folosim 'next_min_id' pe care l-am văzut în consolă!
+      cursor = data?.next_min_id || data?.next_max_id || data?.cursor || "";
       
       if (!cursor) {
-        console.log("🏁 API-ul nu a mai trimis un cursor. Final de listă.");
-        // Debug: vedem ce ne-a trimis API-ul de fapt ca să înțelegem structura
-        console.log("Keys primite de la API:", Object.keys(data));
+        console.log("🏁 Gata! API-ul nu a mai trimis next_min_id.");
         break;
       }
 
-      await sleep(600); // Pauză puțin mai mare să fim siguri
+      await sleep(600); // Pauză să nu ne ia serverul la ochi
     }
 
     if (allComments.length === 0) {
-      return res.status(400).json({ error: "Zero comentarii găsite." });
+      return res.status(400).json({ error: "Nu am găsit niciun comentariu." });
     }
 
     const winner = allComments[Math.floor(Math.random() * allComments.length)];
@@ -130,15 +122,15 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
     res.json({
       success: true,
       winner: {
-        username: winner.user?.username || winner.author?.username || winner.owner?.username || "Anonim",
-        text: winner.text || winner.comment_text || "Fără text",
+        username: winner.user?.username || winner.author?.username || "Anonim",
+        text: winner.text || winner.comment_text || "",
         profilePic: winner.user?.profile_pic_url || winner.author?.profile_pic_url || ""
       },
       totalComments: allComments.length
     });
 
   } catch (error) {
-    console.error("🔥 Eroare:", error.message);
+    console.error("🔥 Eroare la extragere:", error.message);
     res.status(500).json({ error: "Eroare la procesarea paginilor." });
   }
 });
