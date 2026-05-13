@@ -43,7 +43,7 @@ const SOCIAL_PLATFORMS = [
   {
     name: "Discord",
     username: "Karix Community",
-    link: "https://discord.gg/FV7DgzyTJk",
+    link: "https://discord.gg/mVumeNGjTQ",
     glassStyle: "border-[#5865F2]/40 hover:bg-[#5865F2]/10 shadow-[#5865F2]/10",
     iconColor: "text-[#5865F2]",
     icon: (
