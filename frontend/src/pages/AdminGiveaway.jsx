@@ -15,8 +15,7 @@ export default function AdminGiveaway() {
     setWinner(null);
 
     try {
-      // APELĂM RUTA DE ADMIN CARE DEJA FUNCȚIONEAZĂ PENTRU PRODUSE/COMENZI
-      const res = await apiFetch("/admin/insta-pick", { 
+      const res = await apiFetch("/admin/insta-pick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postUrl }),
@@ -35,37 +34,105 @@ export default function AdminGiveaway() {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-12 px-4 bg-[#0b1020] text-white flex flex-col items-center">
-      <div className="max-w-2xl w-full">
-        <h1 className="text-4xl font-black italic text-center mb-8 uppercase tracking-tighter">
-          Instagram <span className="text-purple-500">Giveaway</span>
-        </h1>
+    <div className="relative isolate min-h-screen pt-32 pb-24 px-4 overflow-hidden bg-[#050810] text-white">
+      {/* BACKGROUND EFFECTS (BLOBS) */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] -z-10 animate-pulse" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-600/10 rounded-full blur-[120px] -z-10" />
 
-        <div className="p-8 rounded-[30px] bg-white/5 border border-white/10 backdrop-blur-xl mb-8">
-          <form onSubmit={handlePickWinner} className="flex flex-col gap-4">
-            <input
-              type="url"
-              value={postUrl}
-              onChange={(e) => setPostUrl(e.target.value)}
-              placeholder="Lipește link-ul postării aici..."
-              className="w-full px-4 py-4 rounded-xl bg-black/30 border border-white/10 outline-none focus:border-purple-500 transition-all"
-              required
-            />
-            {error && <p className="text-red-400 text-sm font-bold">{error}</p>}
-            <button
-              disabled={loading}
-              className="w-full py-4 rounded-xl font-black bg-gradient-to-r from-purple-500 to-pink-600 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
-            >
-              {loading ? "SE EXTRAGE..." : "🎲 ALEGE CÂȘTIGĂTOR"}
-            </button>
-          </form>
+      <div className="max-w-3xl mx-auto relative z-10">
+        {/* HEADER STIL KARIX */}
+        <header className="mb-16 text-center">
+          <h1 className="text-6xl font-black text-white tracking-tighter mb-4 italic uppercase">
+            Instagram <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500">Giveaway</span>
+          </h1>
+          <div className="h-1.5 w-24 bg-gradient-to-r from-indigo-500 to-pink-500 mx-auto rounded-full opacity-40 mb-6" />
+          <p className="text-gray-500 uppercase tracking-[0.4em] text-[10px] font-bold">
+            Panou Administrativ Extrageri © 2026
+          </p>
+        </header>
+
+        {/* FORM CARD */}
+        <div className="group relative p-1 rounded-[32px] bg-gradient-to-b from-white/10 to-transparent mb-12">
+          <div className="p-8 rounded-[31px] bg-[#0b1020]/90 backdrop-blur-3xl">
+            <form onSubmit={handlePickWinner} className="space-y-6">
+              <div className="relative">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 ml-2 mb-2 block">
+                  URL Postare Instagram
+                </label>
+                <input
+                  type="url"
+                  value={postUrl}
+                  onChange={(e) => setPostUrl(e.target.value)}
+                  placeholder="https://www.instagram.com/p/..."
+                  className="w-full px-6 py-5 rounded-2xl bg-black/40 border border-white/5 outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-gray-200"
+                  required
+                />
+              </div>
+
+              {error && (
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold flex items-center gap-3 italic">
+                  <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
+                  {error}
+                </div>
+              )}
+
+              <button
+                disabled={loading}
+                className="relative w-full py-5 rounded-2xl font-black text-lg uppercase italic tracking-tight overflow-hidden group/btn transition-all active:scale-95 disabled:opacity-50"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-pink-600 group-hover/btn:scale-110 transition-transform duration-500" />
+                <span className="relative z-10 flex items-center justify-center gap-3">
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      SE EXTRAGE DIN INSTAGRAM...
+                    </>
+                  ) : (
+                    <>🎲 ALEGE CÂȘTIGĂTORUL</>
+                  )}
+                </span>
+              </button>
+            </form>
+          </div>
         </div>
 
+        {/* WINNER RESULT */}
         {winner && (
-          <div className="p-8 rounded-[30px] bg-emerald-500/10 border border-emerald-500/30 text-center animate-bounce-short">
-            <p className="text-emerald-400 font-bold uppercase text-xs mb-4">Câștigător din {totalComments} comentarii</p>
-            <h2 className="text-3xl font-black mb-2 text-white">@{winner.username}</h2>
-            <div className="p-4 bg-black/20 rounded-xl italic text-gray-300">"{winner.text}"</div>
+          <div className="relative group animate-in fade-in zoom-in duration-700">
+            {/* Glow effect in fundalul cardului de castigator */}
+            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-[35px] blur opacity-20 group-hover:opacity-40 transition duration-1000" />
+            
+            <div className="relative p-10 rounded-[32px] bg-[#050810] border border-emerald-500/20 text-center overflow-hidden">
+              {/* Decoration line */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent" />
+              
+              <p className="text-emerald-400 font-black uppercase text-[10px] tracking-[0.3em] mb-6">
+                ✨ Extragere finalizată din {totalComments} comentarii
+              </p>
+              
+              <div className="relative inline-block mb-6">
+                <div className="absolute -inset-4 bg-emerald-500/20 blur-2xl rounded-full" />
+                <h2 className="relative text-5xl sm:text-6xl font-black text-white italic tracking-tighter uppercase">
+                  @{winner.username}
+                </h2>
+              </div>
+
+              <div className="max-w-md mx-auto p-6 rounded-2xl bg-white/[0.02] border border-white/5 relative">
+                <span className="absolute -top-3 left-6 px-3 py-1 bg-emerald-500 text-[8px] font-black rounded-full text-black uppercase">
+                  Comentariu
+                </span>
+                <p className="text-gray-300 italic text-lg leading-relaxed font-medium">
+                  "{winner.text}"
+                </p>
+              </div>
+
+              <button 
+                onClick={() => window.open(postUrl, '_blank')}
+                className="mt-8 text-[10px] font-bold text-gray-500 hover:text-emerald-400 transition-colors uppercase tracking-widest"
+              >
+                Vezi postarea originală →
+              </button>
+            </div>
           </div>
         )}
       </div>
