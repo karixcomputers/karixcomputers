@@ -60,17 +60,6 @@ function shortcodeToId(shortcode) {
   return id.toString();
 }
 
-// Funcție de conversie Shortcode -> ID (obligatoriu pentru acest API)
-function shortcodeToId(shortcode) {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  let id = BigInt(0);
-  for (let i = 0; i < shortcode.length; i++) {
-    const char = shortcode[i];
-    id = (id * BigInt(64)) + BigInt(alphabet.indexOf(char));
-  }
-  return id.toString();
-}
-
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
@@ -153,4 +142,5 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
     res.status(500).json({ error: "Eroare la procesarea paginilor." });
   }
 });
+
 export default router;
