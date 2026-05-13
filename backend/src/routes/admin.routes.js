@@ -51,56 +51,56 @@ router.get("/orders", requireAuth, requireAdmin, async (req, res, next) => {
 
 router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
   console.log("-----------------------------------------");
-  console.log("🚀 [GIVEAWAY 2025] Cerere nouă primită...");
+  console.log("🚀 [FAST-SCRAPER] Începere extragere...");
 
   try {
     const { postUrl } = req.body;
     if (!postUrl) return res.status(400).json({ error: "Lipsește linkul." });
 
-    // Extragem codul postării (shortcode)
+    // Extragem shortcode-ul (ex: DXzkhnKiDCg)
     const match = postUrl.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
     if (!match) return res.status(400).json({ error: "Link Instagram invalid!" });
     const shortcode = match[1];
 
-    console.log("🔍 [DEBUG] Shortcode extras:", shortcode);
+    console.log("🔍 [DEBUG] Folosim codul:", shortcode);
 
-    // Apelăm noul endpoint: /postcomments/ cu parametrul code_or_url
-    const response = await fetch(`https://instagram-scraper-20251.p.rapidapi.com/postcomments/?code_or_url=${shortcode}`, {
+    // Apelăm noul API: instagram-api-fast-reliable-data-scraper
+    // Încercăm să îi dăm shortcode-ul direct la parametrul ?id=
+    const response = await fetch(`https://instagram-api-fast-reliable-data-scraper.p.rapidapi.com/comments?id=${shortcode}`, {
       method: 'GET',
       headers: {
-        'x-rapidapi-host': 'instagram-scraper-20251.p.rapidapi.com',
+        'x-rapidapi-host': 'instagram-api-fast-reliable-data-scraper.p.rapidapi.com',
         'x-rapidapi-key': 'f720f3bf76msh941c7cc2af72c4cp184493jsnba560431b076'
       }
     });
 
     const data = await response.json();
+    
+    // Structura tipică pentru acest API este data.items sau data.comments
+    const items = data?.data?.items || data?.items || data?.comments || [];
 
-    // Acest API returnează de obicei comentariile în data.comments sau direct în rădăcina obiectului
-    // Verificăm mai multe variante ca să fim siguri
-    const items = data?.data?.comments || data?.comments || data?.items || [];
+    console.log(`📦 [DEBUG] Am găsit ${items.length} comentarii pe prima pagină.`);
 
-    if (!Array.isArray(items) || items.length === 0) {
-      console.log("⚠️ [DEBUG] Nu s-au găsit comentarii. Răspuns API:", JSON.stringify(data).substring(0, 300));
-      return res.status(400).json({ error: "Nu s-au putut prelua comentariile. Asigură-te că postarea este publică." });
+    if (items.length === 0) {
+      console.log("⚠️ [DEBUG] Răspuns API gol:", JSON.stringify(data).substring(0, 300));
+      return res.status(400).json({ error: "Nu s-au găsit comentarii. Verifică dacă postarea e publică." });
     }
 
-    // Alegem un câștigător aleatoriu
     const winner = items[Math.floor(Math.random() * items.length)];
 
     res.json({
       success: true,
       winner: {
-        // Adaptăm proprietățile în funcție de ce trimite acest API (user/owner și text/comment_text)
-        username: winner.user?.username || winner.owner?.username || "Anonim",
+        username: winner.user?.username || winner.owner?.username || winner.author?.username || "Anonim",
         text: winner.text || winner.comment_text || "",
-        profilePic: winner.user?.profile_pic_url || winner.owner?.profile_pic_url || ""
+        profilePic: winner.user?.profile_pic_url || winner.author?.profile_pic_url || ""
       },
       totalComments: items.length
     });
 
   } catch (error) {
     console.error("🔥 [API ERROR]:", error.message);
-    res.status(500).json({ error: "Eroare la noul API 2025." });
+    res.status(500).json({ error: "Eroare la noul API Fast-Scraper." });
   }
 });
 
