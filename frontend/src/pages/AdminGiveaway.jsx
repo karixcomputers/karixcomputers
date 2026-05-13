@@ -34,13 +34,15 @@ export default function AdminGiveaway() {
   };
 
   return (
-    <div className="relative isolate min-h-screen pt-32 pb-24 px-4 overflow-hidden bg-[#050810] text-white">
-      {/* BACKGROUND EFFECTS (BLOBS) */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] -z-10 animate-pulse" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-600/10 rounded-full blur-[120px] -z-10" />
+    // FIX 1: FUNDAL TRANSPARENT PE CONTAINERUL PRINCIPAL
+    <div className="relative min-h-screen pt-32 pb-24 px-4 overflow-hidden bg-transparent text-white">
+      
+      {/* BLOBS DE LUMINĂ INTERNI (PĂSTRAȚI PENTRU ADÂNCIME) */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/15 rounded-full blur-[140px] -z-10 animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-600/10 rounded-full blur-[140px] -z-10" />
 
       <div className="max-w-3xl mx-auto relative z-10">
-        {/* HEADER STIL KARIX */}
+        {/* HEADER KARIX */}
         <header className="mb-16 text-center">
           <h1 className="text-6xl font-black text-white tracking-tighter mb-4 italic uppercase">
             Instagram <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500">Giveaway</span>
@@ -51,9 +53,10 @@ export default function AdminGiveaway() {
           </p>
         </header>
 
-        {/* FORM CARD */}
-        <div className="group relative p-1 rounded-[32px] bg-gradient-to-b from-white/10 to-transparent mb-12">
-          <div className="p-8 rounded-[31px] bg-[#0b1020]/90 backdrop-blur-3xl">
+        {/* FORM CARD - GLASSMORPHISM (TRANSPARENT + BLUR) */}
+        <div className="relative p-1 rounded-[32px] bg-gradient-to-b from-white/10 to-transparent mb-12">
+          {/* FIX 2: SCHIMBAT CULOAREA DE FUNDAL ÎN bg-white/[0.02] PENTRU TRANSPARENȚĂ */}
+          <div className="p-8 rounded-[31px] bg-white/[0.02] backdrop-blur-xl border border-white/5">
             <form onSubmit={handlePickWinner} className="space-y-6">
               <div className="relative">
                 <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 ml-2 mb-2 block">
@@ -64,13 +67,14 @@ export default function AdminGiveaway() {
                   value={postUrl}
                   onChange={(e) => setPostUrl(e.target.value)}
                   placeholder="https://www.instagram.com/p/..."
-                  className="w-full px-6 py-5 rounded-2xl bg-black/40 border border-white/5 outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-gray-200"
+                  // Fundal input și mai transparent
+                  className="w-full px-6 py-5 rounded-2xl bg-black/30 backdrop-blur-md border border-white/5 outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-gray-200"
                   required
                 />
               </div>
 
               {error && (
-                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold flex items-center gap-3 italic">
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold flex items-center gap-3 italic backdrop-blur-md">
                   <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
                   {error}
                 </div>
@@ -96,28 +100,28 @@ export default function AdminGiveaway() {
           </div>
         </div>
 
-        {/* WINNER RESULT */}
+        {/* WINNER RESULT - GLASSMORPHISM EMERALD */}
         {winner && (
           <div className="relative group animate-in fade-in zoom-in duration-700">
-            {/* Glow effect in fundalul cardului de castigator */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-[35px] blur opacity-20 group-hover:opacity-40 transition duration-1000" />
+            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-[35px] blur-xl opacity-20" />
             
-            <div className="relative p-10 rounded-[32px] bg-[#050810] border border-emerald-500/20 text-center overflow-hidden">
-              {/* Decoration line */}
+            {/* FIX 3: SCHIMBAT bg-[#050810] ÎN bg-emerald-500/[0.03] PENTRU TRANSPARENȚĂ TONALĂ + BLUR */}
+            <div className="relative p-10 rounded-[32px] bg-emerald-500/[0.03] backdrop-blur-2xl border border-emerald-500/20 text-center overflow-hidden">
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent" />
               
-              <p className="text-emerald-400 font-black uppercase text-[10px] tracking-[0.3em] mb-6">
+              <p className="text-emerald-400 font-black uppercase text-[10px] tracking-[0.3em] mb-6 relative z-10">
                 ✨ Extragere finalizată din {totalComments} comentarii
               </p>
               
-              <div className="relative inline-block mb-6">
+              <div className="relative inline-block mb-6 z-10">
                 <div className="absolute -inset-4 bg-emerald-500/20 blur-2xl rounded-full" />
                 <h2 className="relative text-5xl sm:text-6xl font-black text-white italic tracking-tighter uppercase">
                   @{winner.username}
                 </h2>
               </div>
 
-              <div className="max-w-md mx-auto p-6 rounded-2xl bg-white/[0.02] border border-white/5 relative">
+              {/* Caseta comentariu transparentă */}
+              <div className="max-w-md mx-auto p-6 rounded-2xl bg-black/20 border border-white/5 relative z-10 backdrop-blur-sm">
                 <span className="absolute -top-3 left-6 px-3 py-1 bg-emerald-500 text-[8px] font-black rounded-full text-black uppercase">
                   Comentariu
                 </span>
@@ -128,7 +132,7 @@ export default function AdminGiveaway() {
 
               <button 
                 onClick={() => window.open(postUrl, '_blank')}
-                className="mt-8 text-[10px] font-bold text-gray-500 hover:text-emerald-400 transition-colors uppercase tracking-widest"
+                className="mt-8 text-[10px] font-bold text-gray-500 hover:text-emerald-400 transition-colors uppercase tracking-widest relative z-10"
               >
                 Vezi postarea originală →
               </button>
