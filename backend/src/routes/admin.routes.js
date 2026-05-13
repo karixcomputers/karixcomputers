@@ -6,42 +6,61 @@ import { requireAdmin } from "../middleware/admin.js";
 const prisma = new PrismaClient();
 const router = express.Router();
 
-// --- 1. FUNCȚII HELPER ---
 function shortcodeToId(shortcode) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
   let id = BigInt(0);
   for (let i = 0; i < shortcode.length; i++) {
-    const char = shortcode[i];
-    id = (id * BigInt(64)) + BigInt(alphabet.indexOf(char));
+    id = (id * BigInt(64)) + BigInt(alphabet.indexOf(shortcode[i]));
   }
   return id.toString();
 }
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// Rute Admin Standard
+router.post("/products", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const data = req.body;
+    const p = await prisma.product.create({
+      data: {
+        name: data.name, priceCents: Number(data.priceCents), images: data.images || [],
+        description: data.description || "", cpuBrand: data.cpuBrand || "Intel",
+        gpuBrand: data.gpuBrand || "NVIDIA", ramGb: Number(data.ramGb || 16),
+        storageGb: Number(data.storageGb || 1000), stock: Number(data.stock || 0), tags: data.tags || [],
+      },
+    });
+    res.json(p);
+  } catch (e) { next(e); }
+});
+router.put("/products/:id", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const p = await prisma.product.update({ where: { id: req.params.id }, data: req.body });
+    res.json(p);
+  } catch (e) { next(e); }
+});
+router.get("/orders", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const orders = await prisma.order.findMany({ orderBy: { createdAt: "desc" }, include: { items: true, user: true }, take: 200 });
+    res.json(orders);
+  } catch (e) { next(e); }
+});
 
-// --- 2. RUTE ADMIN EXISTENTE ---
+// --- RUTA GIVEAWAY REPARATĂ ---
 router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
-  console.log("-----------------------------------------");
-  console.log("🚀 [GIVEAWAY] Pornire extragere masivă (10 pagini)...");
-
+  console.log("🚀 [GIVEAWAY] Start...");
   try {
     const { postUrl } = req.body;
     const match = postUrl.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
     if (!match) return res.status(400).json({ error: "Link invalid!" });
     
-    const shortcode = match[1];
-    const numericId = shortcodeToId(shortcode);
-    
+    const numericId = shortcodeToId(match[1]);
     let allComments = [];
     let cursor = "";
-    let previousCursors = new Set(); // Salvăm cursorii folosiți ca să evităm buclele
+    let usedCursors = new Set();
 
-    for (let i = 0; i < 10; i++) {
-      // CURSOR URL ENCODING - Pasul critic!
-      const encodedCursor = encodeURIComponent(cursor);
-      console.log(`\n📄 [PAGINA ${i + 1}] Se caută...`);
+    // Luăm maxim 8 pagini (~120 comentarii) să nu dăm timeout la browser
+    for (let i = 0; i < 8; i++) {
+      console.log(`📄 Pagina ${i + 1}...`);
       
-      const url = `https://instagram-api-fast-reliable-data-scraper.p.rapidapi.com/comments?id=${numericId}${cursor ? `&cursor=${encodedCursor}` : ""}`;
+      const url = `https://instagram-api-fast-reliable-data-scraper.p.rapidapi.com/comments?id=${numericId}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -52,40 +71,35 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
       });
 
       const data = await response.json();
-      const items = data?.comments || data?.data || data?.items || [];
       
-      if (items.length === 0) {
-        console.log("🛑 API-ul a returnat o listă goală.");
-        break;
-      }
+      // Extragem comentariile - verificăm toate locurile unde pot fi
+      const rawItems = data?.comments || data?.data || data?.items || [];
+      const items = Array.isArray(rawItems) ? rawItems : (rawItems.items || []);
 
-      // Adăugăm doar comentariile noi (evităm duplicatele după ID)
-      items.forEach(newItem => {
-        const isDuplicate = allComments.some(existing => (existing.id === newItem.id || existing.pk === newItem.pk));
-        if (!isDuplicate) allComments.push(newItem);
-      });
+      if (items.length === 0) break;
 
-      console.log(`✅ Comentarii unice adunate: ${allComments.length}`);
+      // Adăugăm fără filtrare agresivă de ID-uri (o facem la final)
+      allComments = [...allComments, ...items];
+      console.log(`✅ Adunate: ${allComments.length}`);
 
-      // Verificăm cursorul nou
+      // Cursorul nou
       const nextCursor = data?.next_min_id || data?.next_max_id || data?.cursor || "";
       
-      if (!nextCursor || previousCursors.has(nextCursor)) {
-        console.log("🏁 Gata! Cursorul se repetă sau lipsește.");
+      if (!nextCursor || usedCursors.has(nextCursor)) {
+        console.log("🏁 Stop: Nu mai sunt pagini noi.");
         break;
       }
-
-      previousCursors.add(nextCursor);
+      
+      usedCursors.add(nextCursor);
       cursor = nextCursor;
-
-      await sleep(700); // Pauză puțin mai mare pentru siguranță
     }
 
-    if (allComments.length === 0) {
-      return res.status(400).json({ error: "Nu s-au găsit comentarii." });
-    }
+    if (allComments.length === 0) return res.status(400).json({ error: "Nu am găsit comentarii." });
 
-    const winner = allComments[Math.floor(Math.random() * allComments.length)];
+    // Curățăm duplicatele la final (după ID sau text)
+    const uniqueComments = Array.from(new Map(allComments.map(c => [c.id || c.pk || c.text, c])).values());
+
+    const winner = uniqueComments[Math.floor(Math.random() * uniqueComments.length)];
 
     res.json({
       success: true,
@@ -94,12 +108,13 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
         text: winner.text || winner.comment_text || "",
         profilePic: winner.user?.profile_pic_url || winner.author?.profile_pic_url || ""
       },
-      totalComments: allComments.length
+      totalComments: uniqueComments.length
     });
 
   } catch (error) {
     console.error("🔥 Eroare:", error.message);
-    res.status(500).json({ error: "Eroare la procesarea paginilor." });
+    res.status(500).json({ error: "Eroare server. Încearcă din nou." });
   }
 });
+
 export default router;
