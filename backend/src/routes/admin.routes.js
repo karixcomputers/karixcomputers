@@ -60,12 +60,22 @@ function shortcodeToId(shortcode) {
   return id.toString();
 }
 
-// Funcție pentru a aștepta puțin între cereri
+// Funcție de conversie Shortcode -> ID (obligatoriu pentru acest API)
+function shortcodeToId(shortcode) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  let id = BigInt(0);
+  for (let i = 0; i < shortcode.length; i++) {
+    const char = shortcode[i];
+    id = (id * BigInt(64)) + BigInt(alphabet.indexOf(char));
+  }
+  return id.toString();
+}
+
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
   console.log("-----------------------------------------");
-  console.log("🚀 [GIVEAWAY 150] Pornire extragere...");
+  console.log("🚀 [GIVEAWAY 150] Pornire extragere masivă...");
 
   try {
     const { postUrl } = req.body;
@@ -78,9 +88,8 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
     let allComments = [];
     let cursor = "";
 
-    // Bucla pentru 10 pagini (aprox. 150 comentarii)
     for (let i = 0; i < 10; i++) {
-      console.log(`📄 [PAGINA ${i + 1}] Cerem date...`);
+      console.log(`📄 [PAGINA ${i + 1}] Se caută comentarii...`);
       
       const url = `https://instagram-api-fast-reliable-data-scraper.p.rapidapi.com/comments?id=${numericId}${cursor ? `&cursor=${cursor}` : ""}`;
       
@@ -94,36 +103,37 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
 
       const data = await response.json();
 
-      // Căutăm lista de comentarii în orice format posibil (Array direct, .data, .items sau .comments)
-      let items = [];
-      if (Array.isArray(data)) {
-        items = data;
-      } else {
-        items = data?.data || data?.items || data?.comments || [];
-      }
-
+      // Extragere comentarii (foarte flexibilă)
+      const items = data?.data || data?.items || data?.comments || (Array.isArray(data) ? data : []);
+      
       if (items.length === 0) {
-        console.log("🛑 Nu s-au găsit comentarii pe această pagină. Oprim bucla.");
+        console.log("🛑 Nu s-au găsit comentarii noi. Oprim.");
         break;
       }
 
       allComments = [...allComments, ...items];
-      console.log(`✅ Am strâns ${allComments.length} comentarii până acum.`);
+      console.log(`✅ Am strâns ${allComments.length} comentarii.`);
 
-      // Căutăm cursorul pentru pagina următoare
-      cursor = data?.next_cursor || data?.cursor || data?.pagination?.next_cursor || "";
+      // DETECTARE CURSOR (Căutăm în toate locurile posibile)
+      cursor = data?.next_cursor || 
+               data?.cursor || 
+               data?.data?.next_cursor || 
+               data?.pagination?.next_cursor || 
+               data?.next_max_id || 
+               "";
       
       if (!cursor) {
-        console.log("🏁 Gata! Nu mai există alte pagini.");
+        console.log("🏁 API-ul nu a mai trimis un cursor. Final de listă.");
+        // Debug: vedem ce ne-a trimis API-ul de fapt ca să înțelegem structura
+        console.log("Keys primite de la API:", Object.keys(data));
         break;
       }
 
-      // Așteptăm 500ms ca să nu fim blocați
-      await sleep(500);
+      await sleep(600); // Pauză puțin mai mare să fim siguri
     }
 
     if (allComments.length === 0) {
-      return res.status(400).json({ error: "Nu s-au găsit comentarii. Postarea e privată?" });
+      return res.status(400).json({ error: "Zero comentarii găsite." });
     }
 
     const winner = allComments[Math.floor(Math.random() * allComments.length)];
@@ -139,9 +149,8 @@ router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("🔥 [FATAL]:", error.message);
-    res.status(500).json({ error: "Eroare la procesarea masivă a paginilor." });
+    console.error("🔥 Eroare:", error.message);
+    res.status(500).json({ error: "Eroare la procesarea paginilor." });
   }
 });
-
 export default router;
