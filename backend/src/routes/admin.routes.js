@@ -6,16 +6,10 @@ import { requireAdmin } from "../middleware/admin.js";
 const prisma = new PrismaClient();
 const router = express.Router();
 
-function shortcodeToId(shortcode) {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  let id = BigInt(0);
-  for (let i = 0; i < shortcode.length; i++) {
-    id = (id * BigInt(64)) + BigInt(alphabet.indexOf(shortcode[i]));
-  }
-  return id.toString();
-}
+// HELPER: Pauză între cereri să nu ne blocheze
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Rute Admin Standard
+// --- RUTE ADMIN EXISTENTE ---
 router.post("/products", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const data = req.body;
@@ -30,12 +24,14 @@ router.post("/products", requireAuth, requireAdmin, async (req, res, next) => {
     res.json(p);
   } catch (e) { next(e); }
 });
+
 router.put("/products/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const p = await prisma.product.update({ where: { id: req.params.id }, data: req.body });
     res.json(p);
   } catch (e) { next(e); }
 });
+
 router.get("/orders", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const orders = await prisma.order.findMany({ orderBy: { createdAt: "desc" }, include: { items: true, user: true }, take: 200 });
@@ -43,77 +39,80 @@ router.get("/orders", requireAuth, requireAdmin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// --- RUTA GIVEAWAY REPARATĂ ---
+// --- RUTA GIVEAWAY (API STABLE - 4 PAGINI) ---
 router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
-  console.log("🚀 [GIVEAWAY] Start...");
+  console.log("-----------------------------------------");
+  console.log("🚀 [GIVEAWAY STABLE] Extragere ~200 comentarii...");
+
   try {
     const { postUrl } = req.body;
     const match = postUrl.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
     if (!match) return res.status(400).json({ error: "Link invalid!" });
     
-    const numericId = shortcodeToId(match[1]);
+    const mediaCode = match[1];
     let allComments = [];
-    let cursor = "";
-    let usedCursors = new Set();
+    let nextCursor = "";
 
-    // Luăm maxim 8 pagini (~120 comentarii) să nu dăm timeout la browser
-    for (let i = 0; i < 8; i++) {
-      console.log(`📄 Pagina ${i + 1}...`);
+    // Loop de 4 ori (4 pagini x ~50 comentarii = ~200)
+    for (let i = 0; i < 4; i++) {
+      console.log(`📄 Pagina ${i + 1} (Cursor: ${nextCursor ? 'DA' : 'START'})`);
       
-      const url = `https://instagram-api-fast-reliable-data-scraper.p.rapidapi.com/comments?id=${numericId}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+      const url = `https://instagram-scraper-stable-api.p.rapidapi.com/get_post_comments.php?media_code=${mediaCode}&sort_order=popular${nextCursor ? `&next_cursor=${encodeURIComponent(nextCursor)}` : ""}`;
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'x-rapidapi-host': 'instagram-api-fast-reliable-data-scraper.p.rapidapi.com',
+          'x-rapidapi-host': 'instagram-scraper-stable-api.p.rapidapi.com',
           'x-rapidapi-key': 'f720f3bf76msh941c7cc2af72c4cp184493jsnba560431b076'
         }
       });
 
       const data = await response.json();
       
-      // Extragem comentariile - verificăm toate locurile unde pot fi
-      const rawItems = data?.comments || data?.data || data?.items || [];
-      const items = Array.isArray(rawItems) ? rawItems : (rawItems.items || []);
-
-      if (items.length === 0) break;
-
-      // Adăugăm fără filtrare agresivă de ID-uri (o facem la final)
-      allComments = [...allComments, ...items];
-      console.log(`✅ Adunate: ${allComments.length}`);
-
-      // Cursorul nou
-      const nextCursor = data?.next_min_id || data?.next_max_id || data?.cursor || "";
+      // Extragem comentariile (API-ul ăsta le pune în data.items)
+      const items = data?.data?.items || data?.items || data?.comments || [];
       
-      if (!nextCursor || usedCursors.has(nextCursor)) {
-        console.log("🏁 Stop: Nu mai sunt pagini noi.");
+      if (items.length === 0) {
+        console.log("🛑 Nu mai sunt comentarii de tras.");
         break;
       }
+
+      allComments = [...allComments, ...items];
+      console.log(`✅ Adunate: ${allComments.length} comentarii.`);
+
+      // Luăm cursorul pentru pagina următoare
+      nextCursor = data?.data?.next_cursor || data?.next_cursor || "";
       
-      usedCursors.add(nextCursor);
-      cursor = nextCursor;
+      if (!nextCursor) {
+        console.log("🏁 Final de listă (nu mai există cursor).");
+        break;
+      }
+
+      await sleep(800); // Pauză să fim „invizibili” pentru Instagram
     }
 
-    if (allComments.length === 0) return res.status(400).json({ error: "Nu am găsit comentarii." });
+    if (allComments.length === 0) {
+      return res.status(400).json({ error: "Zero comentarii găsite. E publică postarea?" });
+    }
 
-    // Curățăm duplicatele la final (după ID sau text)
-    const uniqueComments = Array.from(new Map(allComments.map(c => [c.id || c.pk || c.text, c])).values());
+    // Curățăm duplicatele la final (dacă există)
+    const uniqueList = Array.from(new Map(allComments.map(c => [c.id || c.pk || c.text, c])).values());
 
-    const winner = uniqueComments[Math.floor(Math.random() * uniqueComments.length)];
+    const winner = uniqueList[Math.floor(Math.random() * uniqueList.length)];
 
     res.json({
       success: true,
       winner: {
-        username: winner.user?.username || winner.author?.username || "Anonim",
-        text: winner.text || winner.comment_text || "",
-        profilePic: winner.user?.profile_pic_url || winner.author?.profile_pic_url || ""
+        username: winner.user?.username || "Anonim",
+        text: winner.text || "",
+        profilePic: winner.user?.profile_pic_url || ""
       },
-      totalComments: uniqueComments.length
+      totalComments: uniqueList.length
     });
 
   } catch (error) {
     console.error("🔥 Eroare:", error.message);
-    res.status(500).json({ error: "Eroare server. Încearcă din nou." });
+    res.status(500).json({ error: "Eroare la extragere." });
   }
 });
 
