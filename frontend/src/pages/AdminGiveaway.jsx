@@ -48,9 +48,6 @@ export default function AdminGiveaway() {
             Instagram <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500">Giveaway</span>
           </h1>
           <div className="h-1.5 w-24 bg-gradient-to-r from-indigo-500 to-pink-500 mx-auto rounded-full opacity-40 mb-6" />
-          <p className="text-gray-500 uppercase tracking-[0.4em] text-[10px] font-bold">
-            Panou Administrativ Extrageri © 2026
-          </p>
         </header>
 
         {/* FORM CARD - GLASSMORPHISM (TRANSPARENT + BLUR) */}
@@ -60,13 +57,12 @@ export default function AdminGiveaway() {
             <form onSubmit={handlePickWinner} className="space-y-6">
               <div className="relative">
                 <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 ml-2 mb-2 block">
-                  URL Postare Instagram
+                  Link Instagram
                 </label>
                 <input
                   type="url"
                   value={postUrl}
                   onChange={(e) => setPostUrl(e.target.value)}
-                  placeholder="https://www.instagram.com/p/..."
                   // Fundal input și mai transparent
                   className="w-full px-6 py-5 rounded-2xl bg-black/30 backdrop-blur-md border border-white/5 outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-gray-200"
                   required
