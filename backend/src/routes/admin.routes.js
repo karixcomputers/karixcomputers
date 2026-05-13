@@ -50,61 +50,57 @@ router.get("/orders", requireAuth, requireAdmin, async (req, res, next) => {
 // --- RUTA GIVEAWAY FINALĂ ---
 
 router.post("/insta-pick", requireAuth, requireAdmin, async (req, res) => {
-  // Verificăm în pm2 logs dacă ajunge cererea
   console.log("-----------------------------------------");
-  console.log("🚀 [GIVEAWAY] Începere extragere pentru URL:", req.body.postUrl);
+  console.log("🚀 [GIVEAWAY 2025] Cerere nouă primită...");
 
   try {
     const { postUrl } = req.body;
-    if (!postUrl) return res.status(400).json({ error: "Te rog introdu un link." });
+    if (!postUrl) return res.status(400).json({ error: "Lipsește linkul." });
 
-    // Extragere media_code din link
+    // Extragem codul postării (shortcode)
     const match = postUrl.match(/\/(?:p|reel|reels)\/([a-zA-Z0-9_-]+)/);
-    if (!match) {
-      console.log("❌ [GIVEAWAY] Link invalid:", postUrl);
-      return res.status(400).json({ error: "Link Instagram invalid!" });
-    }
-    
-    const mediaCode = match[1];
-    console.log("🔍 [GIVEAWAY] Media Code extras:", mediaCode);
+    if (!match) return res.status(400).json({ error: "Link Instagram invalid!" });
+    const shortcode = match[1];
 
-    // Apel API
-    const response = await fetch(`https://instagram-scraper-stable-api.p.rapidapi.com/get_post_comments.php?media_code=${mediaCode}&sort_order=popular`, {
+    console.log("🔍 [DEBUG] Shortcode extras:", shortcode);
+
+    // Apelăm noul endpoint: /postcomments/ cu parametrul code_or_url
+    const response = await fetch(`https://instagram-scraper-20251.p.rapidapi.com/postcomments/?code_or_url=${shortcode}`, {
       method: 'GET',
       headers: {
-        'x-rapidapi-host': 'instagram-scraper-stable-api.p.rapidapi.com',
+        'x-rapidapi-host': 'instagram-scraper-20251.p.rapidapi.com',
         'x-rapidapi-key': 'f720f3bf76msh941c7cc2af72c4cp184493jsnba560431b076'
       }
     });
 
     const data = await response.json();
 
-    // Verificăm structura datelor primite (API-ul poate varia)
-    const items = data?.data?.items || data?.comments || data?.data || [];
+    // Acest API returnează de obicei comentariile în data.comments sau direct în rădăcina obiectului
+    // Verificăm mai multe variante ca să fim siguri
+    const items = data?.data?.comments || data?.comments || data?.items || [];
 
     if (!Array.isArray(items) || items.length === 0) {
-      console.log("⚠️ [GIVEAWAY] Nu s-au găsit comentarii. Răspuns API:", JSON.stringify(data).substring(0, 200));
-      // Folosim status 400 (Bad Request) în loc de 404 ca să nu inducem browserul în eroare
-      return res.status(400).json({ error: "Nu s-au găsit comentarii la această postare. Verifică dacă este publică." });
+      console.log("⚠️ [DEBUG] Nu s-au găsit comentarii. Răspuns API:", JSON.stringify(data).substring(0, 300));
+      return res.status(400).json({ error: "Nu s-au putut prelua comentariile. Asigură-te că postarea este publică." });
     }
 
-    // Extragere câștigător
+    // Alegem un câștigător aleatoriu
     const winner = items[Math.floor(Math.random() * items.length)];
-    console.log("✅ [GIVEAWAY] Câștigător ales:", winner.user?.username);
 
     res.json({
       success: true,
       winner: {
-        username: winner.user?.username || "Utilizator",
-        text: winner.text || "",
-        profilePic: winner.user?.profile_pic_url || ""
+        // Adaptăm proprietățile în funcție de ce trimite acest API (user/owner și text/comment_text)
+        username: winner.user?.username || winner.owner?.username || "Anonim",
+        text: winner.text || winner.comment_text || "",
+        profilePic: winner.user?.profile_pic_url || winner.owner?.profile_pic_url || ""
       },
       totalComments: items.length
     });
 
   } catch (error) {
-    console.error("🔥 [GIVEAWAY ERROR]:", error.message);
-    res.status(500).json({ error: "Eroare la serverul de giveaway." });
+    console.error("🔥 [API ERROR]:", error.message);
+    res.status(500).json({ error: "Eroare la noul API 2025." });
   }
 });
 
