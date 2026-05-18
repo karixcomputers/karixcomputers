@@ -47,7 +47,7 @@ router.post("/validate", async (req, res) => {
       return res.status(400).json({ error: `Comanda minimă pentru acest cod este de ${minRon} RON.` });
     }
 
-    // Trimitem datele esențiale înapoi (incluzând id-ul dacă e nevoie mai departe)
+    // Trimitem datele esențiale înapoi
     res.json({
       id: coupon.id,
       code: coupon.code,
@@ -62,8 +62,7 @@ router.post("/validate", async (req, res) => {
 });
 
 /**
- * 2. GET: Toate cupoane (Admin)
- * Returnează automat și noul câmp totalDiscounted adăugat în schemă
+ * 2. GET: Toate cupoanele (Admin)
  */
 router.get("/", requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -77,12 +76,27 @@ router.get("/", requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
- * 3. POST: Creare cupon (Admin)
+ * 3. POST: Creare cupon (Admin) -> SUPORTĂ LEGARE PRIN EMAIL UTILIZATOR
  */
 router.post("/", requireAuth, requireAdmin, async (req, res) => {
-  const { code, discountType, discountValue, minOrderTotal, usageLimit, expiryDate } = req.body;
+  const { code, discountType, discountValue, minOrderTotal, usageLimit, expiryDate, userEmail } = req.body;
   
   try {
+    let linkedUserId = null;
+
+    // Dacă admin-ul a completat căsuța de email, căutăm user-ul în baza de date
+    if (userEmail && userEmail.trim() !== "") {
+      const targetUser = await prisma.user.findUnique({
+        where: { email: userEmail.trim().toLowerCase() }
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({ error: `Nu există niciun cont cu emailul: ${userEmail}` });
+      }
+
+      linkedUserId = targetUser.id;
+    }
+
     const newCoupon = await prisma.coupon.create({
       data: {
         code: code.toUpperCase().trim(),
@@ -91,12 +105,19 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
         minOrderTotal: minOrderTotal ? parseInt(minOrderTotal) : 0,
         usageLimit: usageLimit ? parseInt(usageLimit) : null,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
-        totalDiscounted: 0 // Se inițializează automat cu 0 la creare
+        totalDiscounted: 0,
+        earningsCents: 0,
+        userId: linkedUserId // Salvăm ID-ul utilizatorului (va fi null dacă nu s-a introdus email)
       }
     });
+
     res.status(201).json(newCoupon);
   } catch (e) {
-    res.status(400).json({ error: "Codul există deja sau datele introduse sunt invalide." });
+    console.error("CREATE COUPON ERROR:", e);
+    if (e.code === "P2002") {
+      return res.status(400).json({ error: "Acest cod de cupon există deja în baza de date." });
+    }
+    res.status(400).json({ error: "Datele introduse sunt invalide sau incomplete." });
   }
 });
 

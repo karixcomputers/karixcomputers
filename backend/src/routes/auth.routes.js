@@ -41,6 +41,7 @@ const getFullUser = async (userId) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
+      coupon: true,
       _count: {
         select: {
           orders: true,
@@ -53,12 +54,18 @@ const getFullUser = async (userId) => {
 
   if (!user) return null;
 
-  const { passwordHash, refreshTokenHash, verificationCode, ...userData } = user;
+  const { passwordHash, refreshTokenHash, verificationCode, affiliateCoupon,  ...userData } = user;
   return {
     ...userData,
     ordersCount: user._count.orders || 0,
     wishlistCount: user._count.wishlist || 0,
     ticketsCount: user._count.tickets || 0,
+    affiliate: affiliateCoupon ? {
+      code: affiliateCoupon.code,
+      timesUsed: affiliateCoupon.timesUsed,
+      earnings: affiliateCoupon.earningsCents / 100, // Convertim din cenți direct în RON pentru interfață
+      isActive: affiliateCoupon.isActive
+    } : null
   };
 };
 

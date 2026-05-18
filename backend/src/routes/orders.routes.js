@@ -741,7 +741,7 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// === FUNCȚIA DE PROCESARE A CUPONULUI ===
+// === FUNCȚIA DE PROCESARE A CUPONULUI & AFILIERE ===
 async function handleCouponDeliveryStats(orderId) {
   try {
     const order = await prisma.order.findUnique({
@@ -756,23 +756,35 @@ async function handleCouponDeliveryStats(orderId) {
     });
 
     if (coupon) {
+      // Calculăm subtotalul produselor (fără transport)
+      const subtotalItemsCents = order.items.reduce((acc, item) => {
+        return acc + ((item.priceCentsAtBuy || 0) * (item.qty || 1));
+      }, 0);
+
       let discountAmount = 0;
-
       if (coupon.discountType === "percentage") {
-        const subtotalItemsCents = order.items.reduce((acc, item) => {
-          return acc + ((item.priceCentsAtBuy || 0) * (item.qty || 1));
-        }, 0);
-
         discountAmount = Math.round((subtotalItemsCents * coupon.discountValue) / 100);
       } else if (coupon.discountType === "fixed") {
         discountAmount = coupon.discountValue; 
+      }
+
+      // 👉 NOU: CALCUL COMISION AFILIAT
+      // Dacă cuponul are un userId asociat, înseamnă că este un cod de afiliat
+      let affiliateEarningsCents = 0;
+      if (coupon.userId) {
+        const commissionPercentage = 5; // 🚀 Aici poți schimba procentul de câștig al afiliatului (ex: 5%)
+        affiliateEarningsCents = Math.round((subtotalItemsCents * commissionPercentage) / 100);
       }
 
       await prisma.coupon.update({
         where: { code: coupon.code },
         data: {
           timesUsed: { increment: 1 },
-          totalDiscounted: { increment: discountAmount }
+          totalDiscounted: { increment: discountAmount },
+          // 👉 Dacă este cod de afiliat, incrementăm câștigurile în baza de date
+          ...(coupon.userId && {
+            earningsCents: { increment: affiliateEarningsCents }
+          })
         }
       });
 
@@ -781,7 +793,10 @@ async function handleCouponDeliveryStats(orderId) {
         data: { couponProcessed: true }
       });
 
-      console.log(`[CUPON LIVRAT] S-au adăugat statisticile pentru codul ${coupon.code}.`);
+      console.log(
+        `[CUPON LIVRAT] S-au adăugat statisticile pentru codul ${coupon.code}.` +
+        `${coupon.userId ? ` Afiliatul a primit ${affiliateEarningsCents / 100} RON.` : ''}`
+      );
     }
   } catch (err) {
     console.error("⚠️ Eroare la procesarea cuponului la livrare:", err);

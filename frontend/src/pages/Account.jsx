@@ -32,6 +32,9 @@ export default function Account() {
     ticketsCount: user?.ticketsCount || 0
   });
 
+  // 👉 STATE NOU PENTRU DATELE DE AFILIAT
+  const [affiliateData, setAffiliateData] = useState(null);
+
   // State-uri pentru editarea numărului de telefon
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [newPhone, setNewPhone] = useState("");
@@ -51,6 +54,11 @@ export default function Account() {
             wishlistCount: data.user.wishlistCount || 0,
             ticketsCount: data.user.ticketsCount || 0
           });
+          
+          // 👉 Sincronizăm datele cuponului de afiliat dacă backend-ul le trimite în user.coupon
+          if (data.user.coupon) {
+            setAffiliateData(data.user.coupon);
+          }
         }
       }
     } catch (error) {
@@ -83,7 +91,6 @@ export default function Account() {
     setPhoneError("");
 
     try {
-      // NOTĂ: Dacă endpoint-ul tău din backend pentru update profil are altă denumire (ex: /auth/profile), modifică aici.
       const response = await apiFetch("/auth/update", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -92,7 +99,6 @@ export default function Account() {
 
       if (response.ok) {
         setIsEditingPhone(false);
-        // Reîncărcăm pagina pentru a asigura sincronizarea numărului de telefon în întreg site-ul (AuthContext)
         window.location.reload(); 
       } else {
         const data = await response.json();
@@ -107,14 +113,12 @@ export default function Account() {
 
   return (
     <>
-      {/* IMPLEMENTARE SEO DINAMIC */}
       <SEO 
         title={`Contul lui ${user?.name?.split(' ')[0] || "Pilot"}`}
         description="Gestionează-ți comenzile, garanțiile și tichetele de suport direct din panoul de control Karix Computers."
       />
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden">
-        {/* Efecte vizuale fundal */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-gradient-to-b from-indigo-500/10 to-transparent blur-[120px] pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-pink-500/5 blur-[120px] pointer-events-none" />
 
@@ -169,7 +173,6 @@ export default function Account() {
                     <p className="text-white font-bold text-lg border-b border-white/5 pb-2 truncate">{user?.email}</p>
                   </div>
                   
-                  {/* 👉 SECȚIUNE ACTUALIZATĂ PENTRU EDITAREA TELEFONULUI */}
                   <div className="group">
                     <div className="flex justify-between items-center mb-2">
                       <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-pink-400 transition-colors">Telefon</p>
@@ -233,7 +236,48 @@ export default function Account() {
                 </div>
               </div>
 
-              {/* Cards Statistici */}
+              {/* 👉 NOU: PANOU HUB AFILIERE (RANDARE CONDIȚIONATĂ) */}
+              {affiliateData && (
+                <div className="p-10 rounded-[40px] bg-gradient-to-br from-indigo-950/20 to-pink-950/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="absolute right-6 top-6 text-4xl opacity-10 select-none">💎</div>
+                  
+                  <h3 className="text-sm font-black text-pink-400 uppercase tracking-[0.3em] mb-8 flex items-center gap-3">
+                    <span className="h-1 w-8 bg-pink-500 rounded-full"></span>
+                    Program Afiliere Karix
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
+                      <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</p>
+                      <p className="text-xl font-black text-white tracking-wide bg-gradient-to-r from-indigo-400 to-pink-400 text-transparent bg-clip-text font-mono">
+                        {affiliateData.code}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
+                      <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări Cupon</p>
+                      <p className="text-xl font-black text-white">{affiliateData.timesUsed || 0} comenzi</p>
+                    </div>
+
+                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
+                      <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Sold Disponibil</p>
+                      <p className="text-xl font-black text-emerald-400">
+                        {((affiliateData.earningsCents || 0) / 100).toFixed(2)} RON
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-gray-400 flex items-start gap-3">
+                    <span className="text-base mt-0.5">ℹ️</span>
+                    <div>
+                      <p className="font-bold text-gray-300 mb-1">Cum îți retragi banii?</p>
+                      Pentru a solicita plata comisioanelor acumulate, te rugăm să deschizi un <Link to="/tickets" className="text-indigo-400 hover:underline font-bold">Tichet de Suport</Link> sau să contactezi echipa de administrare prin canalele oficiale.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Cards Statistici standard */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
                   { val: stats.ordersCount, label: "Comenzi Totale", icon: "📦", color: "indigo" },

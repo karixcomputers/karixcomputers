@@ -6,13 +6,16 @@ import { formatRON } from "../utils/money";
 export default function AdminCoupons() {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // 👉 AM ADĂUGAT userEmail ÎN STAREA INIȚIALĂ A FORMULARULUI
   const [form, setForm] = useState({
     code: "",
     discountType: "percentage",
     discountValue: "",
     minOrderTotal: "0",
     usageLimit: "",
-    expiryDate: ""
+    expiryDate: "",
+    userEmail: "" 
   });
 
   const fetchCoupons = async () => {
@@ -39,7 +42,16 @@ export default function AdminCoupons() {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        setForm({ code: "", discountType: "percentage", discountValue: "", minOrderTotal: "0", usageLimit: "", expiryDate: "" });
+        // 👉 RESETĂM ȘI CÂMPUL DE EMAIL DUPĂ SALVARE SUCCESIVĂ
+        setForm({ 
+          code: "", 
+          discountType: "percentage", 
+          discountValue: "", 
+          minOrderTotal: "0", 
+          usageLimit: "", 
+          expiryDate: "",
+          userEmail: "" 
+        });
         fetchCoupons();
       } else {
         const err = await res.json();
@@ -105,6 +117,12 @@ export default function AdminCoupons() {
               <input type="date" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-gray-400" value={form.expiryDate} onChange={e => setForm({...form, expiryDate: e.target.value})} />
             </div>
 
+            {/* 👉 NOU: INPUT PENTRU EMAIL AFILIAT */}
+            <div className="flex flex-col gap-2 md:col-span-3">
+              <label className="text-[10px] font-black text-pink-400 uppercase tracking-widest ml-2">Email Utilizator (Opțional - Completează doar dacă e cod de afiliat)</label>
+              <input type="email" placeholder="EX: pilot@karix.ro" className="bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-pink-500 transition-all font-bold" value={form.userEmail} onChange={e => setForm({...form, userEmail: e.target.value})} />
+            </div>
+
             <button type="submit" className="md:col-span-3 py-5 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl font-black uppercase tracking-[0.2em] hover:scale-[1.01] transition-all active:scale-95 shadow-xl shadow-emerald-900/20">
               Creează Cupon Nou
             </button>
@@ -120,8 +138,10 @@ export default function AdminCoupons() {
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-bold uppercase text-gray-500">
                   <span className="text-emerald-400">{c.discountType === 'percentage' ? `${c.discountValue}%` : `${c.discountValue/100} RON`} OFF</span>
                   <span>• Folosit: {c.timesUsed} {c.usageLimit ? `/ ${c.usageLimit}` : ''}</span>
-                  {/* MODIFICAT: Afișare total reduceri generate de cod */}
                   <span className="text-amber-400">• Total Redus: {((c.totalDiscounted || 0) / 100).toFixed(2)} RON</span>
+                  
+                  {/* 👉 INDICAȚIE VIZUALĂ ÎN LISTĂ DACĂ ESTE CUPON DE AFILIAT */}
+                  {c.userId && <span className="text-indigo-400 font-black">• 👤 COD AFILIAT</span>}
                 </div>
                 {c.minOrderTotal > 0 && <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-tighter">Min: {c.minOrderTotal/100} RON</span>}
               </div>

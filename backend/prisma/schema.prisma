@@ -39,6 +39,7 @@ model User {
   returnRequests    ReturnRequest[]
   wishlist          WishlistItem[]
   reviews           Review[]        
+  affiliateCoupon   Coupon?
 }
 
 model Product {
@@ -232,6 +233,9 @@ model Coupon {
   expiryDate    DateTime?
   createdAt     DateTime  @default(now())
   totalDiscounted Int      @default(0)
+  userId          String?   @unique // Devine ocupat doar dacă e cod de afiliat
+  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  earningsCents   Int       @default(0) // Sumele în bani (cenți) acumulate de afiliat din vânzări
 }
 
 model ConfiguratorComponent {
