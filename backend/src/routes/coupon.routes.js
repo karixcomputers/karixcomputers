@@ -111,6 +111,19 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
       }
     });
 
+      if (linkedUserId) {
+      await prisma.user.update({
+        where: { id: linkedUserId },
+        data: {
+          // Folosește denumirea exactă a câmpului/relației din modelul tău de User (ex: couponId sau affiliateCouponId)
+          // Dacă relația e mapată direct prin ID:
+          couponId: newCoupon.id
+          // Sau dacă Prisma folosește connect:
+          // affiliateCoupon: { connect: { id: newCoupon.id } }
+        }
+      });
+    }
+    
     res.status(201).json(newCoupon);
   } catch (e) {
     console.error("CREATE COUPON ERROR:", e);
