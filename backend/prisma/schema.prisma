@@ -229,6 +229,8 @@ model Coupon {
   isActive      Boolean   @default(true)
   expiryDate    DateTime?
   createdAt     DateTime  @default(now())
+  totalDiscounted Int      @default(0)
+  couponProcessed Boolean     @default(false)
 }
 
 model ConfiguratorComponent {

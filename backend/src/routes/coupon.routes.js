@@ -31,7 +31,7 @@ router.post("/validate", async (req, res) => {
       return res.status(404).json({ error: "Codul de reducere este invalid sau inactiv." });
     }
 
-    // Verifică data expirării (Corectat typo)
+    // Verifică data expirării
     if (coupon.expiryDate && new Date(coupon.expiryDate) < new Date()) {
       return res.status(400).json({ error: "Acest cod a expirat." });
     }
@@ -47,8 +47,9 @@ router.post("/validate", async (req, res) => {
       return res.status(400).json({ error: `Comanda minimă pentru acest cod este de ${minRon} RON.` });
     }
 
-    // Trimitem datele esențiale înapoi
+    // Trimitem datele esențiale înapoi (incluzând id-ul dacă e nevoie mai departe)
     res.json({
+      id: coupon.id,
       code: coupon.code,
       discountType: coupon.discountType,
       discountValue: coupon.discountValue
@@ -61,7 +62,8 @@ router.post("/validate", async (req, res) => {
 });
 
 /**
- * 2. GET: Toate cupoanele (Admin)
+ * 2. GET: Toate cupoane (Admin)
+ * Returnează automat și noul câmp totalDiscounted adăugat în schemă
  */
 router.get("/", requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -88,7 +90,8 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
         discountValue: parseInt(discountValue),
         minOrderTotal: minOrderTotal ? parseInt(minOrderTotal) : 0,
         usageLimit: usageLimit ? parseInt(usageLimit) : null,
-        expiryDate: expiryDate ? new Date(expiryDate) : null
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        totalDiscounted: 0 // Se inițializează automat cu 0 la creare
       }
     });
     res.status(201).json(newCoupon);

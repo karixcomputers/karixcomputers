@@ -1,4 +1,3 @@
-// frontend/src/pages/AdminCoupons.jsx
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
@@ -18,7 +17,6 @@ export default function AdminCoupons() {
 
   const fetchCoupons = async () => {
     try {
-      // MODIFICAT: din "/coupons" în "/coupons"
       const res = await apiFetch("/coupons");
       if (res.ok) setCoupons(await res.json());
     } catch (err) { console.error(err); }
@@ -36,7 +34,6 @@ export default function AdminCoupons() {
     };
 
     try {
-      // MODIFICAT: din "/coupons" în "/coupons"
       const res = await apiFetch("/coupons", {
         method: "POST",
         body: JSON.stringify(payload)
@@ -53,7 +50,6 @@ export default function AdminCoupons() {
 
   const deleteCoupon = async (id) => {
     if (!window.confirm("Ștergi acest cod?")) return;
-    // MODIFICAT: din "/coupons/${id}" în "/coupons/${id}"
     await apiFetch(`/coupons/${id}`, { method: "DELETE" });
     fetchCoupons();
   };
@@ -121,9 +117,11 @@ export default function AdminCoupons() {
             <div key={c.id} className="p-6 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-between group hover:border-emerald-500/30 transition-all">
               <div className="flex flex-col gap-1">
                 <span className="text-xl font-black italic text-white uppercase">{c.code}</span>
-                <div className="flex gap-3 text-[10px] font-bold uppercase text-gray-500">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-bold uppercase text-gray-500">
                   <span className="text-emerald-400">{c.discountType === 'percentage' ? `${c.discountValue}%` : `${c.discountValue/100} RON`} OFF</span>
                   <span>• Folosit: {c.timesUsed} {c.usageLimit ? `/ ${c.usageLimit}` : ''}</span>
+                  {/* MODIFICAT: Afișare total reduceri generate de cod */}
+                  <span className="text-amber-400">• Total Redus: {((c.totalDiscounted || 0) / 100).toFixed(2)} RON</span>
                 </div>
                 {c.minOrderTotal > 0 && <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-tighter">Min: {c.minOrderTotal/100} RON</span>}
               </div>

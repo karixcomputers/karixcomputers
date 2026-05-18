@@ -132,6 +132,11 @@ router.patch("/:id/status", requireAuth, requireAdmin, async (req, res, next) =>
       }
     });
 
+    // Procesăm cuponul dacă statusul devine "livrat"
+    if (status === "livrat") {
+      await handleCouponDeliveryStats(id);
+    }
+
     if (status === "anulat" && updatedOrder.user?.email) {
       const mailData = {
         customerName: updatedOrder.shippingName || "Client Karix",
@@ -246,6 +251,11 @@ router.patch("/item/:itemId/status", requireAuth, requireAdmin, async (req, res,
       data: { status: finalOrderStatus }
     });
 
+    // Procesăm cuponul dacă TOATĂ comanda devine "livrat" din cauza acestui item
+    if (finalOrderStatus === "livrat") {
+      await handleCouponDeliveryStats(updatedItem.orderId);
+    }
+
     const userEmail = updatedItem.order.user.email;
     const itemName = normalizeTxt(updatedItem.productName || "");
     const isAssembly = itemName.includes("asamblare");
@@ -339,6 +349,10 @@ router.post("/", requireAuth, async (req, res, next) => {
         invoiceCity: client.invoiceCity || null,
         invoiceAddress: client.invoiceAddress || null,
 
+        // SALVAREA CUPONULUI PENTRU MAI TÂRZIU
+        couponCode: couponCode ? couponCode.toUpperCase().trim() : null,
+        couponProcessed: false,
+
         items: {
           create: cartItems.map(item => {
             const nameFinal = item.productName || item.name;
@@ -359,13 +373,6 @@ router.post("/", requireAuth, async (req, res, next) => {
       },
       include: { items: true }
     });
-
-    if (couponCode) {
-      await prisma.coupon.update({
-        where: { code: couponCode.toUpperCase() },
-        data: { timesUsed: { increment: 1 } }
-      }).catch(err => console.error("Eroare incrementare cupon:", err));
-    }
 
     const uEmail = userEmail || (req.user && req.user.email);
     const adminEmail = process.env.ADMIN_EMAIL || "karixcomputers@gmail.com";
@@ -619,7 +626,7 @@ router.get("/:id/status", async (req, res) => {
     const id = parseInt(req.params.id, 10);
     const order = await prisma.order.findUnique({
       where: { id },
-      select: { status: true, paymentMethod: true } // Extragem strictul necesar din motive de securitate
+      select: { status: true, paymentMethod: true }
     });
 
     if (!order) return res.status(404).json({ error: "Comanda nu a fost găsită." });
@@ -649,7 +656,6 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
       };
     }
 
-    // 1. Aducem TOATE comenzile din perioada respectivă
     const orders = await prisma.order.findMany({
       where: dateFilter,
       select: {
@@ -657,11 +663,10 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
         status: true,
         totalCents: true,
         createdAt: true,
-        paymentMethod: true // <--- NECESAR PENTRU A FILTRA PLĂȚILE ONLINE
+        paymentMethod: true
       }
     });
 
-    // 👉 FIX EXCLUSIVITATE: Păstrăm doar comenzile valide (ignorăm anulatele și cele abandonate la card)
     const validOrders = orders.filter(o => 
       o.status !== "anulat" && 
       !(o.paymentMethod === "online" && o.status === "in_asteptare_plata")
@@ -670,14 +675,12 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
     const totalOrders = validOrders.length;
     const totalRevenueCents = validOrders.reduce((acc, order) => acc + order.totalCents, 0);
 
-    // 2. Calculăm mini-cardurile de status (Afișăm corect în procesare)
     const statusCounts = {
       inProcess: validOrders.filter(o => ["in_asteptare", "in_asteptare_plata", "in_procesare", "in_asteptare_ridicare"].includes(o.status)).length,
       delivered: orders.filter(o => o.status === "livrat").length,
       canceled: orders.filter(o => o.status === "anulat").length,
     };
 
-    // 3. Generăm datele pentru Grafic DOAR din comenzile valide
     const chartMap = {};
     validOrders.forEach(order => {
       const dateStr = order.createdAt.toISOString().split('T')[0]; 
@@ -692,21 +695,19 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
         revenue: chartMap[date]
       }));
 
-    // 4. Calculăm Top 5 Produse cele mai vândute DOAR pentru comenzile valide
     const allItems = await prisma.orderItem.findMany({
       where: { 
-        order: dateFilter, // Filtrăm inițial după dată
+        order: dateFilter,
         status: { not: "anulat" } 
       },
       select: {
         productName: true,
         priceCentsAtBuy: true,
         qty: true,
-        order: { select: { status: true, paymentMethod: true } } // Extragem statusul comenzii parinte
+        order: { select: { status: true, paymentMethod: true } }
       }
     });
 
-    // Excludem din top produsele care fac parte din comenzi anulate sau abandonate la plată
     const validItems = allItems.filter(item => 
       item.order.status !== "anulat" && 
       !(item.order.paymentMethod === "online" && item.order.status === "in_asteptare_plata")
@@ -739,5 +740,52 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
     res.status(500).json({ error: "Eroare la calcularea statisticilor." });
   }
 });
+
+// === FUNCȚIA DE PROCESARE A CUPONULUI ===
+async function handleCouponDeliveryStats(orderId) {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true }
+    });
+
+    if (!order || !order.couponCode || order.couponProcessed) return;
+
+    const coupon = await prisma.coupon.findUnique({
+      where: { code: order.couponCode }
+    });
+
+    if (coupon) {
+      let discountAmount = 0;
+
+      if (coupon.discountType === "percentage") {
+        const subtotalItemsCents = order.items.reduce((acc, item) => {
+          return acc + ((item.priceCentsAtBuy || 0) * (item.qty || 1));
+        }, 0);
+
+        discountAmount = Math.round((subtotalItemsCents * coupon.discountValue) / 100);
+      } else if (coupon.discountType === "fixed") {
+        discountAmount = coupon.discountValue; 
+      }
+
+      await prisma.coupon.update({
+        where: { code: coupon.code },
+        data: {
+          timesUsed: { increment: 1 },
+          totalDiscounted: { increment: discountAmount }
+        }
+      });
+
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { couponProcessed: true }
+      });
+
+      console.log(`[CUPON LIVRAT] S-au adăugat statisticile pentru codul ${coupon.code}.`);
+    }
+  } catch (err) {
+    console.error("⚠️ Eroare la procesarea cuponului la livrare:", err);
+  }
+}
 
 export default router;
