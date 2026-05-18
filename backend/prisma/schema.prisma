@@ -125,6 +125,7 @@ model Order {
   fanboxLocationId      String?         // ID-ul locker-ului (ex: "4920")
   reverseAwb            String?         // AWB-ul de ridicare a dispozitivului defect de la client
   couponProcessed Boolean     @default(false)
+  couponCode             String?
 }
 
 model OrderItem {
