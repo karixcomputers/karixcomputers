@@ -1,19 +1,50 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
-import { requireAuth } from "../middleware/auth.js"; // verifică dacă calea e corectă (src/middleware/auth.js)
+import { requireAuth } from "../middleware/auth.js";
 
 const prisma = new PrismaClient();
 const router = express.Router();
 
-// ... rutele tale vechi (profile, update, etc.) ...
+// --- MIDDLEWARE PENTRU ADMIN ---
+const requireAdmin = (req, res, next) => {
+  if (req.user && req.user.role === "admin") {
+    next();
+  } else {
+    res.status(403).json({ error: "Acces interzis. Necesită drepturi de administrator." });
+  }
+};
 
-// Ruta nouă pentru Admin
-router.get("/admin-all", requireAuth, async (req, res) => {
+/**
+ * 1. GET: Profilul utilizatorului curent (Logat)
+ * Această rută aduce datele tale ȘI cuponul de afiliat din baza de date
+ */
+router.get("/me", requireAuth, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: "Acces interzis." });
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: {
+        // Include relația cu tabela Coupon. 
+        // În majoritatea schemelor configurate One-to-Many/Many-to-Many se numește 'coupons'
+        coupons: true 
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "Utilizatorul nu a fost găsit." });
     }
 
+    res.json(user);
+  } catch (error) {
+    console.error("EROARE RUTA /ME:", error);
+    res.status(500).json({ error: "Eroare la încărcarea datelor utilizatorului." });
+  }
+});
+
+/**
+ * 2. GET: Toți utilizatorii (Admin)
+ */
+router.get("/admin-all", requireAuth, requireAdmin, async (req, res) => {
+  try {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       select: {
@@ -33,5 +64,4 @@ router.get("/admin-all", requireAuth, async (req, res) => {
   }
 });
 
-// 👉 LINIA ASTA LIPSEȘTE SAU E GREȘITĂ:
 export default router;
