@@ -32,8 +32,8 @@ export default function Account() {
     ticketsCount: user?.ticketsCount || 0
   });
 
-  // 👉 STATE NOU PENTRU DATELE DE AFILIAT
-  const [affiliateData, setAffiliateData] = useState(null);
+  // 👉 NOU: State pentru stocarea datelor cuponului de afiliat
+  const [affiliateCoupon, setAffiliateCoupon] = useState(null);
 
   // State-uri pentru editarea numărului de telefon
   const [isEditingPhone, setIsEditingPhone] = useState(false);
@@ -49,15 +49,16 @@ export default function Account() {
       if (response.ok) {
         const data = await response.json();
         if (data.user) {
+          // Sincronizăm numărul de entități din _count sau fallback pe proprietăți directe
           setStats({
-            ordersCount: data.user.ordersCount || 0,
-            wishlistCount: data.user.wishlistCount || 0,
-            ticketsCount: data.user.ticketsCount || 0
+            ordersCount: data.user._count?.orders ?? data.user.ordersCount ?? 0,
+            wishlistCount: data.user._count?.wishlist ?? data.user.wishlistCount ?? 0,
+            ticketsCount: data.user._count?.tickets ?? data.user.ticketsCount ?? 0
           });
-          
-          // 👉 Sincronizăm datele cuponului de afiliat dacă backend-ul le trimite în user.coupon
-          if (data.user.coupon) {
-            setAffiliateData(data.user.coupon);
+
+          // 👉 NOU: Salvăm datele cuponului dacă acesta există pe utilizator
+          if (data.user.affiliateCoupon) {
+            setAffiliateCoupon(data.user.affiliateCoupon);
           }
         }
       }
@@ -113,12 +114,14 @@ export default function Account() {
 
   return (
     <>
+      {/* IMPLEMENTARE SEO DINAMIC */}
       <SEO 
         title={`Contul lui ${user?.name?.split(' ')[0] || "Pilot"}`}
         description="Gestionează-ți comenzile, garanțiile și tichetele de suport direct din panoul de control Karix Computers."
       />
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden">
+        {/* Efecte vizuale fundal */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-gradient-to-b from-indigo-500/10 to-transparent blur-[120px] pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-pink-500/5 blur-[120px] pointer-events-none" />
 
@@ -159,8 +162,10 @@ export default function Account() {
               </nav>
             </div>
 
-            {/* Coloana Dreaptă: Date și Statistici */}
+            {/* Coloana Dreaptă: Date, Afiliere și Statistici */}
             <div className="lg:col-span-8 space-y-8">
+              
+              {/* Caseta Informații Cont */}
               <div className="p-10 rounded-[40px] bg-white/[0.02] border border-white/10 backdrop-blur-md relative overflow-hidden transition-all hover:bg-white/[0.04]">
                 <h3 className="text-sm font-black text-indigo-400 uppercase tracking-[0.3em] mb-10 flex items-center gap-3">
                   <span className="h-1 w-8 bg-indigo-500 rounded-full"></span>
@@ -236,60 +241,57 @@ export default function Account() {
                 </div>
               </div>
 
-              {/* 👉 NOU: PANOU HUB AFILIERE (RANDARE CONDIȚIONATĂ) */}
-              {affiliateData && (
-                <div className="p-10 rounded-[40px] bg-gradient-to-br from-indigo-950/20 to-pink-950/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <div className="absolute right-6 top-6 text-4xl opacity-10 select-none">💎</div>
+              {/* 👉 NOU: PANOU DE AFILIAT (Apare doar dacă utilizatorul are un cupon alocat) */}
+              {affiliateCoupon && (
+                <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl shadow-indigo-950/20 animate-in fade-in duration-500">
+                  <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 blur-3xl pointer-events-none" />
                   
-                  <h3 className="text-sm font-black text-pink-400 uppercase tracking-[0.3em] mb-8 flex items-center gap-3">
-                    <span className="h-1 w-8 bg-pink-500 rounded-full"></span>
+                  <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
+                    <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
                     Program Afiliere Karix
                   </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
-                      <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</p>
-                      <p className="text-xl font-black text-white tracking-wide bg-gradient-to-r from-indigo-400 to-pink-400 text-transparent bg-clip-text font-mono">
-                        {affiliateData.code}
-                      </p>
-                    </div>
-                    
-                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
-                      <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări Cupon</p>
-                      <p className="text-xl font-black text-white">{affiliateData.timesUsed || 0} comenzi</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                    {/* Cod Cupon */}
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center relative">
+                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
+                      <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">
+                        {affiliateCoupon.code}
+                      </span>
                     </div>
 
-                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
-                      <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Sold Disponibil</p>
-                      <p className="text-xl font-black text-emerald-400">
-                        {((affiliateData.earningsCents || 0) / 100).toFixed(2)} RON
-                      </p>
+                    {/* Utilizări totale */}
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
+                      <span className="text-2xl font-black text-white">
+                        {affiliateCoupon.timesUsed || 0}
+                      </span>
                     </div>
-                  </div>
 
-                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-gray-400 flex items-start gap-3">
-                    <span className="text-base mt-0.5">ℹ️</span>
-                    <div>
-                      <p className="font-bold text-gray-300 mb-1">Cum îți retragi banii?</p>
-                      Pentru a solicita plata comisioanelor acumulate, te rugăm să deschizi un <Link to="/tickets" className="text-indigo-400 hover:underline font-bold">Tichet de Suport</Link> sau să contactezi echipa de administrare prin canalele oficiale.
+                    {/* Reduceri totale generate */}
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Reduceri Oferite</span>
+                      <span className="text-2xl font-black text-emerald-400">
+                        {((affiliateCoupon.totalDiscounted || 0) / 100).toFixed(2)} RON
+                      </span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Cards Statistici standard */}
+              {/* Cards Statistici */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
                   { val: stats.ordersCount, label: "Comenzi Totale", icon: "📦", color: "indigo" },
                   { val: stats.wishlistCount, label: "Wishlist", icon: "❤️", color: "pink" },
                   { val: stats.ticketsCount, label: "Tichete Suport", icon: "🛠️", color: "emerald" }
                 ].map((stat, i) => (
-                  <div key={i} className={`group p-8 rounded-[32px] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-${stat.color}-500/30 transition-all relative overflow-hidden backdrop-blur-sm`}>
+                  <div key={i} className={`group p-8 rounded-[32px] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all relative overflow-hidden backdrop-blur-sm`}>
                     <div className="absolute -right-4 -bottom-4 text-6xl opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">{stat.icon}</div>
                     <p className="text-4xl font-black text-white mb-1 tracking-tighter animate-in fade-in slide-in-from-bottom-2 duration-500">
                       {stat.val || 0}
                     </p>
-                    <p className={`text-[10px] font-bold text-${stat.color}-400 uppercase tracking-[0.2em]`}>{stat.label}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">{stat.label}</p>
                   </div>
                 ))}
               </div>
