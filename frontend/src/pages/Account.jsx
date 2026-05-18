@@ -56,7 +56,7 @@ export default function Account() {
     if (!accessToken) return;
     
     try {
-      const response = await apiFetch("/auth/me");
+      const response = await apiFetch("/user/me");
       if (response.ok) {
         const data = await response.json();
         
