@@ -41,7 +41,7 @@ const getFullUser = async (userId) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      coupon: true,
+      affiliateCoupon: true,
       _count: {
         select: {
           orders: true,
