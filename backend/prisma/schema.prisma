@@ -124,6 +124,7 @@ model Order {
   serviceDeliveryMethod String?         // Poate fi "courier" sau "fanbox"
   fanboxLocationId      String?         // ID-ul locker-ului (ex: "4920")
   reverseAwb            String?         // AWB-ul de ridicare a dispozitivului defect de la client
+  couponProcessed Boolean     @default(false)
 }
 
 model OrderItem {
@@ -230,7 +231,6 @@ model Coupon {
   expiryDate    DateTime?
   createdAt     DateTime  @default(now())
   totalDiscounted Int      @default(0)
-  couponProcessed Boolean     @default(false)
 }
 
 model ConfiguratorComponent {
