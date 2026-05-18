@@ -300,14 +300,14 @@ export default function Account() {
                     <div>
                       <p className="text-white font-bold text-base mb-1">Nu ai un cod de afiliat activ</p>
                       <p className="text-xs text-gray-400 max-w-xl leading-relaxed">
-                        Vrei să câștigi comisioane și să oferi reduceri comunității tale? Deschide un tichet de suport pentru a solicita activarea contului de partener Karix.
+                        Vrei să câștigi comisioane și să oferi reduceri comunității tale? Contactează-ne prin metodele de pe pagina de contact pentru a solicita activarea contului de partener Karix.
                       </p>
                     </div>
                     <Link 
-                      to="/tickets" 
+                      to="/contact" 
                       className="px-5 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-black text-[11px] uppercase tracking-wider rounded-xl border border-indigo-500/20 hover:border-indigo-500/40 transition-all text-center whitespace-nowrap auto-cols-max"
                     >
-                      Contactează Suportul ➜
+                      Contactează-ne ➜
                     </Link>
                   </div>
                 </div>
