@@ -20,41 +20,23 @@ const requireAdmin = (req, res, next) => {
  */
 router.get("/me", requireAuth, async (req, res) => {
   try {
-    console.log("=== DEBUG AFILIERE ===");
-    console.log("ID Utilizator logat:", req.user.id);
-
-    // Încercăm să aducem userul simplu
     const user = await prisma.user.findUnique({
-      where: { id: req.user.id }
-    });
-    console.log("User găsit în DB:", user ? "DA" : "NU", user?.email);
-
-    // Încercăm să căutăm manual cuponul în tabela Coupon după email sau userId
-    // Schimbă 'coupon' cu numele tabelei tale din Prisma dacă e diferit (ex: prisma.affiliateCoupon)
-    const manualCoupon = await prisma.coupon.findFirst({
-      where: {
-        OR: [
-          { userId: req.user.id },
-          { code: "KARIX" } // Căutăm direct după cod ca să vedem dacă există
-        ]
+      where: { id: req.user.id },
+      include: {
+        // Include relația cu tabela Coupon. 
+        // În majoritatea schemelor configurate One-to-Many/Many-to-Many se numește 'coupons'
+        coupons: true 
       }
     });
-    console.log("Cupon găsit la căutare manuală:", manualCoupon);
-    console.log("=======================");
 
     if (!user) {
       return res.status(404).json({ error: "Utilizatorul nu a fost găsit." });
     }
 
-    // Îi trimitem frontend-ului obiectul user, dar îi injectăm manual cuponul găsit
-    res.json({
-      ...user,
-      affiliateCoupon: manualCoupon || null
-    });
-
+    res.json(user);
   } catch (error) {
-    console.error("EROARE CRITICĂ DEBUG /ME:", error);
-    res.status(500).json({ error: "Eroare server." });
+    console.error("EROARE RUTA /ME:", error);
+    res.status(500).json({ error: "Eroare la încărcarea datelor utilizatorului." });
   }
 });
 
