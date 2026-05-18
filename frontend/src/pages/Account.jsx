@@ -241,43 +241,65 @@ export default function Account() {
                 </div>
               </div>
 
-              {/* 👉 NOU: PANOU DE AFILIAT (Apare doar dacă utilizatorul are un cupon alocat) */}
-              {affiliateCoupon && (
-                <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl shadow-indigo-950/20 animate-in fade-in duration-500">
-                  <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 blur-3xl pointer-events-none" />
-                  
-                  <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
-                    <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
-                    Program Afiliere Karix
-                  </h3>
+{/* 👉 SECȚIUNE AFILIERE DINAMICĂ (Apare text de suport dacă nu are cupon) */}
+{affiliateCoupon ? (
+  <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl shadow-indigo-950/20 animate-in fade-in duration-500">
+    <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 blur-3xl pointer-events-none" />
+    
+    <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
+      <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
+      Program Afiliere Karix
+    </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                    {/* Cod Cupon */}
-                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center relative">
-                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
-                      <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">
-                        {affiliateCoupon.code}
-                      </span>
-                    </div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+      {/* Cod Cupon */}
+      <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center relative">
+        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
+        <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">
+          {affiliateCoupon.code}
+        </span>
+      </div>
 
-                    {/* Utilizări totale */}
-                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
-                      <span className="text-2xl font-black text-white">
-                        {affiliateCoupon.timesUsed || 0}
-                      </span>
-                    </div>
+      {/* Utilizări totale */}
+      <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
+        <span className="text-2xl font-black text-white">
+          {affiliateCoupon.timesUsed || 0}
+        </span>
+      </div>
 
-                    {/* Reduceri totale generate */}
-                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Reduceri Oferite</span>
-                      <span className="text-2xl font-black text-emerald-400">
-                        {((affiliateCoupon.totalDiscounted || 0) / 100).toFixed(2)} RON
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+      {/* Reduceri totale generate */}
+      <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Reduceri Oferite</span>
+        <span className="text-2xl font-black text-emerald-400">
+          {((affiliateCoupon.totalDiscounted || 0) / 100).toFixed(2)} RON
+        </span>
+      </div>
+    </div>
+  </div>
+) : (
+  /* 👈 CASETA CARE APARE CÂND UTILIZATORUL NU ARE CUPON ALOCAT */
+  <div className="p-8 rounded-[40px] bg-white/[0.01] border border-white/5 backdrop-blur-md relative overflow-hidden transition-all hover:bg-white/[0.02] hover:border-white/10 animate-in fade-in duration-500">
+    <h3 className="text-sm font-black text-gray-400 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
+      <span className="h-1 w-8 bg-gray-600 rounded-full"></span>
+      Program Afiliere Karix
+    </h3>
+    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div>
+        <p className="text-white font-bold text-base mb-1">Nu ai un cod de afiliat activ</p>
+        <p className="text-xs text-gray-400 max-w-xl leading-relaxed">
+          Vrei să câștigi comisioane și să oferi reduceri comunității tale? Deschide un tichet de suport pentru a solicita activarea contului de partener Karix.
+        </p>
+      </div>
+      <Link 
+        to="/tickets" 
+        className="px-5 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-black text-[11px] uppercase tracking-wider rounded-xl border border-indigo-500/20 hover:border-indigo-500/40 transition-all text-center whitespace-nowrap auto-cols-max"
+      >
+        Contactează Suportul ➜
+      </Link>
+    </div>
+  </div>
+)}
 
               {/* Cards Statistici */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
