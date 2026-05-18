@@ -41,14 +41,10 @@ export default function Account() {
   const [phoneError, setPhoneError] = useState("");
   const [isSavingPhone, setIsSavingPhone] = useState(false);
 
-  // Sincronizăm cuponul din AuthContext la prima încărcare a paginii
+  // Sincronizăm cuponul din AuthContext la prima încărcare a paginii folosind noua cheie 'affiliate'
   useEffect(() => {
-    if (user) {
-      if (user.coupons && user.coupons.length > 0) {
-        setAffiliateCoupon(user.coupons[0]);
-      } else if (user.affiliateCoupon) {
-        setAffiliateCoupon(user.affiliateCoupon);
-      }
+    if (user && user.affiliate) {
+      setAffiliateCoupon(user.affiliate);
     }
   }, [user]);
 
@@ -60,7 +56,7 @@ export default function Account() {
       if (response.ok) {
         const data = await response.json();
         
-        // Suportă ambele variante de răspuns de pe backend (direct obiectul sau învelit în .user)
+        // Extras corect din obiectul returnat
         const userData = data.user || data;
 
         if (userData) {
@@ -70,11 +66,9 @@ export default function Account() {
             ticketsCount: userData._count?.tickets ?? userData.ticketsCount ?? 0
           });
 
-          // 👉 LOGICA ACTUALIZATĂ: Verifică array-ul 'coupons' sau fallback pe obiectul direct
-          if (userData.coupons && userData.coupons.length > 0) {
-            setAffiliateCoupon(userData.coupons[0]);
-          } else if (userData.affiliateCoupon) {
-            setAffiliateCoupon(userData.affiliateCoupon);
+          // 👉 POTRIVIRE EXACTĂ: Salvăm obiectul 'affiliate' din rețea
+          if (userData.affiliate) {
+            setAffiliateCoupon(userData.affiliate);
           } else {
             setAffiliateCoupon(null);
           }
@@ -259,8 +253,8 @@ export default function Account() {
                 </div>
               </div>
 
-              {/* 👉 SECȚIUNE AFILIERE DINAMICĂ */}
-              {affiliateCoupon ? (
+              {/* 👉 SECȚIUNE AFILIERE ACTUALIZATĂ CU STRUCTURA DIRECTĂ */}
+              {affiliateCoupon && affiliateCoupon.isActive ? (
                 <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl shadow-indigo-950/20 animate-in fade-in duration-500">
                   <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 blur-3xl pointer-events-none" />
                   
@@ -286,17 +280,17 @@ export default function Account() {
                       </span>
                     </div>
 
-                    {/* Reduceri totale generate */}
+                    {/* Câștiguri generate */}
                     <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Reduceri Oferite</span>
+                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Câștiguri Total</span>
                       <span className="text-2xl font-black text-emerald-400">
-                        {((affiliateCoupon.totalDiscounted || 0) / 100).toFixed(2)} RON
+                        {(affiliateCoupon.earnings || 0).toFixed(2)} RON
                       </span>
                     </div>
                   </div>
                 </div>
               ) : (
-                /* CASETA CARE APARE CÂND UTILIZATORUL NU ARE CUPON ALOCAT */
+                /* CASETA CARE APARE CÂND UTILIZATORUL NU ARE AFILIAT ACTIV */
                 <div className="p-8 rounded-[40px] bg-white/[0.01] border border-white/5 backdrop-blur-md relative overflow-hidden transition-all hover:bg-white/[0.02] hover:border-white/10 animate-in fade-in duration-500">
                   <h3 className="text-sm font-black text-gray-400 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
                     <span className="h-1 w-8 bg-gray-600 rounded-full"></span>
