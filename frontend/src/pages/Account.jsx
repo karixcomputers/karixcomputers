@@ -433,7 +433,7 @@ export default function Account() {
 
                     // CAZ 1: PARTENER ACTIV
                     if (currentStatus === "ACTIVE") {
-                      const earningsRON = ((coupon.earningsCents || coupon.earnings || 0) / 100).toFixed(2);
+                      const earningsRON = (coupon.earnings || 0).toFixed(2);
                       const isEligibleForWithdrawal = parseFloat(earningsRON) >= 100;
 
                       return (
