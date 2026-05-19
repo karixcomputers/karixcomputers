@@ -238,7 +238,7 @@ model Coupon {
   earningsCents   Int       @default(0) // Sumele în bani (cenți) acumulate de afiliat din vânzări
   
   // 👉 LINIILE NOI PENTRU FLUXUL DE AFILIERE
-  status          String    @default("ACTIVE") // Valori: "PENDING" (invitat) sau "ACTIVE" (activat)
+  status          String    @default("PENDING") // Valori: "PENDING" (invitat) sau "ACTIVE" (activat)
   acceptedAt      DateTime? 
 }
 
