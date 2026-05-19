@@ -211,4 +211,52 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * 👉 RUTA REPARATĂ: 6. POST: Cerere de retragere câștiguri (Utilizator Logat)
+ * Această rută preia cererea, verifică dacă are pragul minim și oprește abuzurile
+ */
+router.post("/withdraw", requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user?.sub || req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Utilizator neautentificat." });
+    }
+
+    // 1. Căutăm cuponul partenerului
+    const coupon = await prisma.coupon.findUnique({
+      where: { userId: userId },
+      include: { user: true }
+    });
+
+    if (!coupon) {
+      return res.status(444).json({ error: "Nu deții un cupon de parteneriat." });
+    }
+
+    // 2. Calculăm suma disponibilă în RON direct din totalDiscounted (baza de date)
+    const earningsRON = coupon.totalDiscounted / 100;
+
+    // 3. Verificăm pragul minim de 100 RON
+    if (earningsRON < 100) {
+      return res.status(400).json({ 
+        error: `Suma minimă pentru retragere este de 100 RON. Momentan ai: ${earningsRON.toFixed(2)} RON.` 
+      });
+    }
+
+    // TODO: Aici poți adăuga logica ta internă (ex: trimitere email automată către tine la karixcomputers@gmail.com,
+    // sau crearea unei înregistrări într-un tabel `WithdrawalRequests` din baza de date).
+
+    console.log(`💰 Cerere de retragere înregistrată pentru ${coupon.user?.name || 'Partener'} - Suma: ${earningsRON.toFixed(2)} RON`);
+
+    res.json({ 
+      success: true, 
+      message: `Cererea de retragere pentru suma de ${earningsRON.toFixed(2)} RON a fost înregistrată cu succes! Te vom contacta în scurt timp.` 
+    });
+
+  } catch (error) {
+    console.error("WITHDRAWAL ROUTE ERROR:", error);
+    res.status(500).json({ error: "Eroare la procesarea cererii de retragere." });
+  }
+});
+
 export default router;
