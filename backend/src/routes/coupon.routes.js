@@ -7,8 +7,6 @@ import { sendPartnerInvitationEmail, sendPartnerActivationEmail } from "../servi
 const prisma = new PrismaClient();
 const router = express.Router();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 
 // --- MIDDLEWARE PENTRU ADMIN ---
