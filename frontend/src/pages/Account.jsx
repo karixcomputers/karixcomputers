@@ -339,128 +339,106 @@ export default function Account() {
                 </div>
               )}
 
-              {/* === TAB 2: PROGRAM AFILIERE (MODIFICAT CONFORM FLUXULUI DE ACCEPTARE) === */}
-              {activeTab === "affiliate" && (
-                <div className="space-y-8 animate-in fade-in duration-300">
-                  
-                  {/* CAZ 1: CUPON EXISTENT ȘI ACTIVAT (ACTIVE) */}
-                  {affiliateCoupon && affiliateCoupon.status === "ACTIVE" && affiliateCoupon.isActive && (
-                    <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl">
-                      <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
-                        <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
-                        Statistici Partener Karix
-                      </h3>
+              {/* === TAB 2: PROGRAM AFILIERE === */}
+{activeTab === "affiliate" && (
+  <div className="space-y-8 animate-in fade-in duration-300">
+    
+    {(() => {
+      // Forțăm starea să fie citită corect indiferent dacă e obiect direct sau vine din array-ul de cupoane
+      const coupon = affiliateCoupon;
+      if (!coupon) {
+        return (
+          <div className="p-8 rounded-[40px] bg-white/[0.01] border border-white/5 backdrop-blur-md relative overflow-hidden">
+            <h3 className="text-sm font-black text-gray-400 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
+              <span className="h-1 w-8 bg-gray-600 rounded-full"></span>
+              Program Afiliere Karix
+            </h3>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div>
+                <p className="text-white font-bold text-base mb-1">Nu ai un cod de afiliat activ</p>
+                <p className="text-xs text-gray-400 max-w-xl leading-relaxed">
+                  Vrei să câștigi comisioane și să oferi reduceri comunității tale pe live-uri sau clipuri? Contactează-ne pentru a solicita verificarea canalelor tale sociale.
+                </p>
+              </div>
+              <Link to="/contact" className="px-5 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-black text-[11px] uppercase tracking-wider rounded-xl border border-indigo-500/20 hover:border-indigo-500/40 transition-all text-center whitespace-nowrap">
+                Contactează-ne ➜
+              </Link>
+            </div>
+          </div>
+        );
+      }
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
-                          <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">
-                            {affiliateCoupon.code}
-                          </span>
-                        </div>
+      // Normalizăm statusul ca să fie mereu cu litere mari ("PENDING" / "ACTIVE")
+      const currentStatus = coupon.status?.toUpperCase();
 
-                        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
-                          <span className="text-2xl font-black text-white">
-                            {affiliateCoupon.timesUsed || 0}
-                          </span>
-                        </div>
+      // CAZ 1: PARTENER ACTIV
+      if (currentStatus === "ACTIVE") {
+        return (
+          <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl">
+            <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
+              <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
+              Statistici Partener Karix
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+              <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
+                <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">{coupon.code}</span>
+              </div>
+              <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
+                <span className="text-2xl font-black text-white">{coupon.timesUsed || 0}</span>
+              </div>
+              <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Comisioane</span>
+                <span className="text-2xl font-black text-emerald-400">{((coupon.earningsCents || coupon.earnings || 0) / 100).toFixed(2)} RON</span>
+              </div>
+            </div>
+          </div>
+        );
+      }
 
-                        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Comisioane Generate</span>
-                          <span className="text-2xl font-black text-emerald-400">
-                            {((affiliateCoupon.earningsCents || affiliateCoupon.earnings || 0) / 100).toFixed(2)} RON
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+      // CAZ 2: INVITAȚIE ÎN AȘTEPTARE (PENDING)
+      if (currentStatus === "PENDING" || !coupon.isActive) {
+        return (
+          <div className="p-10 rounded-[40px] bg-gradient-to-b from-indigo-500/10 to-pink-500/5 border border-indigo-500/30 backdrop-blur-xl relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <h3 className="text-lg font-black text-white uppercase tracking-wider mb-2 flex items-center gap-2 italic">
+              🚀 Invitație Parteneriat Pre-Aprobată!
+            </h3>
+            <p className="text-xs text-gray-400 mb-8 leading-relaxed">
+              Felicitări! Ai fost selectat pentru a deveni partener oficial al brandului **Karix Computers**. Comunitatea ta va primi un cod de **1% reducere** la orice comandă pe site.
+            </p>
+            <div className="bg-black/30 border border-white/5 rounded-3xl p-6 mb-8 space-y-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Codul rezervat:</span>
+                <span className="text-sm font-black text-pink-400 bg-pink-500/10 px-3 py-1 rounded-xl border border-pink-500/20">{coupon.code || "FĂRĂ_COD"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Acord Oficial:</span>
+                <button onClick={() => setShowTermsModal(true)} className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 underline uppercase tracking-wider">
+                  Citește Termenii și Condițiile ➜
+                </button>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 mb-6 select-none">
+              <input type="checkbox" id="termsCheck" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 h-4 w-4 rounded border-white/10 bg-black/40 text-indigo-500 focus:ring-0 focus:ring-offset-0 cursor-pointer" />
+              <label htmlFor="termsCheck" className="text-xs text-gray-300 cursor-pointer leading-tight font-medium">
+                Confirm că am citit și sunt de acord cu termenii de afiliere Karix.
+              </label>
+            </div>
+            {acceptError && <p className="text-xs text-pink-500 font-bold uppercase tracking-wide mb-4">⚠️ {acceptError}</p>}
+            <button onClick={handleAcceptPartnership} disabled={isAccepting} className="w-full py-4 bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl disabled:opacity-50">
+              {isAccepting ? "Se activează contul..." : "Activează Contul de Partener 🚀"}
+            </button>
+          </div>
+        );
+      }
 
-                  {/* CAZ 2: INVITAȚIE ÎN AȘTEPTARE (PENDING) -> CASETA CYBERPUNK DE ACCEPTARE */}
-                  {affiliateCoupon && affiliateCoupon.status === "PENDING" && (
-                    <div className="p-10 rounded-[40px] bg-gradient-to-b from-indigo-500/10 to-pink-500/5 border border-indigo-500/30 backdrop-blur-xl relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
-                      <div className="absolute right-0 top-0 w-64 h-64 bg-pink-500/10 blur-3xl pointer-events-none" />
-                      
-                      <h3 className="text-lg font-black text-white uppercase tracking-wider mb-2 flex items-center gap-2 italic">
-                        🚀 Invitație Parteneriat Pre-Aprobată!
-                      </h3>
-                      <p className="text-xs text-gray-400 mb-8 leading-relaxed">
-                        Felicitări! Ai fost selectat pentru a deveni partener oficial al brandului **Karix Computers**. Comunitatea ta va primi un cod de **1% reducere** la orice comandă pe site, iar tu vei acumula comisioane direct în bani în acest panou.
-                      </p>
+      // În caz extrem în care starea e necunoscută, nu lăsăm ecranul gol
+      return <p className="text-xs text-gray-500">Stare parteneriat nedefinită. Contactează suportul.</p>;
+    })()}
 
-                      <div className="bg-black/30 border border-white/5 rounded-3xl p-6 mb-8 space-y-4">
-                        <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Codul rezervat pentru tine:</span>
-                          <span className="text-sm font-black text-pink-400 bg-pink-500/10 px-3 py-1 rounded-xl border border-pink-500/20">{affiliateCoupon.code}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Acord Oficial:</span>
-                          <button 
-                            onClick={() => setShowTermsModal(true)}
-                            className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 underline uppercase tracking-wider"
-                          >
-                            Citește Termenii și Condițiile ➜
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Checkbox Acceptare */}
-                      <div className="flex items-start gap-3 mb-6 select-none">
-                        <input 
-                          type="checkbox" 
-                          id="termsCheck"
-                          checked={acceptedTerms}
-                          onChange={(e) => setAcceptedTerms(e.target.checked)}
-                          className="mt-1 h-4 w-4 rounded border-white/10 bg-black/40 text-indigo-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
-                        />
-                        <label htmlFor="termsCheck" className="text-xs text-gray-300 cursor-pointer leading-tight font-medium">
-                          Confirm că am citit, înțeleg și sunt pe deplin de acord cu termenii și obligațiile stipulate în contractul digital de afiliere Karix.
-                        </label>
-                      </div>
-
-                      {acceptError && (
-                        <p className="text-xs text-pink-500 font-bold uppercase tracking-wide mb-4 animate-shake">
-                          ⚠️ {acceptError}
-                        </p>
-                      )}
-
-                      {/* Buton Activare */}
-                      <button
-                        onClick={handleAcceptPartnership}
-                        disabled={isAccepting}
-                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl shadow-indigo-950/50 disabled:opacity-50"
-                      >
-                        {isAccepting ? "Se activează contul..." : "Activează Contul de Partener 🚀"}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* CAZ 3: NU EXISTĂ UN COD ASOCIAT */}
-                  {(!affiliateCoupon || !affiliateCoupon.isActive) && (
-                    <div className="p-8 rounded-[40px] bg-white/[0.01] border border-white/5 backdrop-blur-md relative overflow-hidden">
-                      <h3 className="text-sm font-black text-gray-400 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
-                        <span className="h-1 w-8 bg-gray-600 rounded-full"></span>
-                        Program Afiliere Karix
-                      </h3>
-                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                        <div>
-                          <p className="text-white font-bold text-base mb-1">Nu ai un cod de afiliat activ</p>
-                          <p className="text-xs text-gray-400 max-w-xl leading-relaxed">
-                            Vrei să câștigi comisioane și să oferi reduceri comunității tale pe live-uri sau clipuri? Contactează-ne pentru a solicita verificarea canalelor tale sociale și generarea unui link de partener pre-aprobat.
-                          </p>
-                        </div>
-                        <Link 
-                          to="/contact" 
-                          className="px-5 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-black text-[11px] uppercase tracking-wider rounded-xl border border-indigo-500/20 hover:border-indigo-500/40 transition-all text-center whitespace-nowrap"
-                        >
-                          Contactează-ne ➜
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              )}
+  </div>
+)}
 
             </div>
           </div>
