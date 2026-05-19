@@ -431,31 +431,31 @@ export default function Account() {
 
                     const currentStatus = coupon.status?.toUpperCase();
 
-                    // CAZ 1: PARTENER ACTIV
-                    if (currentStatus === "ACTIVE") {
-                      const earningsRON = (coupon.earnings || 0).toFixed(2);
-                      const isEligibleForWithdrawal = parseFloat(earningsRON) >= 100;
+if (currentStatus === "ACTIVE") {
+  // 👉 SCHIMBARE AICI: Folosim 'totalDiscounted' și împărțim la 100
+  const earningsRON = ((coupon.totalDiscounted || 0) / 100).toFixed(2);
+  const isEligibleForWithdrawal = parseFloat(earningsRON) >= 100;
 
-                      return (
-                        <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl">
-                          <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
-                            <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
-                            Statistici Partener Karix
-                          </h3>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                            <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
-                              <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">{coupon.code}</span>
-                            </div>
-                            <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
-                              <span className="text-2xl font-black text-white">{coupon.timesUsed || 0}</span>
-                            </div>
-                            <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Comisioane</span>
-                              <span className="text-2xl font-black text-emerald-400">{earningsRON} RON</span>
-                            </div>
-                          </div>
+  return (
+    <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl">
+      <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
+        <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
+        Statistici Partener Karix
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
+          <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">{coupon.code}</span>
+        </div>
+        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
+          <span className="text-2xl font-black text-white">{coupon.timesUsed || 0}</span>
+        </div>
+        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Reduceri Generate</span>
+          <span className="text-2xl font-black text-emerald-400">{earningsRON} RON</span>
+        </div>
+      </div>
 
                           {/* ZONA DE RETRAGERE (NOU) */}
                           <div className="mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
