@@ -1341,8 +1341,8 @@ export async function sendServiceAwbRejectedEmail(to, data) {
  */
 export const sendPartnerInvitationEmail = async (toEmail, customerName) => {
   try {
-    // Schimbă calea dacă ai pus fișierele HTML într-un alt folder (ex: "../templates/asociereafiliat.html")
-    const filePath = path.join(__dirname, "../templates/asociereafiliat.html");
+    // Folosim process.cwd() în loc de __dirname pentru a păstra aceeași logică din proiect
+    const filePath = path.resolve(process.cwd(), "src", "templates", "asociereafiliat.html");
     let htmlContent = fs.readFileSync(filePath, "utf8");
 
     // Înlocuim variabilele template-ului
@@ -1351,12 +1351,13 @@ export const sendPartnerInvitationEmail = async (toEmail, customerName) => {
       .replace(/{{accountUrl}}/g, "https://karixcomputers.ro/account");
 
     const mailOptions = {
-      from: '"Karix Computers" <noreply@karixcomputers.ro>', // Configurează adresa ta oficială
+      from: env.MAIL_FROM || '"Karix Computers" <noreply@karixcomputers.ro>', // Folosește env dacă e disponibil, altfel fallback
       to: toEmail,
       subject: "Felicitări! Ai fost selectat ca partener Karix Computers 🚀",
       html: htmlContent,
     };
 
+    // Folosim sendHtmlMail nucleul tău sau direct transporter-ul dacă e exportat
     return await transporter.sendMail(mailOptions);
   } catch (error) {
     console.error("Eroare în sendPartnerInvitationEmail:", error);
@@ -1369,7 +1370,8 @@ export const sendPartnerInvitationEmail = async (toEmail, customerName) => {
  */
 export const sendPartnerActivationEmail = async (toEmail, customerName, affiliateCode) => {
   try {
-    const filePath = path.join(__dirname, "../templates/acceptareafiliere.html");
+    // Folosim process.cwd() în loc de __dirname
+    const filePath = path.resolve(process.cwd(), "src", "templates", "acceptareafiliere.html");
     let htmlContent = fs.readFileSync(filePath, "utf8");
 
     // Înlocuim variabilele template-ului
@@ -1379,7 +1381,7 @@ export const sendPartnerActivationEmail = async (toEmail, customerName, affiliat
       .replace(/{{accountUrl}}/g, "https://karixcomputers.ro/account");
 
     const mailOptions = {
-      from: '"Karix Computers" <noreply@karixcomputers.ro>',
+      from: env.MAIL_FROM || '"Karix Computers" <noreply@karixcomputers.ro>',
       to: toEmail,
       subject: "Parteneriat Activat! Codul tău este pregătit pentru live 🎉",
       html: htmlContent,
