@@ -404,9 +404,11 @@ export default function Account() {
                   
                   {(() => {
                     const coupon = Array.isArray(affiliateCoupon) 
+                    
                       ? (affiliateCoupon.length > 0 ? affiliateCoupon[0] : null) 
                       : affiliateCoupon;
-                    
+                    console.log("DEBUG: Obiectul coupon primit:", coupon);
+console.log("DEBUG: totalDiscounted:", coupon?.totalDiscounted);
                     if (!coupon) {
                       return (
                         <div className="p-8 rounded-[40px] bg-white/[0.01] border border-white/5 backdrop-blur-md relative overflow-hidden">
