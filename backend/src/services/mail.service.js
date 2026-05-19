@@ -1395,35 +1395,57 @@ export const sendPartnerActivationEmail = async (toEmail, customerName, affiliat
 };
 
 export const sendAdminWithdrawalAlert = async (data) => {
-  const htmlBody = getTemplate("admin-withdrawal-alert", {
-    userName: data.userName,
-    userEmail: data.userEmail,
-    amount: data.amount.toFixed(2),
-    type: data.type,
-    fullName: data.fullName,
-    identifier: data.identifier,
-    iban: data.iban,
-    bankName: data.bankName || "Nespecificată"
-  });
+  try {
+    // 1. Citim fișierul HTML din src/templates/
+    const filePath = path.resolve(process.cwd(), "src", "templates", "admin-withdrawal-alert.html");
+    let htmlContent = fs.readFileSync(filePath, "utf8");
 
-  await transporter.sendMail({
-    from: '"Karix Computers" <no-reply@karixcomputers.ro>',
-    to: data.adminEmail,
-    subject: `🚨 RE-EXTRAGERE: ${data.amount.toFixed(2)} RON - ${data.userName}`,
-    html: htmlBody
-  });
+    // 2. Înlocuim variabilele din template
+    htmlContent = htmlContent
+      .replace(/{{userName}}/g, data.userName)
+      .replace(/{{userEmail}}/g, data.userEmail)
+      .replace(/{{amount}}/g, Number(data.amount).toFixed(2))
+      .replace(/{{type}}/g, data.type || "Nespecificat")
+      .replace(/{{fullName}}/g, data.fullName || data.userName)
+      .replace(/{{identifier}}/g, data.identifier || "Nespecificat")
+      .replace(/{{iban}}/g, data.iban || "Nespecificat")
+      .replace(/{{bankName}}/g, data.bankName || "Nespecificată");
+
+    const mailOptions = {
+      from: env.MAIL_FROM || '"Karix Computers" <no-reply@karixcomputers.ro>',
+      to: data.adminEmail,
+      subject: `🚨 RE-EXTRAGERE: ${Number(data.amount).toFixed(2)} RON - ${data.userName}`,
+      html: htmlContent,
+    };
+
+    return await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Eroare în sendAdminWithdrawalAlert:", error);
+    throw error;
+  }
 };
 
 export const sendUserWithdrawalConfirmation = async (email, name, amount) => {
-  const htmlBody = getTemplate("promoter-withdrawal-confirmation", {
-    name: name,
-    amount: amount.toFixed(2)
-  });
+  try {
+    // 1. Citim fișierul HTML din src/templates/
+    const filePath = path.resolve(process.cwd(), "src", "templates", "promoter-withdrawal-confirmation.html");
+    let htmlContent = fs.readFileSync(filePath, "utf8");
 
-  await transporter.sendMail({
-    from: '"Karix Computers" <no-reply@karixcomputers.ro>',
-    to: email,
-    subject: `💰 Retragerea ta de ${amount.toFixed(2)} RON este în procesare`,
-    html: htmlBody
-  });
+    // 2. Înlocuim variabilele din template
+    htmlContent = htmlContent
+      .replace(/{{name}}/g, name)
+      .replace(/{{amount}}/g, Number(amount).toFixed(2));
+
+    const mailOptions = {
+      from: env.MAIL_FROM || '"Karix Computers" <no-reply@karixcomputers.ro>',
+      to: email,
+      subject: `💰 Retragerea ta de ${Number(amount).toFixed(2)} RON este în procesare`,
+      html: htmlContent,
+    };
+
+    return await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Eroare în sendUserWithdrawalConfirmation:", error);
+    throw error;
+  }
 };
