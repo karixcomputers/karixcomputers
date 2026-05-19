@@ -770,10 +770,11 @@ async function handleCouponDeliveryStats(orderId) {
 
       // 👉 NOU: CALCUL COMISION AFILIAT
       // Dacă cuponul are un userId asociat, înseamnă că este un cod de afiliat
-      let affiliateEarningsCents = 0;
+// 👉 NOU: CALCUL COMISION AFILIAT
+let affiliateEarningsCents = 0;
 if (coupon.userId) {
-  // În loc de procent, folosim direct discountAmount-ul calculat anterior
-  affiliateEarningsCents = discountAmount; 
+  const commissionPercentage = 5; // 🚀 AICI ESTE PROBLEMA
+  affiliateEarningsCents = Math.round((subtotalItemsCents * commissionPercentage) / 100);
 }
 
       await prisma.coupon.update({
