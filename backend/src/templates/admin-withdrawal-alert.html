@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cerere Nouă de Retragere - Karix Computers</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #030303; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #ffffff;">
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 30px auto; background-color: #0b0c10; border: 1px solid #1f2937; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.7);">
+    
+    <tr>
+      <td align="center" style="padding: 40px 40px 20px 40px; background: linear-gradient(135deg, #4f46e5 0%, #db2777 100%);">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; font-style: italic; color: #ffffff;">
+          🚀 ALERTA RETRAGERE
+        </h1>
+        <p style="margin: 5px 0 0 0; font-size: 12px; font-weight: bold; letter-spacing: 4px; text-transform: uppercase; color: rgba(255,255,255,0.7);">
+          KARIX COMPUTERS SYSTEM
+        </p>
+      </td>
+    </tr>
+
+    <tr>
+      <td style="padding: 40px 30px;">
+        <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #9ca3af;">
+          Salut! Utilizatorul <strong style="color: #ffffff;">{{userName}}</strong> (<a href="mailto:{{userEmail}}" style="color: #818cf8; text-decoration: none;">{{userEmail}}</a>) a solicitat o retragere de fonduri din programul de afiliere.
+        </p>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: rgba(16, 185, 129, 0.05); border: 1px dashed #10b981; border-radius: 16px; margin-bottom: 30px;">
+          <tr>
+            <td style="padding: 20px; text-align: center;">
+              <span style="font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #10b981; display: block; margin-bottom: 5px;">SUMA BRUTĂ SOLICITATĂ</span>
+              <span style="font-size: 32px; font-weight: 900; color: #10b981; font-style: italic;">{{amount}} RON</span>
+            </td>
+          </tr>
+        </table>
+
+        <h3 style="margin: 0 0 15px 0; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #a5b4fc; border-bottom: 1px solid #1f2937; padding-bottom: 5px;">
+          📋 FIȘĂ DETALII FACTURARE / PLATĂ
+        </h3>
+        
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px; font-size: 13px;">
+          <tr>
+            <td style="padding: 8px 0; color: #6b7280; width: 35%;">Tip Entitate:</td>
+            <td style="padding: 8px 0; color: #ffffff; font-weight: bold;">{{type}}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #6b7280;">Nume Beneficiar:</td>
+            <td style="padding: 8px 0; color: #ffffff; font-weight: bold;">{{fullName}}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #6b7280;">CNP / CUI:</td>
+            <td style="padding: 8px 0; color: #f43f5e; font-weight: bold; font-family: monospace; letter-spacing: 1px;">{{identifier}}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #6b7280;">Cont IBAN:</td>
+            <td style="padding: 8px 0; color: #38bdf8; font-weight: bold; font-family: monospace; font-size: 14px;">{{iban}}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #6b7280;">Banca:</td>
+            <td style="padding: 8px 0; color: #ffffff;">{{bankName}}</td>
+          </tr>
+        </table>
+
+        <div style="background-color: #111827; border-left: 4px solid #6366f1; padding: 15px; border-radius: 0 12px 12px 0; font-size: 12px; line-height: 1.5; color: #d1d5db;">
+          <strong>Notă contabilă:</strong> Dacă profilul este FIZIC, efectuează plata NETĂ (Suma minus 10% impozit ANAF) și trimite datele la contabil pentru Declarația 112. Dacă este JURIDIC, plata se face integral în baza facturii primite.
+        </div>
+      </td>
+    </tr>
+
+    <tr>
+      <td align="center" style="padding: 20px; background-color: #010103; border-top: 1px solid #1f2937; font-size: 11px; color: #4b5563;">
+        Sistem automat de gestiune financiară Karix Computers.
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -265,3 +265,18 @@ model Announcement {
   updatedAt  DateTime @updatedAt
   image     String?
 }
+
+model WithdrawalRequest {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountRon   Float
+  type        String   // "FIZICA" sau "JURIDICA"
+  fullName    String   // Nume complet / Denumire Firmă
+  identifier  String   // CNP pentru persoane fizice / CUI pentru juridice
+  iban        String
+  bankName    String?
+  status      String   @default("PENDING") // "PENDING", "PAID", "REJECTED"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

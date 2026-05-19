@@ -1393,3 +1393,37 @@ export const sendPartnerActivationEmail = async (toEmail, customerName, affiliat
     throw error;
   }
 };
+
+export const sendAdminWithdrawalAlert = async (data) => {
+  const htmlBody = getTemplate("admin-withdrawal-alert", {
+    userName: data.userName,
+    userEmail: data.userEmail,
+    amount: data.amount.toFixed(2),
+    type: data.type,
+    fullName: data.fullName,
+    identifier: data.identifier,
+    iban: data.iban,
+    bankName: data.bankName || "Nespecificată"
+  });
+
+  await transporter.sendMail({
+    from: '"Karix Computers" <no-reply@karixcomputers.ro>',
+    to: data.adminEmail,
+    subject: `🚨 RE-EXTRAGERE: ${data.amount.toFixed(2)} RON - ${data.userName}`,
+    html: htmlBody
+  });
+};
+
+export const sendUserWithdrawalConfirmation = async (email, name, amount) => {
+  const htmlBody = getTemplate("promoter-withdrawal-confirmation", {
+    name: name,
+    amount: amount.toFixed(2)
+  });
+
+  await transporter.sendMail({
+    from: '"Karix Computers" <no-reply@karixcomputers.ro>',
+    to: email,
+    subject: `💰 Retragerea ta de ${amount.toFixed(2)} RON este în procesare`,
+    html: htmlBody
+  });
+};
