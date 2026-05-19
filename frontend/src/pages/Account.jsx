@@ -463,20 +463,32 @@ export default function Account() {
               </button>
             </header>
 
-            {/* Zona de text scrollabilă cu termenii */}
-            <div className="flex-1 overflow-y-auto pr-2 space-y-4 text-xs text-gray-400 leading-relaxed font-medium">
-              <p className="text-white font-bold text-sm">1. Dispoziții Generale</p>
-              <p>Prezentul acord stabilește termenii legali pentru participarea în programul de promovare Karix Computers. Prin activarea codului, deveniți un promotor independent și nu un angajat legal al brandului.</p>
-              
-              <p className="text-white font-bold text-sm">2. Generarea și Utilizarea Codului</p>
-              <p>Codul atribuit oferă o reducere fixă de 1% cumpărătorilor la finalizarea comenzilor pe site-ul oficial. Este interzisă publicarea codului pe site-uri de vouchere generice (agregatoare de cupoane). Codul este destinat exclusiv comunității dumneavoastră (TikTok Live, YouTube, Discord, Instagram etc.).</p>
-              
-              <p className="text-white font-bold text-sm">3. Calculul și Plata Comisioanelor</p>
-              <p>Comisioanele se acumulează ca valoare netă în sistem (înregistrate în timp real). Sumele devin eligibile pentru retragere doar după trecerea perioadei legale de retur de 14 zile a produselor comandate de clienți. Plata se realizează pe bază de factură (dacă dețineți PFA/SRL) sau prin acorduri de drepturi de autor, conform legislației fiscale din România.</p>
+{/* Zona de text scrollabilă cu termenii */}
+<div className="flex-1 overflow-y-auto pr-2 space-y-4 text-xs text-gray-400 leading-relaxed font-medium">
+  <p className="text-white font-bold text-sm">1. Dispoziții Generale</p>
+  <p>Prezentul acord stabilește termenii legali pentru participarea în programul de promovare și afiliere Karix Computers. Prin activarea codului, deveniți un partener/promotor independent și nu un angajat legal sau reprezentant oficial al brandului.</p>
+  
+  <p className="text-white font-bold text-sm">2. Generarea și Utilizarea Codului</p>
+  <p>Codul atribuit oferă o reducere fixă de 1% cumpărătorilor la finalizarea comenzilor pe site-ul oficial. Este strict interzisă publicarea codului pe site-uri de vouchere generice (agregatoare de cupoane). Codul este destinat exclusiv comunității dumneavoastră și canalelor media proprii (TikTok Live, YouTube, Discord, Instagram etc.). Încălcarea acestei reguli atrage anularea comisioanelor acumulate.</p>
+  
+  <p className="text-white font-bold text-sm">3. Calculul, Reținerea Taxelor și Plata Comisioanelor</p>
+  <p>Comisioanele se acumulează în sistem în timp real. Sumele generate devin eligibile pentru retragere doar după confirmarea plății comenzilor de către clienți și trecerea perioadei legale de retur de 14 zile pentru produsele respective.</p>
+  <p>**Pragul minim de retragere** a comisioanelor este de **100 RON**.</p>
+  <p>Modalitățile de plată se realizează diferențiat, în funcție de forma juridică a Partenerului, conform legislației fiscale din România:</p>
+  <ul className="list-disc pl-4 space-y-1">
+    <li><strong>Persoane Juridice (PFA/SRL):</strong> Plata se face integral (Suma Brută), în baza unei facturi fiscale emise de Partener.</li>
+    <li><strong>Persoane Fizice (Fără Firmă):</strong> Veniturile sunt încadrate ca drepturi de autor sau convenții civile. Karix Computers va calcula, va reține la sursă și va vira către ANAF impozitul pe venit de 10% datorat de Partener. Plata efectivă în contul bancar al Partenerului se va face sub formă de <strong>Sumă Netă</strong> (Suma Brută minus impozitul de 10%).</li>
+  </ul>
 
-              <p className="text-white font-bold text-sm">4. Conduită și Imagine publică</p>
-              <p>Partenerul se obligă să mențină o imagine publică decentă. Sunt strict interzise promovarea codului în contexte de fraudă, comportament toxic sau defăimarea directă a brandului ori a serviciilor noastre tehnice.</p>
-            </div>
+  <p className="text-white font-bold text-sm">4. Date Obligatorii pentru Plată (Persoane Fizice)</p>
+  <p>Pentru a putea efectua plata legală și declararea taxelor la ANAF (prin Declarația 112), Partenerii persoane fizice au obligația de a furniza la prima retragere: Numele complet (conform CI), CNP-ul și contul IBAN personal. Datele sunt colectate exclusiv în scop fiscal și contabil.</p>
+
+  <p className="text-white font-bold text-sm">5. Conduită și Imagine Publică</p>
+  <p>Partenerul se obligă să mențină o imagine publică decentă în timpul promovării brandului. Sunt strict interzise promovarea codului în contexte de fraudă, dezinformare, comportament toxic sau defăimarea directă a brandului Karix Computers ori a serviciilor noastre tehnice.</p>
+
+  <p className="text-white font-bold text-sm">6. Durata și Încetarea Contractului</p>
+  <p>Prezentul acord intră în vigoare la data acceptării lui electronice și este încheiat pe durată nedeterminată. **Oricare dintre părți (Karix Computers sau Partenerul) poate denunța unilateral și încheia acest parteneriat în orice moment**, fără preaviz și fără obligația de a justifica decizia. În cazul încetării, comisioanele corect acumulate și validate până la momentul rezilierii care depășesc pragul minim vor fi achitate Partenerului.</p>
+</div>
 
             <footer className="mt-6 pt-4 border-top border-white/5 flex justify-end">
               <button
