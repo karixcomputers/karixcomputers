@@ -16,16 +16,15 @@ const requireAdmin = (req, res, next) => {
 
 /**
  * 1. GET: Profilul utilizatorului curent (Logat)
- * Această rută aduce datele tale ȘI cuponul de afiliat din baza de date
+ * Această rută aduce datele tale, cuponul de afiliat ȘI starea parteneriatului
  */
 router.get("/me", requireAuth, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       include: {
-        // Include relația cu tabela Coupon. 
-        // În majoritatea schemelor configurate One-to-Many/Many-to-Many se numește 'coupons'
-        coupons: true 
+        coupons: true, 
+        affiliate: true // 🚀 ADAUGĂ ACEASTĂ LINIE (sau 'partner', în funcție de cum ai numit-o în schema.prisma)
       }
     });
 
