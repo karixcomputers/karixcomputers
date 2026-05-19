@@ -2,29 +2,54 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
-// IMPORTĂM COMPONENTA SEO
 import SEO from "../components/SEO";
 
-const MenuLink = ({ to, icon, label, badge }) => (
-  <Link 
-    to={to} 
-    className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all group backdrop-blur-sm"
-  >
+// Componenta de meniu actualizată pentru a suporta și evenimente de tip Tab/Click local
+const MenuLink = ({ to, icon, label, badge, onClick, isActive }) => {
+  const content = (
     <div className="flex items-center gap-4">
       <span className="text-xl group-hover:scale-110 transition-transform">{icon}</span>
-      <span className="text-sm font-bold text-gray-300 group-hover:text-white uppercase tracking-wider">{label}</span>
+      <span className="text-sm font-bold uppercase tracking-wider">{label}</span>
     </div>
-    {badge > 0 && (
-      <span className="bg-indigo-500/20 text-indigo-400 text-[10px] font-black px-2 py-1 rounded-lg border border-indigo-500/20 animate-in fade-in zoom-in duration-300">
-        {badge}
-      </span>
-    )}
-  </Link>
-);
+  );
+
+  const classes = `w-full flex items-center justify-between p-4 rounded-2xl transition-all group backdrop-blur-sm text-left ${
+    isActive 
+      ? "bg-gradient-to-r from-indigo-500/20 to-pink-500/10 border-indigo-500 text-white font-black" 
+      : "bg-white/[0.02] border-white/5 text-gray-300 hover:bg-white/[0.05] hover:border-indigo-500/30"
+  } border`;
+
+  if (onClick) {
+    return (
+      <button onClick={onClick} className={classes}>
+        {content}
+        {badge > 0 && (
+          <span className="bg-pink-500 text-white text-[9px] font-black px-2 py-0.5 rounded-lg border border-pink-400 animate-pulse">
+            NEW
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <Link to={to} className={classes}>
+      {content}
+      {badge > 0 && (
+        <span className="bg-indigo-500/20 text-indigo-400 text-[10px] font-black px-2 py-1 rounded-lg border border-indigo-500/20">
+          {badge}
+        </span>
+      )}
+    </Link>
+  );
+};
 
 export default function Account() {
   const { user, logout, accessToken } = useAuth();
   const navigate = useNavigate();
+
+  // Tab curent în panou: "general" sau "affiliate"
+  const [activeTab, setActiveTab] = useState("general");
 
   const [stats, setStats] = useState({
     ordersCount: user?.ordersCount || 0,
@@ -32,7 +57,6 @@ export default function Account() {
     ticketsCount: user?.ticketsCount || 0
   });
 
-  // State pentru stocarea datelor cuponului de afiliat
   const [affiliateCoupon, setAffiliateCoupon] = useState(null);
 
   // State-uri pentru editarea numărului de telefon
@@ -41,7 +65,12 @@ export default function Account() {
   const [phoneError, setPhoneError] = useState("");
   const [isSavingPhone, setIsSavingPhone] = useState(false);
 
-  // Sincronizăm cuponul din AuthContext la prima încărcare a paginii folosind noua cheie 'affiliate'
+  // State-uri pentru fluxul de acceptare termeni parteneriat
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState("");
+  const [showTermsModal, setShowTermsModal] = useState(false);
+
   useEffect(() => {
     if (user && user.affiliate) {
       setAffiliateCoupon(user.affiliate);
@@ -55,8 +84,6 @@ export default function Account() {
       const response = await apiFetch("/auth/me");
       if (response.ok) {
         const data = await response.json();
-        
-        // Extras corect din obiectul returnat
         const userData = data.user || data;
 
         if (userData) {
@@ -66,7 +93,6 @@ export default function Account() {
             ticketsCount: userData._count?.tickets ?? userData.ticketsCount ?? 0
           });
 
-          // 👉 POTRIVIRE EXACTĂ: Salvăm obiectul 'affiliate' din rețea
           if (userData.affiliate) {
             setAffiliateCoupon(userData.affiliate);
           } else {
@@ -124,9 +150,37 @@ export default function Account() {
     }
   };
 
+  // Funcția de trimitere acceptare parteneriat către Backend
+  const handleAcceptPartnership = async () => {
+    if (!acceptedTerms) {
+      setAcceptError("Trebuie să bifezi că ești de acord cu termenii programului.");
+      return;
+    }
+
+    setIsAccepting(true);
+    setAcceptError("");
+
+    try {
+      const response = await apiFetch("/coupons/accept", {
+        method: "POST"
+      });
+
+      if (response.ok) {
+        // Reîmprospătăm datele (statusul va deveni ACTIVE)
+        await fetchFreshStats();
+      } else {
+        const data = await response.json();
+        setAcceptError(data.error || "Nu s-a putut activa parteneriatul.");
+      }
+    } catch (err) {
+      setAcceptError("Eroare de comunicare cu serverul.");
+    } finally {
+      setIsAccepting(false);
+    }
+  };
+
   return (
     <>
-      {/* IMPLEMENTARE SEO DINAMIC */}
       <SEO 
         title={`Contul lui ${user?.name?.split(' ')[0] || "Pilot"}`}
         description="Gestionează-ți comenzile, garanțiile și tichetele de suport direct din panoul de control Karix Computers."
@@ -160,13 +214,24 @@ export default function Account() {
               </div>
 
               <nav className="flex flex-col gap-3">
-                <MenuLink to="/orders" icon="📦" label="Comenzile Mele"  />
+                <MenuLink to="#" icon="👤" label="Informații Cont" onClick={() => setActiveTab("general")} isActive={activeTab === "general"} />
+                <MenuLink to="/orders" icon="📦" label="Comenzile Mele" />
                 <MenuLink to="/account/warranties" icon="🛠️" label="Garanții" />
-                <MenuLink to="/tickets" icon="🔄" label="Tichete Suport"  />
+                <MenuLink to="/tickets" icon="🔄" label="Tichete Suport" />
+                
+                {/* 👉 BUTONUL NOU MUTAT ÎN MENIUL DIN STÂNGA */}
+                <MenuLink 
+                  to="#" 
+                  icon="🚀" 
+                  label="Program Afiliere" 
+                  onClick={() => setActiveTab("affiliate")} 
+                  isActive={activeTab === "affiliate"}
+                  badge={affiliateCoupon?.status === "PENDING" ? 1 : 0}
+                />
                 
                 <button 
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-4 p-4 rounded-2xl bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 transition-all mt-4 group backdrop-blur-sm"
+                  className="w-full flex items-center gap-4 p-4 rounded-2xl bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 transition-all mt-4 group backdrop-blur-sm text-left"
                 >
                   <span className="text-xl group-hover:rotate-12 transition-transform">🚪</span>
                   <span className="text-sm font-bold text-red-400 uppercase tracking-wider">Deconectare</span>
@@ -174,166 +239,279 @@ export default function Account() {
               </nav>
             </div>
 
-            {/* Coloana Dreaptă: Date, Afiliere și Statistici */}
+            {/* Coloana Dreaptă: Conținut Dinamic */}
             <div className="lg:col-span-8 space-y-8">
               
-              {/* Caseta Informații Cont */}
-              <div className="p-10 rounded-[40px] bg-white/[0.02] border border-white/10 backdrop-blur-md relative overflow-hidden transition-all hover:bg-white/[0.04]">
-                <h3 className="text-sm font-black text-indigo-400 uppercase tracking-[0.3em] mb-10 flex items-center gap-3">
-                  <span className="h-1 w-8 bg-indigo-500 rounded-full"></span>
-                  Informații Cont
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-12">
-                  <div className="group">
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 group-hover:text-indigo-400 transition-colors">Email</p>
-                    <p className="text-white font-bold text-lg border-b border-white/5 pb-2 truncate">{user?.email}</p>
-                  </div>
-                  
-                  <div className="group">
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-pink-400 transition-colors">Telefon</p>
-                      {!isEditingPhone && (
-                        <button onClick={handleEditPhoneClick} className="text-[9px] text-indigo-400 hover:text-white uppercase tracking-widest font-black transition-colors">
-                          Modifică
-                        </button>
-                      )}
-                    </div>
-
-                    {isEditingPhone ? (
-                      <div className="flex flex-col gap-2 mt-1 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex gap-2">
-                          <input 
-                            type="tel"
-                            value={newPhone}
-                            onChange={(e) => setNewPhone(e.target.value)}
-                            className="flex-1 bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-white text-xs outline-none focus:border-indigo-500 transition-colors"
-                            placeholder="Ex: 0712345678"
-                            disabled={isSavingPhone}
-                          />
-                          <button 
-                            onClick={handleSavePhone} 
-                            disabled={isSavingPhone}
-                            className="bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
-                          >
-                            {isSavingPhone ? "..." : "✓"}
-                          </button>
-                          <button 
-                            onClick={() => setIsEditingPhone(false)} 
-                            disabled={isSavingPhone}
-                            className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                        {phoneError && <span className="text-[9px] text-pink-500 font-bold uppercase tracking-widest">{phoneError}</span>}
+              {/* === TAB 1: INFORMAȚII CONT (GENERAL) === */}
+              {activeTab === "general" && (
+                <div className="space-y-8 animate-in fade-in duration-300">
+                  <div className="p-10 rounded-[40px] bg-white/[0.02] border border-white/10 backdrop-blur-md relative overflow-hidden transition-all hover:bg-white/[0.04]">
+                    <h3 className="text-sm font-black text-indigo-400 uppercase tracking-[0.3em] mb-10 flex items-center gap-3">
+                      <span className="h-1 w-8 bg-indigo-500 rounded-full"></span>
+                      Informații Cont
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-12">
+                      <div className="group">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 group-hover:text-indigo-400 transition-colors">Email</p>
+                        <p className="text-white font-bold text-lg border-b border-white/5 pb-2 truncate">{user?.email}</p>
                       </div>
-                    ) : (
-                      <p className="text-white font-bold text-lg border-b border-white/5 pb-2">{user?.phone || "—"}</p>
-                    )}
-                  </div>
+                      
+                      <div className="group">
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-pink-400 transition-colors">Telefon</p>
+                          {!isEditingPhone && (
+                            <button onClick={handleEditPhoneClick} className="text-[9px] text-indigo-400 hover:text-white uppercase tracking-widest font-black transition-colors">
+                              Modifică
+                            </button>
+                          )}
+                        </div>
 
-                  <div className="group">
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Membru din</p>
-                    <p className="text-white font-bold text-lg">
-                      {user?.createdAt 
-                        ? new Date(user.createdAt).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })
-                        : "Recent"}
-                    </p>
-                  </div>
+                        {isEditingPhone ? (
+                          <div className="flex flex-col gap-2 mt-1 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="flex gap-2">
+                              <input 
+                                type="tel"
+                                value={newPhone}
+                                onChange={(e) => setNewPhone(e.target.value)}
+                                className="flex-1 bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-white text-xs outline-none focus:border-indigo-500 transition-colors"
+                                placeholder="Ex: 0712345678"
+                                disabled={isSavingPhone}
+                              />
+                              <button 
+                                onClick={handleSavePhone} 
+                                disabled={isSavingPhone}
+                                className="bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
+                              >
+                                {isSavingPhone ? "..." : "✓"}
+                              </button>
+                              <button 
+                                onClick={() => setIsEditingPhone(false)} 
+                                disabled={isSavingPhone}
+                                className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            {phoneError && <span className="text-[9px] text-pink-500 font-bold uppercase tracking-widest">{phoneError}</span>}
+                          </div>
+                        ) : (
+                          <p className="text-white font-bold text-lg border-b border-white/5 pb-2">{user?.phone || "—"}</p>
+                        )}
+                      </div>
 
-                  <div className="group">
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Securitate</p>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${user?.isEmailVerified ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}>
-                        {user?.isEmailVerified ? "Email Verificat ✅" : "Neconfirmat ⚠️"}
-                      </span>
+                      <div className="group">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Membru din</p>
+                        <p className="text-white font-bold text-lg">
+                          {user?.createdAt 
+                            ? new Date(user.createdAt).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })
+                            : "Recent"}
+                        </p>
+                      </div>
+
+                      <div className="group">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Securitate</p>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${user?.isEmailVerified ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}>
+                            {user?.isEmailVerified ? "Email Verificat ✅" : "Neconfirmat ⚠️"}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* 👉 SECȚIUNE AFILIERE ACTUALIZATĂ CU STRUCTURA DIRECTĂ */}
-              {affiliateCoupon && affiliateCoupon.isActive ? (
-                <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl shadow-indigo-950/20 animate-in fade-in duration-500">
-                  <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 blur-3xl pointer-events-none" />
-                  
-                  <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
-                    <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
-                    Program Afiliere Karix
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                    {/* Cod Cupon */}
-                    <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center relative">
-                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
-                      <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">
-                        {affiliateCoupon.code}
-                      </span>
-                    </div>
-
-                    {/* Utilizări totale */}
-                    <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
-                      <span className="text-2xl font-black text-white">
-                        {affiliateCoupon.timesUsed || 0}
-                      </span>
-                    </div>
-
-                    {/* Câștiguri generate */}
-                    <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Câștiguri Total</span>
-                      <span className="text-2xl font-black text-emerald-400">
-                        {(affiliateCoupon.earnings || 0).toFixed(2)} RON
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* CASETA CARE APARE CÂND UTILIZATORUL NU ARE AFILIAT ACTIV */
-                <div className="p-8 rounded-[40px] bg-white/[0.01] border border-white/5 backdrop-blur-md relative overflow-hidden transition-all hover:bg-white/[0.02] hover:border-white/10 animate-in fade-in duration-500">
-                  <h3 className="text-sm font-black text-gray-400 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
-                    <span className="h-1 w-8 bg-gray-600 rounded-full"></span>
-                    Program Afiliere Karix
-                  </h3>
-                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                    <div>
-                      <p className="text-white font-bold text-base mb-1">Nu ai un cod de afiliat activ</p>
-                      <p className="text-xs text-gray-400 max-w-xl leading-relaxed">
-                        Vrei să câștigi comisioane și să oferi reduceri comunității tale? Contactează-ne prin metodele de pe pagina de contact pentru a solicita activarea contului de partener Karix.
-                      </p>
-                    </div>
-                    <Link 
-                      to="/contact" 
-                      className="px-5 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-black text-[11px] uppercase tracking-wider rounded-xl border border-indigo-500/20 hover:border-indigo-500/40 transition-all text-center whitespace-nowrap auto-cols-max"
-                    >
-                      Contactează-ne ➜
-                    </Link>
+                  {/* Cards Statistici */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[
+                      { val: stats.ordersCount, label: "Comenzi Totale", icon: "📦" },
+                      { val: stats.wishlistCount, label: "Wishlist", icon: "❤️" },
+                      { val: stats.ticketsCount, label: "Tichete Suport", icon: "🛠️" }
+                    ].map((stat, i) => (
+                      <div key={i} className="group p-8 rounded-[32px] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all relative overflow-hidden backdrop-blur-sm">
+                        <div className="absolute -right-4 -bottom-4 text-6xl opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">{stat.icon}</div>
+                        <p className="text-4xl font-black text-white mb-1 tracking-tighter">
+                          {stat.val || 0}
+                        </p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">{stat.label}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Cards Statistici */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                  { val: stats.ordersCount, label: "Comenzi Totale", icon: "📦", color: "indigo" },
-                  { val: stats.wishlistCount, label: "Wishlist", icon: "❤️", color: "pink" },
-                  { val: stats.ticketsCount, label: "Tichete Suport", icon: "🛠️", color: "emerald" }
-                ].map((stat, i) => (
-                  <div key={i} className={`group p-8 rounded-[32px] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all relative overflow-hidden backdrop-blur-sm`}>
-                    <div className="absolute -right-4 -bottom-4 text-6xl opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">{stat.icon}</div>
-                    <p className="text-4xl font-black text-white mb-1 tracking-tighter animate-in fade-in slide-in-from-bottom-2 duration-500">
-                      {stat.val || 0}
-                    </p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">{stat.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+              {/* === TAB 2: PROGRAM AFILIERE (MODIFICAT CONFORM FLUXULUI DE ACCEPTARE) === */}
+              {activeTab === "affiliate" && (
+                <div className="space-y-8 animate-in fade-in duration-300">
+                  
+                  {/* CAZ 1: CUPON EXISTENT ȘI ACTIVAT (ACTIVE) */}
+                  {affiliateCoupon && affiliateCoupon.status === "ACTIVE" && affiliateCoupon.isActive && (
+                    <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl">
+                      <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
+                        <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
+                        Statistici Partener Karix
+                      </h3>
 
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
+                          <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">
+                            {affiliateCoupon.code}
+                          </span>
+                        </div>
+
+                        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
+                          <span className="text-2xl font-black text-white">
+                            {affiliateCoupon.timesUsed || 0}
+                          </span>
+                        </div>
+
+                        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Comisioane Generate</span>
+                          <span className="text-2xl font-black text-emerald-400">
+                            {((affiliateCoupon.earningsCents || affiliateCoupon.earnings || 0) / 100).toFixed(2)} RON
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CAZ 2: INVITAȚIE ÎN AȘTEPTARE (PENDING) -> CASETA CYBERPUNK DE ACCEPTARE */}
+                  {affiliateCoupon && affiliateCoupon.status === "PENDING" && (
+                    <div className="p-10 rounded-[40px] bg-gradient-to-b from-indigo-500/10 to-pink-500/5 border border-indigo-500/30 backdrop-blur-xl relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                      <div className="absolute right-0 top-0 w-64 h-64 bg-pink-500/10 blur-3xl pointer-events-none" />
+                      
+                      <h3 className="text-lg font-black text-white uppercase tracking-wider mb-2 flex items-center gap-2 italic">
+                        🚀 Invitație Parteneriat Pre-Aprobată!
+                      </h3>
+                      <p className="text-xs text-gray-400 mb-8 leading-relaxed">
+                        Felicitări! Ai fost selectat pentru a deveni partener oficial al brandului **Karix Computers**. Comunitatea ta va primi un cod de **1% reducere** la orice comandă pe site, iar tu vei acumula comisioane direct în bani în acest panou.
+                      </p>
+
+                      <div className="bg-black/30 border border-white/5 rounded-3xl p-6 mb-8 space-y-4">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Codul rezervat pentru tine:</span>
+                          <span className="text-sm font-black text-pink-400 bg-pink-500/10 px-3 py-1 rounded-xl border border-pink-500/20">{affiliateCoupon.code}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Acord Oficial:</span>
+                          <button 
+                            onClick={() => setShowTermsModal(true)}
+                            className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 underline uppercase tracking-wider"
+                          >
+                            Citește Termenii și Condițiile ➜
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Checkbox Acceptare */}
+                      <div className="flex items-start gap-3 mb-6 select-none">
+                        <input 
+                          type="checkbox" 
+                          id="termsCheck"
+                          checked={acceptedTerms}
+                          onChange={(e) => setAcceptedTerms(e.target.checked)}
+                          className="mt-1 h-4 w-4 rounded border-white/10 bg-black/40 text-indigo-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                        />
+                        <label htmlFor="termsCheck" className="text-xs text-gray-300 cursor-pointer leading-tight font-medium">
+                          Confirm că am citit, înțeleg și sunt pe deplin de acord cu termenii și obligațiile stipulate în contractul digital de afiliere Karix.
+                        </label>
+                      </div>
+
+                      {acceptError && (
+                        <p className="text-xs text-pink-500 font-bold uppercase tracking-wide mb-4 animate-shake">
+                          ⚠️ {acceptError}
+                        </p>
+                      )}
+
+                      {/* Buton Activare */}
+                      <button
+                        onClick={handleAcceptPartnership}
+                        disabled={isAccepting}
+                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl shadow-indigo-950/50 disabled:opacity-50"
+                      >
+                        {isAccepting ? "Se activează contul..." : "Activează Contul de Partener 🚀"}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* CAZ 3: NU EXISTĂ UN COD ASOCIAT */}
+                  {(!affiliateCoupon || !affiliateCoupon.isActive) && (
+                    <div className="p-8 rounded-[40px] bg-white/[0.01] border border-white/5 backdrop-blur-md relative overflow-hidden">
+                      <h3 className="text-sm font-black text-gray-400 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
+                        <span className="h-1 w-8 bg-gray-600 rounded-full"></span>
+                        Program Afiliere Karix
+                      </h3>
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                        <div>
+                          <p className="text-white font-bold text-base mb-1">Nu ai un cod de afiliat activ</p>
+                          <p className="text-xs text-gray-400 max-w-xl leading-relaxed">
+                            Vrei să câștigi comisioane și să oferi reduceri comunității tale pe live-uri sau clipuri? Contactează-ne pentru a solicita verificarea canalelor tale sociale și generarea unui link de partener pre-aprobat.
+                          </p>
+                        </div>
+                        <Link 
+                          to="/contact" 
+                          className="px-5 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-black text-[11px] uppercase tracking-wider rounded-xl border border-indigo-500/20 hover:border-indigo-500/40 transition-all text-center whitespace-nowrap"
+                        >
+                          Contactează-ne ➜
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+            </div>
           </div>
         </div>
       </div>
+
+      {/* ================= MODAL CITIRE TERMENI ȘI CONDIȚII ================= */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-[#0f172a] border border-white/10 rounded-[32px] p-8 max-h-[80vh] flex flex-col relative overflow-hidden shadow-2xl">
+            <header className="mb-6 flex justify-between items-center border-b border-white/5 pb-4">
+              <h4 className="text-lg font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">
+                Termeni și Condiții Afiliere
+              </h4>
+              <button 
+                onClick={() => setShowTermsModal(false)}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-xs font-black flex items-center justify-center transition-colors"
+              >
+                ✕
+              </button>
+            </header>
+
+            {/* Zona de text scrollabilă cu termenii */}
+            <div className="flex-1 overflow-y-auto pr-2 space-y-4 text-xs text-gray-400 leading-relaxed font-medium">
+              <p className="text-white font-bold text-sm">1. Dispoziții Generale</p>
+              <p>Prezentul acord stabilește termenii legali pentru participarea în programul de promovare Karix Computers. Prin activarea codului, deveniți un promotor independent și nu un angajat legal al brandului.</p>
+              
+              <p className="text-white font-bold text-sm">2. Generarea și Utilizarea Codului</p>
+              <p>Codul atribuit oferă o reducere fixă de 1% cumpărătorilor la finalizarea comenzilor pe site-ul oficial. Este interzisă publicarea codului pe site-uri de vouchere generice (agregatoare de cupoane). Codul este destinat exclusiv comunității dumneavoastră (TikTok Live, YouTube, Discord, Instagram etc.).</p>
+              
+              <p className="text-white font-bold text-sm">3. Calculul și Plata Comisioanelor</p>
+              <p>Comisioanele se acumulează ca valoare netă în sistem (înregistrate în timp real). Sumele devin eligibile pentru retragere doar după trecerea perioadei legale de retur de 14 zile a produselor comandate de clienți. Plata se realizează pe bază de factură (dacă dețineți PFA/SRL) sau prin acorduri de drepturi de autor, conform legislației fiscale din România.</p>
+
+              <p className="text-white font-bold text-sm">4. Conduită și Imagine publică</p>
+              <p>Partenerul se obligă să mențină o imagine publică decentă. Sunt strict interzise promovarea codului în contexte de fraudă, comportament toxic sau defăimarea directă a brandului ori a serviciilor noastre tehnice.</p>
+            </div>
+
+            <footer className="mt-6 pt-4 border-top border-white/5 flex justify-end">
+              <button
+                onClick={() => {
+                  setAcceptedTerms(true);
+                  setShowTermsModal(false);
+                }}
+                className="px-6 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-colors"
+              >
+                Am citit și Accept termenii
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -1,6 +1,8 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
+// 👉 IMPORTĂM SERVICIUL DE MAIL (ajustează calea dacă diferă în proiectul tău)
+import { sendPartnerInvitationEmail, sendPartnerActivationEmail } from "../services/mail.service.js";
 
 const prisma = new PrismaClient();
 const router = express.Router();
@@ -16,6 +18,7 @@ const requireAdmin = (req, res, next) => {
 
 /**
  * 1. POST: Validare cupon (Public - pentru clienți în coș)
+ * OPTIMIZAT: Un cupon cu status PENDING nu poate fi folosit la cumpărături!
  */
 router.post("/validate", async (req, res) => {
   try {
@@ -27,7 +30,8 @@ router.post("/validate", async (req, res) => {
       where: { code: code.toUpperCase().trim() }
     });
 
-    if (!coupon || !coupon.isActive) {
+    // Verifică dacă e activ și dacă statusul este ACTIVE
+    if (!coupon || !coupon.isActive || coupon.status !== "ACTIVE") {
       return res.status(404).json({ error: "Codul de reducere este invalid sau inactiv." });
     }
 
@@ -47,7 +51,6 @@ router.post("/validate", async (req, res) => {
       return res.status(400).json({ error: `Comanda minimă pentru acest cod este de ${minRon} RON.` });
     }
 
-    // Trimitem datele esențiale înapoi
     res.json({
       id: coupon.id,
       code: coupon.code,
@@ -76,17 +79,17 @@ router.get("/", requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
- * 3. POST: Creare cupon (Admin) -> SUPORTĂ LEGARE PRIN EMAIL UTILIZATOR
+ * 3. POST: Creare cupon (Admin) -> IMPLEMENTAT FLUX INVITATIE
  */
 router.post("/", requireAuth, requireAdmin, async (req, res) => {
   const { code, discountType, discountValue, minOrderTotal, usageLimit, expiryDate, userEmail } = req.body;
   
   try {
     let linkedUserId = null;
+    let targetUser = null;
 
-    // Dacă admin-ul a completat căsuța de email, căutăm user-ul în baza de date
     if (userEmail && userEmail.trim() !== "") {
-      const targetUser = await prisma.user.findUnique({
+      targetUser = await prisma.user.findUnique({
         where: { email: userEmail.trim().toLowerCase() }
       });
 
@@ -97,19 +100,32 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
       linkedUserId = targetUser.id;
     }
 
+    // Dacă este legat de un user, pornește ca "PENDING", altfel e un cupon simplu direct "ACTIVE"
+    const initialStatus = linkedUserId ? "PENDING" : "ACTIVE";
+
     const newCoupon = await prisma.coupon.create({
       data: {
         code: code.toUpperCase().trim(),
-        discountType, // "percentage" sau "fixed"
+        discountType,
         discountValue: parseInt(discountValue),
         minOrderTotal: minOrderTotal ? parseInt(minOrderTotal) : 0,
         usageLimit: usageLimit ? parseInt(usageLimit) : null,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
-        totalDiscounted: 0,
-        earningsCents: 0,
-        userId: linkedUserId // Salvăm ID-ul utilizatorului (va fi null dacă nu s-a introdus email)
+        userId: linkedUserId,
+        status: initialStatus
       }
     });
+
+    // Trimitem e-mailul de invitație dacă avem un utilizator asociat
+    if (linkedUserId && targetUser) {
+      try {
+        await sendPartnerInvitationEmail(targetUser.email, targetUser.name);
+        console.log(`✉️ Email invitație partener trimis către: ${targetUser.email}`);
+      } catch (mailErr) {
+        console.error("❌ Eroare la trimiterea email-ului de invitație:", mailErr);
+        // Nu blocăm crearea cuponului dacă crapă serviciul de mail
+      }
+    }
 
     res.status(201).json(newCoupon);
   } catch (e) {
@@ -122,7 +138,51 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
- * 4. DELETE: Șterge cupon (Admin)
+ * 👉 RUTA NOUĂ: 4. POST: Acceptare termeni parteneriat (Utilizator Logat)
+ * Această rută va fi apelată din frontend când streamerul apasă pe butonul de activare din cont
+ */
+router.post("/accept", requireAuth, async (req, res) => {
+  try {
+    // Căutăm cuponul asociat utilizatorului curent logat
+    const coupon = await prisma.coupon.findUnique({
+      where: { userId: req.user.id }
+    });
+
+    if (!coupon) {
+      return res.status(444).json({ error: "Nu a fost găsit niciun cont de partener pre-aprobat." });
+    }
+
+    if (coupon.status === "ACTIVE") {
+      return res.status(400).json({ error: "Parteneriatul este deja activ." });
+    }
+
+    // Actualizăm statusul în bază
+    const updatedCoupon = await prisma.coupon.update({
+      where: { id: coupon.id },
+      data: {
+        status: "ACTIVE",
+        acceptedAt: new Date()
+      }
+    });
+
+    // Trimitem E-mailul 2 (Confirmarea activării + Codul primit)
+    try {
+      await sendPartnerActivationEmail(req.user.email, req.user.name, coupon.code);
+      console.log(`✉️ Email activare partener trimis către: ${req.user.email}`);
+    } catch (mailErr) {
+      console.error("❌ Eroare la trimiterea email-ului de activare:", mailErr);
+    }
+
+    res.json({ success: true, message: "Parteneriat activat cu succes!", coupon: updatedCoupon });
+
+  } catch (error) {
+    console.error("ACCEPT PARTNERSHIP ERROR:", error);
+    res.status(500).json({ error: "Eroare la activarea parteneriatului." });
+  }
+});
+
+/**
+ * 5. DELETE: Șterge cupon (Admin)
  */
 router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
   try {

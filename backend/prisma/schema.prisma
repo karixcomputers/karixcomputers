@@ -222,20 +222,24 @@ model WishlistItem {
 }
 
 model Coupon {
-  id            String    @id @default(cuid())
-  code          String    @unique 
-  discountType  String    
-  discountValue Int       
-  minOrderTotal Int       @default(0) 
-  usageLimit    Int?      
-  timesUsed     Int       @default(0)
-  isActive      Boolean   @default(true)
-  expiryDate    DateTime?
-  createdAt     DateTime  @default(now())
-  totalDiscounted Int      @default(0)
+  id              String    @id @default(cuid())
+  code            String    @unique 
+  discountType    String    
+  discountValue   Int       
+  minOrderTotal   Int       @default(0) 
+  usageLimit      Int?      
+  timesUsed       Int       @default(0)
+  isActive        Boolean   @default(true)
+  expiryDate      DateTime?
+  createdAt       DateTime  @default(now())
+  totalDiscounted Int       @default(0)
   userId          String?   @unique // Devine ocupat doar dacă e cod de afiliat
   user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   earningsCents   Int       @default(0) // Sumele în bani (cenți) acumulate de afiliat din vânzări
+  
+  // 👉 LINIILE NOI PENTRU FLUXUL DE AFILIERE
+  status          String    @default("ACTIVE") // Valori: "PENDING" (invitat) sau "ACTIVE" (activat)
+  acceptedAt      DateTime? 
 }
 
 model ConfiguratorComponent {

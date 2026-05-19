@@ -1334,3 +1334,60 @@ export async function sendServiceAwbRejectedEmail(to, data) {
     console.error("❌ Eroare sendServiceAwbRejectedEmail:", err);
   }
 }
+
+
+/**
+ * Trimite e-mailul de invitație când adminul asociază contul (PENDING)
+ */
+export const sendPartnerInvitationEmail = async (toEmail, customerName) => {
+  try {
+    // Schimbă calea dacă ai pus fișierele HTML într-un alt folder (ex: "../templates/asociereafiliat.html")
+    const filePath = path.join(__dirname, "../templates/asociereafiliat.html");
+    let htmlContent = fs.readFileSync(filePath, "utf8");
+
+    // Înlocuim variabilele template-ului
+    htmlContent = htmlContent
+      .replace(/{{customerName}}/g, customerName)
+      .replace(/{{accountUrl}}/g, "https://karixcomputers.ro/account");
+
+    const mailOptions = {
+      from: '"Karix Computers" <noreply@karixcomputers.ro>', // Configurează adresa ta oficială
+      to: toEmail,
+      subject: "Felicitări! Ai fost selectat ca partener Karix Computers 🚀",
+      html: htmlContent,
+    };
+
+    return await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Eroare în sendPartnerInvitationEmail:", error);
+    throw error;
+  }
+};
+
+/**
+ * Trimite e-mailul de confirmare după ce partenerul acceptă termenii (ACTIVE)
+ */
+export const sendPartnerActivationEmail = async (toEmail, customerName, affiliateCode) => {
+  try {
+    const filePath = path.join(__dirname, "../templates/acceptareafiliere.html");
+    let htmlContent = fs.readFileSync(filePath, "utf8");
+
+    // Înlocuim variabilele template-ului
+    htmlContent = htmlContent
+      .replace(/{{customerName}}/g, customerName)
+      .replace(/{{affiliateCode}}/g, affiliateCode.toUpperCase())
+      .replace(/{{accountUrl}}/g, "https://karixcomputers.ro/account");
+
+    const mailOptions = {
+      from: '"Karix Computers" <noreply@karixcomputers.ro>',
+      to: toEmail,
+      subject: "Parteneriat Activat! Codul tău este pregătit pentru live 🎉",
+      html: htmlContent,
+    };
+
+    return await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Eroare în sendPartnerActivationEmail:", error);
+    throw error;
+  }
+};
