@@ -33,18 +33,19 @@ router.get("/me", requireAuth, async (req, res) => {
 
     const { passwordHash, refreshTokenHash, verificationCode, affiliateCoupon, ...userData } = user;
 console.log("DEBUG BACKEND: Ce conține affiliateCoupon:", affiliateCoupon);
-    const responseData = {
-      ...userData,
-      affiliate: affiliateCoupon ? {
-        code: affiliateCoupon.code,
-        timesUsed: affiliateCoupon.timesUsed,
-        isActive: affiliateCoupon.isActive,
-        status: affiliateCoupon.status,
-        // ✅ AICI ESTE PROBLEMA: Asigură-te că folosești numele exact din schema Prisma
-        // Verifică în schema.prisma dacă se numește 'totalDiscounted'
-        totalDiscounted: affiliateCoupon.totalDiscounted || 0 
-      } : null
-    };
+const responseData = {
+  ...userData,
+  // ✅ Păstrează numele exact pe care îl așteaptă frontend-ul!
+  affiliateCoupon: affiliateCoupon ? {
+    id: affiliateCoupon.id,
+    code: affiliateCoupon.code,
+    timesUsed: affiliateCoupon.timesUsed,
+    isActive: affiliateCoupon.isActive,
+    status: affiliateCoupon.status,
+    totalDiscounted: affiliateCoupon.totalDiscounted || 0,
+    earningsCents: affiliateCoupon.earningsCents || 0 // Trimitem și câștigurile!
+  } : null
+};
 
     res.json({ user: responseData });
   } catch (error) {

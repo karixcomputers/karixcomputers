@@ -431,14 +431,13 @@ console.log("DEBUG: totalDiscounted:", coupon?.totalDiscounted);
                       );
                     }
 
-                    const currentStatus = coupon.status?.toUpperCase();
+const currentStatus = coupon.status?.toUpperCase();
 
 if (currentStatus === "ACTIVE") {
-  // 👉 SCHIMBARE AICI: Folosim 'totalDiscounted' și împărțim la 100
-// În loc de varianta veche, folosește asta:
-const totalCents = coupon?.totalDiscounted || 0;
-const earningsRON = (totalCents / 100).toFixed(2);
-const isEligibleForWithdrawal = parseFloat(earningsRON) >= 100;
+  // ✅ Folosim earningsCents (sau totalDiscounted ca fallback)
+  const totalCents = coupon?.earningsCents || coupon?.totalDiscounted || 0;
+  const earningsRON = (totalCents / 100).toFixed(2);
+  const isEligibleForWithdrawal = parseFloat(earningsRON) >= 100;
 
   return (
     <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl">
