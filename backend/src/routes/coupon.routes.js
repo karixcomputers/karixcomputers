@@ -145,9 +145,19 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
  */
 router.post("/accept", requireAuth, async (req, res) => {
   try {
-    // Căutăm cuponul asociat utilizatorului curent logat
+    // 1. Extragere sigură a ID-ului de utilizator (acoperă atât .sub cât și .id)
+    const userId = req.user?.sub || req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Utilizator neautentificat sau ID lipsă." });
+    }
+
+    // 2. Căutăm cuponul asociat utilizatorului curent logat + includem datele de User pentru email
     const coupon = await prisma.coupon.findUnique({
-      where: { userId: req.user.id }
+      where: { userId: userId },
+      include: {
+        user: true // 🚀 Includem relația cu user-ul ca să avem acces sigur la email și nume real!
+      }
     });
 
     if (!coupon) {
@@ -158,7 +168,7 @@ router.post("/accept", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Parteneriatul este deja activ." });
     }
 
-    // Actualizăm statusul în bază
+    // 3. Actualizăm statusul în bază
     const updatedCoupon = await prisma.coupon.update({
       where: { id: coupon.id },
       data: {
@@ -167,12 +177,16 @@ router.post("/accept", requireAuth, async (req, res) => {
       }
     });
 
-    // Trimitem E-mailul 2 (Confirmarea activării + Codul primit)
-    try {
-      await sendPartnerActivationEmail(req.user.email, req.user.name, coupon.code);
-      console.log(`✉️ Email activare partener trimis către: ${req.user.email}`);
-    } catch (mailErr) {
-      console.error("❌ Eroare la trimiterea email-ului de activare:", mailErr);
+    // 4. Trimitem E-mailul folosind datele sigure venite din baza de date (coupon.user)
+    if (coupon.user) {
+      try {
+        await sendPartnerActivationEmail(coupon.user.email, coupon.user.name, coupon.code);
+        console.log(`✉️ Email activare partener trimis către: ${coupon.user.email}`);
+      } catch (mailErr) {
+        console.error("❌ Eroare la trimiterea email-ului de activare:", mailErr);
+      }
+    } else {
+      console.warn("⚠️ Cuponul nu are un utilizator asociat valid pentru trimiterea email-ului.");
     }
 
     res.json({ success: true, message: "Parteneriat activat cu succes!", coupon: updatedCoupon });
