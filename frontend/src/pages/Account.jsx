@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import SEO from "../components/SEO";
 
-// Componenta de meniu actualizată pentru a suporta și evenimente de tip Tab/Click local
+// Componenta de meniu
 const MenuLink = ({ to, icon, label, badge, onClick, isActive }) => {
   const content = (
     <div className="flex items-center gap-4">
@@ -48,9 +48,7 @@ export default function Account() {
   const { user, logout, accessToken } = useAuth();
   const navigate = useNavigate();
 
-  // Tab curent în panou: "general" sau "affiliate"
   const [activeTab, setActiveTab] = useState("general");
-
   const [stats, setStats] = useState({
     ordersCount: user?.ordersCount || 0,
     wishlistCount: user?.wishlistCount || 0,
@@ -58,26 +56,27 @@ export default function Account() {
   });
 
   const [affiliateCoupon, setAffiliateCoupon] = useState(null);
+  
+  // State pentru istoricul retragerilor
+  const [myWithdrawals, setMyWithdrawals] = useState([]);
+  const [showMyHistory, setShowMyHistory] = useState(false);
 
-  // State-uri pentru editarea numărului de telefon
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [newPhone, setNewPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [isSavingPhone, setIsSavingPhone] = useState(false);
 
-  // State-uri pentru fluxul de acceptare termeni parteneriat
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
   const [acceptError, setAcceptError] = useState("");
   const [showTermsModal, setShowTermsModal] = useState(false);
 
-  // State-uri pentru fluxul de retragere fonduri
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawForm, setWithdrawForm] = useState({
-    type: "FIZICA", // "FIZICA" sau "JURIDICA"
+    type: "FIZICA",
     amount: "",
     fullName: "",
-    identifier: "", // CNP sau CUI
+    identifier: "",
     iban: "",
     bankName: ""
   });
@@ -88,6 +87,15 @@ export default function Account() {
       setAffiliateCoupon(user.affiliate);
     }
   }, [user]);
+
+  const fetchMyWithdrawals = async () => {
+    try {
+      const res = await apiFetch("/coupons/my-withdrawals");
+      if (res.ok) setMyWithdrawals(await res.json());
+    } catch (err) {
+      console.error("Eroare încărcare retrageri personale:", err);
+    }
+  };
 
   const fetchFreshStats = async () => {
     if (!accessToken) return;
@@ -119,7 +127,8 @@ export default function Account() {
 
   useEffect(() => {
     fetchFreshStats();
-  }, [accessToken]); 
+    if (accessToken) fetchMyWithdrawals();
+  }, [accessToken]);
 
   const handleLogout = async () => {
     await logout();
@@ -193,7 +202,6 @@ export default function Account() {
     e.preventDefault();
     setWithdrawStatus({ loading: true, error: "", success: "" });
 
-    // Validare de bază
     if (!withdrawForm.amount || parseFloat(withdrawForm.amount) < 100) {
       setWithdrawStatus({ loading: false, error: "Suma minimă este 100 RON.", success: "" });
       return;
@@ -219,11 +227,11 @@ export default function Account() {
 
       if (response.ok) {
         setWithdrawStatus({ loading: false, error: "", success: "Cererea de retragere a fost trimisă cu succes!" });
-        // Închidem modalul și facem refresh la date după 2 secunde
         setTimeout(() => {
           setShowWithdrawModal(false);
           setWithdrawStatus({ loading: false, error: "", success: "" });
           fetchFreshStats();
+          fetchMyWithdrawals(); // Reîncarcă și istoricul retragerilor
         }, 2000);
       } else {
         const data = await response.json();
@@ -239,6 +247,14 @@ export default function Account() {
     setWithdrawForm(prev => ({ ...prev, [name]: value }));
   };
 
+  // Funcție de helper pentru a extrage cuponul curent
+  const getCoupon = () => {
+    return Array.isArray(affiliateCoupon) 
+      ? (affiliateCoupon.length > 0 ? affiliateCoupon[0] : null) 
+      : affiliateCoupon;
+  };
+
+  // === RENDER ===
   return (
     <>
       <SEO 
@@ -247,7 +263,6 @@ export default function Account() {
       />
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden">
-        {/* Efecte vizuale fundal */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-gradient-to-b from-indigo-500/10 to-transparent blur-[120px] pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-pink-500/5 blur-[120px] pointer-events-none" />
 
@@ -263,7 +278,7 @@ export default function Account() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
-            {/* Coloana Stângă: Profil și Navigare */}
+            {/* Coloana Stângă */}
             <div className="lg:col-span-4 space-y-4">
               <div className="p-8 rounded-[40px] bg-white/[0.02] border border-white/10 backdrop-blur-md mb-6 transition-all hover:bg-white/[0.04]">
                 <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-pink-500 mx-auto mb-4 flex items-center justify-center text-3xl font-black text-white shadow-2xl shadow-indigo-500/30 rotate-3">
@@ -285,7 +300,7 @@ export default function Account() {
                   label="Program Afiliere" 
                   onClick={() => setActiveTab("affiliate")} 
                   isActive={activeTab === "affiliate"}
-                  badge={affiliateCoupon?.status === "PENDING" ? 1 : 0}
+                  badge={getCoupon()?.status === "PENDING" ? 1 : 0}
                 />
                 
                 <button 
@@ -298,10 +313,10 @@ export default function Account() {
               </nav>
             </div>
 
-            {/* Coloana Dreaptă: Conținut Dinamic */}
+            {/* Coloana Dreaptă */}
             <div className="lg:col-span-8 space-y-8">
               
-              {/* === TAB 1: INFORMAȚII CONT (GENERAL) === */}
+              {/* TAB 1: GENERAL */}
               {activeTab === "general" && (
                 <div className="space-y-8 animate-in fade-in duration-300">
                   <div className="p-10 rounded-[40px] bg-white/[0.02] border border-white/10 backdrop-blur-md relative overflow-hidden transition-all hover:bg-white/[0.04]">
@@ -337,18 +352,10 @@ export default function Account() {
                                 placeholder="Ex: 0712345678"
                                 disabled={isSavingPhone}
                               />
-                              <button 
-                                onClick={handleSavePhone} 
-                                disabled={isSavingPhone}
-                                className="bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
-                              >
+                              <button onClick={handleSavePhone} disabled={isSavingPhone} className="bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-colors disabled:opacity-50">
                                 {isSavingPhone ? "..." : "✓"}
                               </button>
-                              <button 
-                                onClick={() => setIsEditingPhone(false)} 
-                                disabled={isSavingPhone}
-                                className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
-                              >
+                              <button onClick={() => setIsEditingPhone(false)} disabled={isSavingPhone} className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-black text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl transition-colors disabled:opacity-50">
                                 ✕
                               </button>
                             </div>
@@ -379,7 +386,6 @@ export default function Account() {
                     </div>
                   </div>
 
-                  {/* Cards Statistici */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {[
                       { val: stats.ordersCount, label: "Comenzi Totale", icon: "📦" },
@@ -398,17 +404,12 @@ export default function Account() {
                 </div>
               )}
 
-              {/* === TAB 2: PROGRAM AFILIERE === */}
+              {/* TAB 2: AFILIERE */}
               {activeTab === "affiliate" && (
                 <div className="space-y-8 animate-in fade-in duration-300">
-                  
                   {(() => {
-                    const coupon = Array.isArray(affiliateCoupon) 
+                    const coupon = getCoupon();
                     
-                      ? (affiliateCoupon.length > 0 ? affiliateCoupon[0] : null) 
-                      : affiliateCoupon;
-                    console.log("DEBUG: Obiectul coupon primit:", coupon);
-console.log("DEBUG: totalDiscounted:", coupon?.totalDiscounted);
                     if (!coupon) {
                       return (
                         <div className="p-8 rounded-[40px] bg-white/[0.01] border border-white/5 backdrop-blur-md relative overflow-hidden">
@@ -431,71 +432,107 @@ console.log("DEBUG: totalDiscounted:", coupon?.totalDiscounted);
                       );
                     }
 
-const currentStatus = coupon.status?.toUpperCase();
+                    const currentStatus = coupon.status?.toUpperCase();
 
-if (currentStatus === "ACTIVE") {
-  // ✅ REPARAT: Backend-ul trimite 'earnings' direct ca valoare calculată (ex: 1322.28)
-  // Punem și o verificare de siguranță în caz că pe viitor revii la varianta cu totalDiscounted
-  let earningsRON = "0.00";
+                    // CAZ 1: PARTENER ACTIV
+                    if (currentStatus === "ACTIVE") {
+                      let earningsRON = "0.00";
+                      if (coupon?.earnings !== undefined) {
+                        earningsRON = Number(coupon.earnings).toFixed(2);
+                      } else {
+                        const totalCents = coupon?.totalDiscounted || 0;
+                        earningsRON = (totalCents / 100).toFixed(2);
+                      }
 
-  if (coupon?.earnings !== undefined) {
-    // Dacă primim direct 'earnings' (cum e acum în Network: 1322.28)
-    earningsRON = Number(coupon.earnings).toFixed(2);
-  } else {
-    // Fallback în caz că pe viitor vine sub formă de cenți în totalDiscounted
-    const totalCents = coupon?.totalDiscounted || 0;
-    earningsRON = (totalCents / 100).toFixed(2);
-  }
+                      const isEligibleForWithdrawal = parseFloat(earningsRON) >= 100;
+                      const pendingWithdrawal = myWithdrawals?.find(w => w.status === "PENDING");
+                      const paidWithdrawals = myWithdrawals?.filter(w => w.status === "PAID") || [];
 
-  const isEligibleForWithdrawal = parseFloat(earningsRON) >= 100;
-
-  return (
-    <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl">
-      <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
-        <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
-        Statistici Partener Karix
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
-          <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">{coupon.code}</span>
-        </div>
-        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
-          <span className="text-2xl font-black text-white">{coupon.timesUsed || 0}</span>
-        </div>
-        <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
-          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Reduceri Generate</span>
-          <span className="text-2xl font-black text-emerald-400">{earningsRON} RON</span>
-        </div>
-      </div>
-
-                          {/* ZONA DE RETRAGERE (NOU) */}
-                          <div className="mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <div>
-                              <p className="text-[11px] text-gray-400 uppercase tracking-widest font-bold">Prag minim retragere: 100 RON</p>
-                              {!isEligibleForWithdrawal && (
-                                <p className="text-[10px] text-pink-400 font-bold uppercase mt-1">
-                                  Mai ai nevoie de {(100 - parseFloat(earningsRON)).toFixed(2)} RON
-                                </p>
-                              )}
+                      return (
+                        <>
+                          <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl">
+                            <h3 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
+                              <span className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full"></span>
+                              Statistici Partener Karix
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                              <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Codul Tău</span>
+                                <span className="text-2xl font-black italic text-indigo-400 uppercase tracking-wider select-all cursor-pointer">{coupon.code}</span>
+                              </div>
+                              <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Utilizări</span>
+                                <span className="text-2xl font-black text-white">{coupon.timesUsed || 0}</span>
+                              </div>
+                              <div className="bg-black/20 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Reduceri Generate</span>
+                                <span className="text-2xl font-black text-emerald-400">{earningsRON} RON</span>
+                              </div>
                             </div>
-                            <button
-                              onClick={() => {
-                                setWithdrawForm(prev => ({ ...prev, amount: earningsRON }));
-                                setShowWithdrawModal(true);
-                              }}
-                              disabled={!isEligibleForWithdrawal}
-                              className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-widest rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/20"
-                            >
-                              Solicită Retragerea
-                            </button>
+
+                            <div className="mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
+                              <div>
+                                <p className="text-[11px] text-gray-400 uppercase tracking-widest font-bold">Prag minim retragere: 100 RON</p>
+                                {!isEligibleForWithdrawal && (
+                                  <p className="text-[10px] text-pink-400 font-bold uppercase mt-1">
+                                    Mai ai nevoie de {(100 - parseFloat(earningsRON || 0)).toFixed(2)} RON
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setWithdrawForm(prev => ({ ...prev, amount: earningsRON }));
+                                  setShowWithdrawModal(true);
+                                }}
+                                disabled={!isEligibleForWithdrawal || pendingWithdrawal}
+                                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-widest rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/20"
+                              >
+                                {pendingWithdrawal ? "Cerere în procesare" : "Solicită Retragerea"}
+                              </button>
+                            </div>
                           </div>
-                        </div>
+
+                          {/* ALERTA PENDING */}
+                          {pendingWithdrawal && (
+                            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold italic flex items-center gap-2 animate-pulse text-left w-full">
+                              <span>⏳ Ai o cerere de retragere în curs de procesare pentru suma de {Number(pendingWithdrawal.amountRon || 0).toFixed(2)} RON (Trimisă la: {new Date(pendingWithdrawal.createdAt || Date.now()).toLocaleDateString('ro-RO')}).</span>
+                            </div>
+                          )}
+
+                          {/* ISTORIC RETRAGERI */}
+                          <div className="w-full text-left">
+                            <button
+                              type="button"
+                              onClick={() => setShowMyHistory(!showMyHistory)}
+                              className="px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all text-white"
+                            >
+                              {showMyHistory ? "Ascunde Istoric" : `📜 Istoric Retrageri Finalizate (${paidWithdrawals.length})`}
+                            </button>
+
+                            {showMyHistory && (
+                              <div className="mt-4 p-6 rounded-3xl bg-white/5 border border-white/10 flex flex-col gap-3 text-white">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400 mb-2">Plăți efectuate cu succes</h4>
+                                {paidWithdrawals.length === 0 ? (
+                                  <p className="text-gray-500 italic text-xs">Nu ai nicio retragere finalizată încă.</p>
+                                ) : (
+                                  paidWithdrawals.map(w => (
+                                    <div key={w.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 flex justify-between items-center text-sm">
+                                      <div>
+                                        <div className="font-bold text-white">Suma trimisă în cont</div>
+                                        <div className="text-[10px] text-gray-500 font-mono mt-0.5">IBAN: {w.iban} | Dată plată: {new Date(w.updatedAt).toLocaleDateString('ro-RO')}</div>
+                                      </div>
+                                      <div className="font-black text-emerald-400 text-lg">+{Number(w.amountRon).toFixed(2)} RON</div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </>
                       );
                     }
 
-                    // CAZ 2: INVITAȚIE ÎN AȘTEPTARE (PENDING)
+                    // CAZ 2: INVITAȚIE PENDING
                     if (currentStatus === "PENDING" || !coupon.isActive) {
                       return (
                         <div className="p-10 rounded-[40px] bg-gradient-to-b from-indigo-500/10 to-pink-500/5 border border-indigo-500/30 backdrop-blur-xl relative overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
@@ -533,7 +570,6 @@ if (currentStatus === "ACTIVE") {
 
                     return <p className="text-xs text-gray-500">Stare parteneriat nedefinită. Contactează suportul.</p>;
                   })()}
-
                 </div>
               )}
             </div>
@@ -541,7 +577,7 @@ if (currentStatus === "ACTIVE") {
         </div>
       </div>
 
-      {/* ================= MODAL CITIRE TERMENI ȘI CONDIȚII ================= */}
+      {/* ================= MODALE ================= */}
       {showTermsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-2xl bg-[#0f172a] border border-white/10 rounded-[32px] p-8 max-h-[80vh] flex flex-col relative overflow-hidden shadow-2xl">
@@ -549,41 +585,27 @@ if (currentStatus === "ACTIVE") {
               <h4 className="text-lg font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">
                 Termeni și Condiții Afiliere
               </h4>
-              <button 
-                onClick={() => setShowTermsModal(false)}
-                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-xs font-black flex items-center justify-center transition-colors"
-              >
+              <button onClick={() => setShowTermsModal(false)} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-xs font-black flex items-center justify-center transition-colors">
                 ✕
               </button>
             </header>
 
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 text-xs text-gray-400 leading-relaxed font-medium custom-scrollbar">
               <p className="text-white font-bold text-sm">1. Dispoziții Generale</p>
-              <p>Prezentul acord stabilește termenii legali pentru participarea în programul de promovare și afiliere Karix Computers. Prin activarea codului, deveniți un partener/promotor independent și nu un angajat legal sau reprezentant oficial al brandului.</p>
-              
+              <p>Prezentul acord stabilește termenii legali pentru participarea în programul de promovare și afiliere Karix Computers.</p>
               <p className="text-white font-bold text-sm">2. Generarea și Utilizarea Codului</p>
-              <p>Codul atribuit oferă o reducere fixă de 1% cumpărătorilor la finalizarea comenzilor pe site-ul oficial. Este strict interzisă publicarea codului pe site-uri de vouchere generice (agregatoare de cupoane). Codul este destinat exclusiv comunității dumneavoastră și canalelor media proprii (TikTok Live, YouTube, Discord, Instagram etc.). Încălcarea acestei reguli atrage anularea comisioanelor acumulate.</p>
-              
+              <p>Codul atribuit oferă o reducere fixă de 1% cumpărătorilor la finalizarea comenzilor pe site-ul oficial. Este strict interzisă publicarea codului pe site-uri de vouchere generice.</p>
               <p className="text-white font-bold text-sm">3. Calculul, Reținerea Taxelor și Plata Comisioanelor</p>
-              <p>Comisioanele se acumulează în sistem în timp real. Sumele generate devin eligibile pentru retragere doar după confirmarea plății comenzilor de către clienți și trecerea perioadei legale de retur de 14 zile pentru produsele respective.</p>
               <p>**Pragul minim de retragere** a comisioanelor este de **100 RON**.</p>
-              <p>Modalitățile de plată se realizează diferențiat, în funcție de forma juridică a Partenerului, conform legislației fiscale din România:</p>
               <ul className="list-disc pl-4 space-y-1">
-                <li><strong>Persoane Juridice (PFA/SRL):</strong> Plata se face integral (Suma Brută), în baza unei facturi fiscale emise de Partener.</li>
-                <li><strong>Persoane Fizice (Fără Firmă):</strong> Veniturile sunt încadrate ca drepturi de autor sau convenții civile. Karix Computers va calcula, va reține la sursă și va vira către ANAF impozitul pe venit de 10% datorat de Partener. Plata efectivă în contul bancar al Partenerului se va face sub formă de <strong>Sumă Netă</strong> (Suma Brută minus impozitul de 10%).</li>
+                <li><strong>Persoane Juridice (PFA/SRL):</strong> Plata integrală.</li>
+                <li><strong>Persoane Fizice (Fără Firmă):</strong> Se reține impozitul de 10%. Plata efectivă este Suma Netă.</li>
               </ul>
-
               <p className="text-white font-bold text-sm">4. Date Obligatorii pentru Plată (Persoane Fizice)</p>
-              <p>Pentru a putea efectua plata legală și declararea taxelor la ANAF (prin Declarația 112), Partenerii persoane fizice au obligația de a furniza la prima retragere: Numele complet (conform CI), CNP-ul și contul IBAN personal. Datele sunt colectate exclusiv în scop fiscal și contabil.</p>
-
-              <p className="text-white font-bold text-sm">5. Conduită și Imagine Publică</p>
-              <p>Partenerul se obligă să mențină o imagine publică decentă în timpul promovării brandului. Sunt strict interzise promovarea codului în contexte de fraudă, dezinformare, comportament toxic sau defăimarea directă a brandului Karix Computers ori a serviciilor noastre tehnice.</p>
-
-              <p className="text-white font-bold text-sm">6. Durata și Încetarea Contractului</p>
-              <p>Prezentul acord intră în vigoare la data acceptării lui electronice și este încheiat pe durată nedeterminată. **Oricare dintre părți (Karix Computers sau Partenerul) poate denunța unilateral și încheia acest parteneriat în orice moment**, fără preaviz și fără obligația de a justifica decizia. În cazul încetării, comisioanele corect acumulate și validate până la momentul rezilierii care depășesc pragul minim vor fi achitate Partenerului.</p>
+              <p>Obligația de a furniza Nume complet, CNP și cont IBAN.</p>
             </div>
 
-            <footer className="mt-6 pt-4 border-top border-white/5 flex justify-end">
+            <footer className="mt-6 pt-4 border-t border-white/5 flex justify-end">
               <button
                 onClick={() => {
                   setAcceptedTerms(true);
@@ -598,21 +620,15 @@ if (currentStatus === "ACTIVE") {
         </div>
       )}
 
-      {/* ================= MODAL FORMULAR RETRAGERE (NOU) ================= */}
       {showWithdrawModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-lg bg-[#0b0c10] border border-white/10 rounded-[32px] p-8 relative overflow-hidden shadow-2xl">
             <header className="mb-6 border-b border-white/5 pb-4 flex justify-between items-start">
               <div>
-                <h4 className="text-lg font-black uppercase tracking-wider text-emerald-400 flex items-center gap-2">
-                  💰 Solicitare Retragere
-                </h4>
+                <h4 className="text-lg font-black uppercase tracking-wider text-emerald-400 flex items-center gap-2">💰 Solicitare Retragere</h4>
                 <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">Transfer Bancar direct</p>
               </div>
-              <button 
-                onClick={() => setShowWithdrawModal(false)}
-                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-xs font-black flex items-center justify-center transition-colors"
-              >
+              <button onClick={() => setShowWithdrawModal(false)} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-xs font-black flex items-center justify-center transition-colors">
                 ✕
               </button>
             </header>
@@ -625,23 +641,11 @@ if (currentStatus === "ACTIVE") {
               </div>
             ) : (
               <form onSubmit={handleWithdrawSubmit} className="space-y-5">
-                
-                {/* Suma de retras */}
                 <div className="bg-black/20 p-4 rounded-2xl border border-white/5">
                   <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Sumă de retras (RON)</label>
-                  <input 
-                    type="number"
-                    name="amount"
-                    value={withdrawForm.amount}
-                    onChange={handleFormChange}
-                    min="100"
-                    step="0.01"
-                    className="w-full bg-transparent text-2xl font-black text-white outline-none"
-                    required
-                  />
+                  <input type="number" name="amount" value={withdrawForm.amount} onChange={handleFormChange} min="100" step="0.01" className="w-full bg-transparent text-2xl font-black text-white outline-none" required />
                 </div>
 
-                {/* Tip Entitate */}
                 <div>
                   <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Tip Profil Fiscal</label>
                   <div className="flex gap-4">
@@ -656,90 +660,42 @@ if (currentStatus === "ACTIVE") {
                   </div>
                 </div>
 
-                {/* Date Personale / Firmă */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">
-                      {withdrawForm.type === "FIZICA" ? "Nume Complet (din CI)" : "Nume Firmă (PFA/SRL)"}
-                    </label>
-                    <input 
-                      type="text"
-                      name="fullName"
-                      value={withdrawForm.fullName}
-                      onChange={handleFormChange}
-                      className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-indigo-500 transition-colors"
-                      required
-                    />
+                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">{withdrawForm.type === "FIZICA" ? "Nume Complet (din CI)" : "Nume Firmă"}</label>
+                    <input type="text" name="fullName" value={withdrawForm.fullName} onChange={handleFormChange} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-indigo-500 transition-colors" required />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">
-                      {withdrawForm.type === "FIZICA" ? "CNP" : "CUI / CIF"}
-                    </label>
-                    <input 
-                      type="text"
-                      name="identifier"
-                      value={withdrawForm.identifier}
-                      onChange={handleFormChange}
-                      className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-indigo-500 transition-colors"
-                      required
-                    />
+                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">{withdrawForm.type === "FIZICA" ? "CNP" : "CUI / CIF"}</label>
+                    <input type="text" name="identifier" value={withdrawForm.identifier} onChange={handleFormChange} className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-indigo-500 transition-colors" required />
                   </div>
                 </div>
 
-                {/* Date Bancare */}
                 <div className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Cont IBAN</label>
-                    <input 
-                      type="text"
-                      name="iban"
-                      value={withdrawForm.iban}
-                      onChange={handleFormChange}
-                      placeholder="RO..."
-                      className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-indigo-500 transition-colors font-mono uppercase"
-                      required
-                    />
+                    <input type="text" name="iban" value={withdrawForm.iban} onChange={handleFormChange} placeholder="RO..." className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-indigo-500 transition-colors font-mono uppercase" required />
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Nume Bancă (Opțional)</label>
-                    <input 
-                      type="text"
-                      name="bankName"
-                      value={withdrawForm.bankName}
-                      onChange={handleFormChange}
-                      placeholder="Ex: Banca Transilvania"
-                      className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-indigo-500 transition-colors"
-                    />
+                    <input type="text" name="bankName" value={withdrawForm.bankName} onChange={handleFormChange} placeholder="Ex: Banca Transilvania" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-indigo-500 transition-colors" />
                   </div>
                 </div>
 
-                {/* Mesaje de eroare */}
                 {withdrawStatus.error && (
                   <div className="bg-pink-500/10 border border-pink-500/20 rounded-xl p-3">
                     <p className="text-[10px] text-pink-400 font-bold uppercase tracking-widest text-center">⚠️ {withdrawStatus.error}</p>
                   </div>
                 )}
 
-                {/* Buton Submit */}
-                <button 
-                  type="submit"
-                  disabled={withdrawStatus.loading}
-                  className="w-full py-4 mt-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all shadow-xl disabled:opacity-50"
-                >
+                <button type="submit" disabled={withdrawStatus.loading} className="w-full py-4 mt-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all shadow-xl disabled:opacity-50">
                   {withdrawStatus.loading ? "Se procesează..." : "Trimite Cererea"}
                 </button>
-                
-                {/* Info Text pentru Persoane Fizice */}
-                {withdrawForm.type === "FIZICA" && (
-                  <p className="text-[9px] text-gray-500 text-center leading-relaxed px-4">
-                    *În calitate de persoană fizică, Karix Computers va reține la sursă impozitul pe venit (10%) și îl va declara la ANAF în numele tău. Suma încasată efectiv în cont va fi valoarea NETĂ.
-                  </p>
-                )}
               </form>
             )}
           </div>
         </div>
       )}
     </>
-  ); 
+  );
 }

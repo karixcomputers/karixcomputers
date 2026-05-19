@@ -78,4 +78,24 @@ router.get("/admin-all", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * 👉 GET: Retragerile utilizatorului curent logat
+ */
+router.get("/my-withdrawals", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user?.sub || req.user?.id;
+    
+    const myRequests = await prisma.withdrawalRequest.findMany({
+      where: { userId: userId },
+      orderBy: { createdAt: "desc" }
+    });
+    
+    res.json(myRequests);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Nu s-a putut încărca istoricul personal." });
+  }
+});
+
+
 export default router;
