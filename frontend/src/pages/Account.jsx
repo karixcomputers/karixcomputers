@@ -557,7 +557,7 @@ export default function Account() {
                           <div className="flex items-start gap-3 mb-6 select-none">
                             <input type="checkbox" id="termsCheck" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 h-4 w-4 rounded border-white/10 bg-black/40 text-indigo-500 focus:ring-0 focus:ring-offset-0 cursor-pointer" />
                             <label htmlFor="termsCheck" className="text-xs text-gray-300 cursor-pointer leading-tight font-medium">
-                              Confirm că am citit și sunt de acord cu termenii de afiliere Karix.
+                              Confirm că am citit și sunt de acord cu termenii de afiliere Karix Computers.
                             </label>
                           </div>
                           {acceptError && <p className="text-xs text-pink-500 font-bold uppercase tracking-wide mb-4">⚠️ {acceptError}</p>}
