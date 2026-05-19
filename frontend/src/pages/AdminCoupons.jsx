@@ -27,7 +27,7 @@ export default function AdminCoupons() {
       if (res.ok) setCoupons(await res.json());
 
       // 👉 2. TRAGEM ISTORICUL DIN BACKEND
-      const resW = await apiFetch("/coupons/withdrawal");
+      const resW = await apiFetch("/coupons/withdraw");
       if (resW.ok) setWithdrawals(await resW.json());
     } catch (err) { 
       console.error(err); 
