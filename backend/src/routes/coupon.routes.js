@@ -1,13 +1,15 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
-// 👉 IMPORTĂM SERVICIUL DE MAIL (ajustează calea dacă diferă în proiectul tău)
-import { sendPartnerInvitationEmail, sendPartnerActivationEmail, sendAdminWithdrawalAlert, sendUserWithdrawalConfirmation } from "../services/mail.service.js";
+import { 
+  sendPartnerInvitationEmail, 
+  sendPartnerActivationEmail, 
+  sendAdminWithdrawalAlert, 
+  sendUserWithdrawalConfirmation 
+} from "../services/mail.service.js";
 
 const prisma = new PrismaClient();
 const router = express.Router();
-
-
 
 // --- MIDDLEWARE PENTRU ADMIN ---
 const requireAdmin = (req, res, next) => {
@@ -19,8 +21,24 @@ const requireAdmin = (req, res, next) => {
 };
 
 /**
+ * 🚀 NOUĂ & REPARATĂ: 7. GET: Istoric retrageri (Admin)
+ * Pusă sus de tot ca să evite erorile de 404 cauzate de rutele dinamice de mai jos
+ */
+router.get("/withdraw", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const requests = await prisma.withdrawalRequest.findMany({
+      include: { user: true },
+      orderBy: { createdAt: "desc" }
+    });
+    res.json(requests);
+  } catch (e) {
+    console.error("EROARE GET WITHDRAW:", e);
+    res.status(500).json({ error: "Nu s-au putut încărca cererile de retragere." });
+  }
+});
+
+/**
  * 1. POST: Validare cupon (Public - pentru clienți în coș)
- * OPTIMIZAT: Un cupon cu status PENDING nu poate fi folosit la cumpărături!
  */
 router.post("/validate", async (req, res) => {
   try {
@@ -32,22 +50,18 @@ router.post("/validate", async (req, res) => {
       where: { code: code.toUpperCase().trim() }
     });
 
-    // Verifică dacă e activ și dacă statusul este ACTIVE
     if (!coupon || !coupon.isActive || coupon.status !== "ACTIVE") {
       return res.status(404).json({ error: "Codul de reducere este invalid sau inactiv." });
     }
 
-    // Verifică data expirării
     if (coupon.expiryDate && new Date(coupon.expiryDate) < new Date()) {
       return res.status(400).json({ error: "Acest cod a expirat." });
     }
 
-    // Verifică limita de utilizări
     if (coupon.usageLimit && coupon.timesUsed >= coupon.usageLimit) {
       return res.status(400).json({ error: "Acest cod nu mai este disponibil (limită atinsă)." });
     }
 
-    // Verifică totalul minim al comenzii
     if (cartTotal < coupon.minOrderTotal) {
       const minRon = (coupon.minOrderTotal / 100).toFixed(0);
       return res.status(400).json({ error: `Comanda minimă pentru acest cod este de ${minRon} RON.` });
@@ -81,7 +95,7 @@ router.get("/", requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
- * 3. POST: Creare cupon (Admin) -> IMPLEMENTAT FLUX INVITATIE
+ * 3. POST: Creare cupon (Admin)
  */
 router.post("/", requireAuth, requireAdmin, async (req, res) => {
   const { code, discountType, discountValue, minOrderTotal, usageLimit, expiryDate, userEmail } = req.body;
@@ -102,7 +116,6 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
       linkedUserId = targetUser.id;
     }
 
-    // Dacă este legat de un user, pornește ca "PENDING", altfel e un cupon simplu direct "ACTIVE"
     const initialStatus = linkedUserId ? "PENDING" : "ACTIVE";
 
     const newCoupon = await prisma.coupon.create({
@@ -118,14 +131,12 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
       }
     });
 
-    // Trimitem e-mailul de invitație dacă avem un utilizator asociat
     if (linkedUserId && targetUser) {
       try {
         await sendPartnerInvitationEmail(targetUser.email, targetUser.name);
         console.log(`✉️ Email invitație partener trimis către: ${targetUser.email}`);
       } catch (mailErr) {
         console.error("❌ Eroare la trimiterea email-ului de invitație:", mailErr);
-        // Nu blocăm crearea cuponului dacă crapă serviciul de mail
       }
     }
 
@@ -140,24 +151,18 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
- * 👉 RUTA NOUĂ: 4. POST: Acceptare termeni parteneriat (Utilizator Logat)
- * Această rută va fi apelată din frontend când streamerul apasă pe butonul de activare din cont
+ * 4. POST: Acceptare termeni parteneriat (Utilizator Logat)
  */
 router.post("/accept", requireAuth, async (req, res) => {
   try {
-    // 1. Extragere sigură a ID-ului de utilizator (acoperă atât .sub cât și .id)
     const userId = req.user?.sub || req.user?.id;
-
     if (!userId) {
       return res.status(401).json({ error: "Utilizator neautentificat sau ID lipsă." });
     }
 
-    // 2. Căutăm cuponul asociat utilizatorului curent logat + includem datele de User pentru email
     const coupon = await prisma.coupon.findUnique({
       where: { userId: userId },
-      include: {
-        user: true // 🚀 Includem relația cu user-ul ca să avem acces sigur la email și nume real!
-      }
+      include: { user: true }
     });
 
     if (!coupon) {
@@ -168,7 +173,6 @@ router.post("/accept", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Parteneriatul este deja activ." });
     }
 
-    // 3. Actualizăm statusul în bază
     const updatedCoupon = await prisma.coupon.update({
       where: { id: coupon.id },
       data: {
@@ -177,7 +181,6 @@ router.post("/accept", requireAuth, async (req, res) => {
       }
     });
 
-    // 4. Trimitem E-mailul folosind datele sigure venite din baza de date (coupon.user)
     if (coupon.user) {
       try {
         await sendPartnerActivationEmail(coupon.user.email, coupon.user.name, coupon.code);
@@ -185,8 +188,6 @@ router.post("/accept", requireAuth, async (req, res) => {
       } catch (mailErr) {
         console.error("❌ Eroare la trimiterea email-ului de activare:", mailErr);
       }
-    } else {
-      console.warn("⚠️ Cuponul nu are un utilizator asociat valid pentru trimiterea email-ului.");
     }
 
     res.json({ success: true, message: "Parteneriat activat cu succes!", coupon: updatedCoupon });
@@ -212,17 +213,13 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
- * 👉 RUTA COMPLETĂ: 6. POST: Cerere de retragere câștiguri + Trimite Mailuri
+ * 🛠️ ACTUALIZATĂ: 6. POST: Cerere de retragere câștiguri + Salvare în Baza de date + Trimite Mailuri
  */
 router.post("/withdraw", requireAuth, async (req, res, next) => {
   try {
     const userId = req.user?.sub || req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Utilizator neautentificat." });
 
-    if (!userId) {
-      return res.status(401).json({ error: "Utilizator neautentificat." });
-    }
-
-    // 1. Căutăm cuponul partenerului și includem datele de utilizator
     const coupon = await prisma.coupon.findUnique({
       where: { userId: userId },
       include: { user: true }
@@ -232,53 +229,66 @@ router.post("/withdraw", requireAuth, async (req, res, next) => {
       return res.status(444).json({ error: "Nu deții un cont de parteneriat valid." });
     }
 
-    // 2. Calculăm suma disponibilă în RON direct din totalDiscounted
     const earningsRON = coupon.totalDiscounted / 100;
 
-    // 3. Verificăm pragul minim de 100 RON
     if (earningsRON < 100) {
       return res.status(400).json({ 
         error: `Suma minimă pentru retragere este de 100 RON. Momentan ai: ${earningsRON.toFixed(2)} RON.` 
       });
     }
 
-    // 4. Extragem datele trimise din frontend (IBAN, Nume Complet etc.)
-    // Asigură-te că în frontend trimiți aceste câmpuri în corpul request-ului (req.body)
     const { type, fullName, identifier, iban, bankName } = req.body;
 
-    // 5. TRMITEM EMAIL CĂTRE ADMIN (Karix Computers)
+    if (!fullName || !identifier || !iban) {
+      return res.status(400).json({ error: "Te rugăm să completezi Numele complet, CNP/CUI și contul IBAN." });
+    }
+
+    // 🚀 TRANZACȚIE: Salvăm în noul tău model de Prisma (WithdrawalRequest) și resetăm câștigurile cuponului
+    await prisma.$transaction([
+      prisma.withdrawalRequest.create({
+        data: {
+          userId,
+          amountRon: parseFloat(earningsRON.toFixed(2)), // Salvat ca Float conform noului model
+          type: type || "FIZICA",
+          fullName,
+          identifier,
+          iban,
+          bankName: bankName || "Nespecificată"
+        }
+      }),
+      prisma.coupon.update({
+        where: { id: coupon.id },
+        data: { totalDiscounted: 0 } // Îl resetăm la 0 ca să nu mai tragă banii încă o dată
+      })
+    ]);
+
+    // Trimitem email către Admin
     try {
       await sendAdminWithdrawalAlert({
         userName: coupon.user.name,
         userEmail: coupon.user.email,
         amount: earningsRON,
-        type: type || "Nespecificat (PFA/PF)",
-        fullName: fullName || coupon.user.name,
-        identifier: identifier || "Nespecificat",
-        iban: iban || "Nespecificat",
+        type: type || "FIZICA",
+        fullName: fullName,
+        identifier: identifier,
+        iban: iban,
         bankName: bankName || "Nespecificată",
-        adminEmail: "karixcomputers@gmail.com" // 👈 Mailul tău unde vrei să primești alerta
+        adminEmail: "karixcomputers@gmail.com"
       });
-      console.log("✉️ Alertă de retragere trimisă către Admin.");
     } catch (adminMailErr) {
       console.error("❌ Eroare la trimiterea mail-ului către admin:", adminMailErr);
     }
 
-    // 6. TRIMITEM EMAIL DE CONFIRMARE CĂTRE UTILIZATOR / PROMOTER
+    // Trimitem email către partener
     try {
-      await sendUserWithdrawalConfirmation(
-        coupon.user.email,
-        coupon.user.name,
-        earningsRON
-      );
-      console.log(`✉️ Confirmare de retragere trimisă către partener: ${coupon.user.email}`);
+      await sendUserWithdrawalConfirmation(coupon.user.email, coupon.user.name, earningsRON);
     } catch (userMailErr) {
       console.error("❌ Eroare la trimiterea mail-ului către partener:", userMailErr);
     }
 
     res.json({ 
       success: true, 
-      message: `Cererea de retragere pentru suma de ${earningsRON.toFixed(2)} RON a fost înregistrată. Verifică adresa de email!` 
+      message: `Cererea de retragere pentru suma de ${earningsRON.toFixed(2)} RON a fost înregistrată cu succes!` 
     });
 
   } catch (error) {
@@ -286,4 +296,5 @@ router.post("/withdraw", requireAuth, async (req, res, next) => {
     res.status(500).json({ error: "Eroare la procesarea cererii de retragere." });
   }
 });
+
 export default router;
