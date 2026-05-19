@@ -63,7 +63,10 @@ const getFullUser = async (userId) => {
     affiliate: affiliateCoupon ? {
       code: affiliateCoupon.code,
       timesUsed: affiliateCoupon.timesUsed,
-      earnings: affiliateCoupon.earningsCents / 100, // Convertim din cenți direct în RON pentru interfață
+      // ✅ Convertim valoarea din baza de date direct în RON (Ex: din 55095 cenți în 550.95 RON)
+      earnings: affiliateCoupon.earningsCents / 100, 
+      // ✅ REPARAT: Trimitem OBLIGATORIU și totalDiscounted împărțit la 100 către frontend!
+      totalDiscounted: affiliateCoupon.totalDiscounted / 100, 
       isActive: affiliateCoupon.isActive,
       status: affiliateCoupon.status
     } : null
