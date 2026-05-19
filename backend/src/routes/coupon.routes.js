@@ -2,7 +2,7 @@ import express from "express";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
 // 👉 IMPORTĂM SERVICIUL DE MAIL (ajustează calea dacă diferă în proiectul tău)
-import { sendPartnerInvitationEmail, sendPartnerActivationEmail } from "../services/mail.service.js";
+import { sendPartnerInvitationEmail, sendPartnerActivationEmail, sendAdminWithdrawalAlert, sendUserWithdrawalConfirmation } from "../services/mail.service.js";
 
 const prisma = new PrismaClient();
 const router = express.Router();
@@ -212,8 +212,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
 });
 
 /**
- * 👉 RUTA REPARATĂ: 6. POST: Cerere de retragere câștiguri (Utilizator Logat)
- * Această rută preia cererea, verifică dacă are pragul minim și oprește abuzurile
+ * 👉 RUTA COMPLETĂ: 6. POST: Cerere de retragere câștiguri + Trimite Mailuri
  */
 router.post("/withdraw", requireAuth, async (req, res, next) => {
   try {
@@ -223,17 +222,17 @@ router.post("/withdraw", requireAuth, async (req, res, next) => {
       return res.status(401).json({ error: "Utilizator neautentificat." });
     }
 
-    // 1. Căutăm cuponul partenerului
+    // 1. Căutăm cuponul partenerului și includem datele de utilizator
     const coupon = await prisma.coupon.findUnique({
       where: { userId: userId },
       include: { user: true }
     });
 
-    if (!coupon) {
-      return res.status(444).json({ error: "Nu deții un cupon de parteneriat." });
+    if (!coupon || !coupon.user) {
+      return res.status(444).json({ error: "Nu deții un cont de parteneriat valid." });
     }
 
-    // 2. Calculăm suma disponibilă în RON direct din totalDiscounted (baza de date)
+    // 2. Calculăm suma disponibilă în RON direct din totalDiscounted
     const earningsRON = coupon.totalDiscounted / 100;
 
     // 3. Verificăm pragul minim de 100 RON
@@ -243,14 +242,43 @@ router.post("/withdraw", requireAuth, async (req, res, next) => {
       });
     }
 
-    // TODO: Aici poți adăuga logica ta internă (ex: trimitere email automată către tine la karixcomputers@gmail.com,
-    // sau crearea unei înregistrări într-un tabel `WithdrawalRequests` din baza de date).
+    // 4. Extragem datele trimise din frontend (IBAN, Nume Complet etc.)
+    // Asigură-te că în frontend trimiți aceste câmpuri în corpul request-ului (req.body)
+    const { type, fullName, identifier, iban, bankName } = req.body;
 
-    console.log(`💰 Cerere de retragere înregistrată pentru ${coupon.user?.name || 'Partener'} - Suma: ${earningsRON.toFixed(2)} RON`);
+    // 5. TRMITEM EMAIL CĂTRE ADMIN (Karix Computers)
+    try {
+      await sendAdminWithdrawalAlert({
+        userName: coupon.user.name,
+        userEmail: coupon.user.email,
+        amount: earningsRON,
+        type: type || "Nespecificat (PFA/PF)",
+        fullName: fullName || coupon.user.name,
+        identifier: identifier || "Nespecificat",
+        iban: iban || "Nespecificat",
+        bankName: bankName || "Nespecificată",
+        adminEmail: "karixcomputers@gmail.com" // 👈 Mailul tău unde vrei să primești alerta
+      });
+      console.log("✉️ Alertă de retragere trimisă către Admin.");
+    } catch (adminMailErr) {
+      console.error("❌ Eroare la trimiterea mail-ului către admin:", adminMailErr);
+    }
+
+    // 6. TRIMITEM EMAIL DE CONFIRMARE CĂTRE UTILIZATOR / PROMOTER
+    try {
+      await sendUserWithdrawalConfirmation(
+        coupon.user.email,
+        coupon.user.name,
+        earningsRON
+      );
+      console.log(`✉️ Confirmare de retragere trimisă către partener: ${coupon.user.email}`);
+    } catch (userMailErr) {
+      console.error("❌ Eroare la trimiterea mail-ului către partener:", userMailErr);
+    }
 
     res.json({ 
       success: true, 
-      message: `Cererea de retragere pentru suma de ${earningsRON.toFixed(2)} RON a fost înregistrată cu succes! Te vom contacta în scurt timp.` 
+      message: `Cererea de retragere pentru suma de ${earningsRON.toFixed(2)} RON a fost înregistrată. Verifică adresa de email!` 
     });
 
   } catch (error) {
@@ -258,5 +286,4 @@ router.post("/withdraw", requireAuth, async (req, res, next) => {
     res.status(500).json({ error: "Eroare la procesarea cererii de retragere." });
   }
 });
-
 export default router;
