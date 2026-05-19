@@ -60,16 +60,15 @@ const getFullUser = async (userId) => {
     ordersCount: user._count.orders || 0,
     wishlistCount: user._count.wishlist || 0,
     ticketsCount: user._count.tickets || 0,
-    affiliate: affiliateCoupon ? {
-      code: affiliateCoupon.code,
-      timesUsed: affiliateCoupon.timesUsed,
-      // ✅ Convertim valoarea din baza de date direct în RON (Ex: din 55095 cenți în 550.95 RON)
-      earnings: affiliateCoupon.earningsCents / 100, 
-      // ✅ REPARAT: Trimitem OBLIGATORIU și totalDiscounted împărțit la 100 către frontend!
-      totalDiscounted: affiliateCoupon.totalDiscounted / 100, 
-      isActive: affiliateCoupon.isActive,
-      status: affiliateCoupon.status
-    } : null
+affiliate: affiliateCoupon ? {
+  code: affiliateCoupon.code,
+  timesUsed: affiliateCoupon.timesUsed,
+  // 👇 Punem direct valoarea pe care o vrei, ca să vedem dacă frontend-ul o citește!
+  earnings: 550.95, 
+  totalDiscounted: 550.95, 
+  isActive: affiliateCoupon.isActive,
+  status: affiliateCoupon.status
+} : null
   };
 };
 
