@@ -434,9 +434,19 @@ console.log("DEBUG: totalDiscounted:", coupon?.totalDiscounted);
 const currentStatus = coupon.status?.toUpperCase();
 
 if (currentStatus === "ACTIVE") {
-  // ✅ Folosim earningsCents (sau totalDiscounted ca fallback)
-  const totalCents = coupon?.earningsCents || coupon?.totalDiscounted || 0;
-  const earningsRON = (totalCents / 100).toFixed(2);
+  // ✅ REPARAT: Backend-ul trimite 'earnings' direct ca valoare calculată (ex: 1322.28)
+  // Punem și o verificare de siguranță în caz că pe viitor revii la varianta cu totalDiscounted
+  let earningsRON = "0.00";
+
+  if (coupon?.earnings !== undefined) {
+    // Dacă primim direct 'earnings' (cum e acum în Network: 1322.28)
+    earningsRON = Number(coupon.earnings).toFixed(2);
+  } else {
+    // Fallback în caz că pe viitor vine sub formă de cenți în totalDiscounted
+    const totalCents = coupon?.totalDiscounted || 0;
+    earningsRON = (totalCents / 100).toFixed(2);
+  }
+
   const isEligibleForWithdrawal = parseFloat(earningsRON) >= 100;
 
   return (
