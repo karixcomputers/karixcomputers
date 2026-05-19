@@ -24,13 +24,15 @@ router.get("/me", requireAuth, async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { affiliateCoupon: true }
+      include: { 
+        affiliateCoupon: true // Asigură-te că relația e corectă aici
+      }
     });
 
     if (!user) return res.status(404).json({ error: "Utilizator inexistent." });
 
     const { passwordHash, refreshTokenHash, verificationCode, affiliateCoupon, ...userData } = user;
-
+console.log("DEBUG BACKEND: Ce conține affiliateCoupon:", affiliateCoupon);
     const responseData = {
       ...userData,
       affiliate: affiliateCoupon ? {
@@ -38,13 +40,15 @@ router.get("/me", requireAuth, async (req, res) => {
         timesUsed: affiliateCoupon.timesUsed,
         isActive: affiliateCoupon.isActive,
         status: affiliateCoupon.status,
-        // TRIMITEM DOAR VALOAREA BRUTĂ, FĂRĂ CALCULE DE COMISION AICI
-        totalDiscounted: affiliateCoupon.totalDiscounted || 0
+        // ✅ AICI ESTE PROBLEMA: Asigură-te că folosești numele exact din schema Prisma
+        // Verifică în schema.prisma dacă se numește 'totalDiscounted'
+        totalDiscounted: affiliateCoupon.totalDiscounted || 0 
       } : null
     };
 
     res.json({ user: responseData });
   } catch (error) {
+    console.error("Eroare în ruta /me:", error);
     res.status(500).json({ error: "Eroare server." });
   }
 });
