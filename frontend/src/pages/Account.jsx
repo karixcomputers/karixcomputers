@@ -339,13 +339,15 @@ export default function Account() {
                 </div>
               )}
 
-              {/* === TAB 2: PROGRAM AFILIERE === */}
+{/* === TAB 2: PROGRAM AFILIERE === */}
 {activeTab === "affiliate" && (
   <div className="space-y-8 animate-in fade-in duration-300">
     
     {(() => {
-      // Forțăm starea să fie citită corect indiferent dacă e obiect direct sau vine din array-ul de cupoane
-      const coupon = affiliateCoupon;
+      // 👉 FIX: Dacă `affiliateCoupon` este un array, îl extragem pe primul. Dacă e array gol, îl setăm ca null.
+      const coupon = Array.isArray(affiliateCoupon) 
+        ? (affiliateCoupon.length > 0 ? affiliateCoupon[0] : null) 
+        : affiliateCoupon;
       if (!coupon) {
         return (
           <div className="p-8 rounded-[40px] bg-white/[0.01] border border-white/5 backdrop-blur-md relative overflow-hidden">
