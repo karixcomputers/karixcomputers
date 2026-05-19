@@ -297,4 +297,24 @@ router.post("/withdraw", requireAuth, async (req, res, next) => {
   }
 });
 
+/**
+ * 👉 8. PUT: Finalizare retragere (Doar Admin)
+ * Schimbă statusul din PENDING în PAID
+ */
+router.put("/withdraw/:id/finalize", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const updatedRequest = await prisma.withdrawalRequest.update({
+      where: { id: id },
+      data: { status: "PAID" }
+    });
+
+    res.json({ success: true, message: "Retragerea a fost marcată ca finalizată!", updatedRequest });
+  } catch (error) {
+    console.error("FINALIZE WITHDRAWAL ERROR:", error);
+    res.status(500).json({ error: "Nu s-a putut finaliza cererea." });
+  }
+});
+
 export default router;

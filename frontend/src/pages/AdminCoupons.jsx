@@ -38,6 +38,22 @@ export default function AdminCoupons() {
 
   useEffect(() => { fetchCoupons(); }, []);
 
+const handleFinalizeWithdraw = async (id) => {
+  if (!window.confirm("Ești sigur că ai trimis banii și vrei să finalizezi cererea?")) return;
+  try {
+    const res = await apiFetch(`/coupons/withdraw/${id}/finalize`, { method: "PUT" });
+    if (res.ok) {
+      // Reîmprospătăm listele ca să vedem statusul actualizat
+      fetchCoupons();
+    } else {
+      const err = await res.json();
+      alert(err.error || "Eroare la finalizare.");
+    }
+  } catch (err) {
+    alert("Eroare server.");
+  }
+};
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = {
@@ -170,27 +186,38 @@ export default function AdminCoupons() {
         ) : (
           /* 👉 4. LISTA CURATĂ CU ISTORICUL RETRAGERILOR */
           <div className="flex flex-col gap-4">
-            {withdrawals.length === 0 ? (
-              <p className="text-gray-500 italic text-sm ml-2">Nu există nicio cerere înregistrată în baza de date.</p>
-            ) : (
-              withdrawals.map(w => (
-                <div key={w.id} className="p-6 rounded-3xl bg-white/5 border border-white/10 flex justify-between items-center gap-4 hover:border-pink-500/30 transition-all">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-black text-xl text-white">{w.fullName}</span>
-                      <span className="text-[9px] bg-white/10 px-2 py-0.5 rounded text-gray-400 font-bold uppercase">{w.type}</span>
-                      <span className="px-3 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500/10 text-amber-400">{w.status}</span>
-                    </div>
-                    <div className="text-xs text-gray-400 font-mono mt-1">IBAN: <span className="text-gray-200">{w.iban}</span> | {w.bankName}</div>
-                    <div className="text-xs text-gray-400 font-mono">CNP/CUI: <span className="text-gray-200">{w.identifier}</span></div>
-                    <div className="text-[10px] text-indigo-400 font-bold uppercase mt-2">Dată cerere: {new Date(w.createdAt).toLocaleString('ro-RO')}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-black text-pink-500">{Number(w.amountRon).toFixed(2)} RON</div>
-                  </div>
-                </div>
-              ))
-            )}
+            {withdrawals.map(w => (
+  <div key={w.id} className="p-6 rounded-3xl bg-white/5 border border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 hover:border-pink-500/30 transition-all w-full">
+    <div>
+      <div className="flex items-center gap-3">
+        <span className="font-black text-xl text-white">{w.fullName}</span>
+        <span className="text-[9px] bg-white/10 px-2 py-0.5 rounded text-gray-400 font-bold uppercase">{w.type}</span>
+        <span className={`px-3 py-0.5 rounded-full text-[9px] font-black uppercase ${w.status === 'PAID' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+          {w.status}
+        </span>
+      </div>
+      <div className="text-xs text-gray-400 font-mono mt-1">IBAN: <span className="text-gray-200">{w.iban}</span> | {w.bankName}</div>
+      <div className="text-xs text-gray-400 font-mono">CNP/CUI: <span className="text-gray-200">{w.identifier}</span></div>
+      <div className="text-[10px] text-indigo-400 font-bold uppercase mt-2">Dată cerere: {new Date(w.createdAt).toLocaleString('ro-RO')}</div>
+    </div>
+    
+    <div className="flex items-center gap-6 self-end md:self-center">
+      <div className="text-right">
+        <div className="text-2xl font-black text-pink-500">{Number(w.amountRon).toFixed(2)} RON</div>
+      </div>
+      
+      {/* 👉 BUTONUL DE FINALIZEAZĂ: Apare doar dacă statusul este încă PENDING */}
+      {w.status === "PENDING" && (
+        <button
+          onClick={() => handleFinalizeWithdraw(w.id)}
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all"
+        >
+          ✓ Finalizează
+        </button>
+      )}
+    </div>
+  </div>
+))}
           </div>
         )}
 
