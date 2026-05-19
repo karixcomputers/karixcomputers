@@ -434,8 +434,9 @@ export default function Account() {
 if (currentStatus === "ACTIVE") {
   // 👉 SCHIMBARE AICI: Folosim 'totalDiscounted' și împărțim la 100
 // În loc de varianta veche, folosește asta:
-const rawTotal = coupon?.totalDiscounted;
-const earningsRON = rawTotal ? (rawTotal / 100).toFixed(2) : "0.00";
+const totalCents = coupon?.totalDiscounted || 0;
+const earningsRON = (totalCents / 100).toFixed(2);
+const isEligibleForWithdrawal = parseFloat(earningsRON) >= 100;
 
   return (
     <div className="p-8 rounded-[40px] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-pink-500/10 border border-indigo-500/20 backdrop-blur-md relative overflow-hidden transition-all hover:border-indigo-500/40 shadow-2xl">
