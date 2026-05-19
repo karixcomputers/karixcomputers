@@ -63,9 +63,9 @@ const getFullUser = async (userId) => {
 affiliate: affiliateCoupon ? {
   code: affiliateCoupon.code,
   timesUsed: affiliateCoupon.timesUsed,
-  // 👇 Punem direct valoarea pe care o vrei, ca să vedem dacă frontend-ul o citește!
-  earnings: 550.95, 
-  totalDiscounted: 550.95, 
+  // ✅ Înlocuim valoarea manuală cu citirea din baza de date (cenți / 100)
+  earnings: affiliateCoupon.totalDiscounted / 100, 
+  totalDiscounted: affiliateCoupon.totalDiscounted / 100, 
   isActive: affiliateCoupon.isActive,
   status: affiliateCoupon.status
 } : null
