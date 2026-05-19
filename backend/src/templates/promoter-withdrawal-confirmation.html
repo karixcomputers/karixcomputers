@@ -1,68 +1,90 @@
 <!DOCTYPE html>
 <html lang="ro">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cererea ta de retragere a fost înregistrată!</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cererea ta de retragere a fost înregistrată!</title>
+    <style>
+        .content-text p, .content-text ul {
+            color: #94a3b8;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        .content-text strong, .content-text b {
+            color: #ffffff;
+        }
+        @media only screen and (max-width: 600px) {
+            .container { width: 100% !important; border-radius: 0 !important; }
+        }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #030303; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #ffffff;">
-  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 30px auto; background-color: #0b0c10; border: 1px solid #1f2937; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
-    
-    <tr>
-      <td align="center" style="padding: 40px 40px; background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%); border-bottom: 1px solid #1f2937;">
-        <div style="font-size: 40px; margin-bottom: 10px;">💰</div>
-        <h1 style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 1px; color: #ffffff;">
-          Cerere Înregistrată!
-        </h1>
-        <p style="margin: 5px 0 0 0; font-size: 12px; color: #a5b4fc; font-weight: 500;">
-          Banii tăi au intrat în procesare
-        </p>
-      </td>
-    </tr>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b1020; color: #ffffff;">
+    <center style="width: 100%; table-layout: fixed; background-color: #0b1020; padding: 40px 0;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #0f172a; border-radius: 24px; overflow: hidden; border: 1px solid #1e293b; box-shadow: 0 20px 50px rgba(0,0,0,0.5);" class="container">
+            
+            <tr>
+                <td align="center" style="background: linear-gradient(to right, #4f46e5, #ec4899); padding: 60px 20px;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; text-transform: uppercase; letter-spacing: 5px; font-style: italic; font-weight: 900; text-shadow: 0 2px 15px rgba(0,0,0,0.4);">
+                        Karix Computers
+                    </h1>
+                </td>
+            </tr>
 
-    <tr>
-      <td style="padding: 40px 35px;">
-        <p style="margin: 0 0 15px 0; font-size: 16px; font-weight: bold; color: #ffffff;">
-          Salut, {{name}}! 👋
-        </p>
-        <p style="margin: 0 0 25px 0; font-size: 14px; line-height: 1.6; color: #9ca3af;">
-          Am primit cu succes solicitarea ta de retragere a comisioanelor acumulate pe platforma <strong style="color: #ffffff;">Karix Computers</strong>. Echipa noastră financiară se ocupă deja de verificarea detaliilor.
-        </p>
+            <tr>
+                <td style="padding: 40px 30px;">
+                    
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <img src="https://karixcomputers.ro/logo.png" alt="Karix Logo" style="height: 150px; width: auto; display: inline-block; outline: none; border: none;">
+                    </div>
 
-        <table width="100%" cellpadding="0" cellspacing="0" style="background: #111827; border: 1px solid #1f2937; border-radius: 16px; margin-bottom: 25px;">
-          <tr>
-            <td style="padding: 20px; text-align: center;">
-              <span style="font-size: 11px; font-weight: 900; text-transform: uppercase; color: #6366f1; letter-spacing: 1px; display: block; margin-bottom: 5px;">
-                Sumă transferată spre validare
-              </span>
-              <span style="font-size: 26px; font-weight: 900; color: #ffffff; font-style: italic;">
-                {{amount}} RON
-              </span>
-            </td>
-          </tr>
+                    <h2 style="margin-top: 0; color: #10b981; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; text-align: center; font-weight: 800;">
+                        Cerere Înregistrată! 💰
+                    </h2>
+                    
+                    <div class="content-text" style="color: #94a3b8; font-size: 16px; line-height: 1.6;">
+                        <p>Salut <strong style="color: #ffffff;">{{name}}</strong>,</p>
+                        <p>Am primit cu succes solicitarea ta de retragere a comisioanelor acumulate pe platforma <strong style="color: #ffffff;">Karix Computers</strong>. Echipa noastră financiară se ocupă deja de verificarea detaliilor.</p>
+                        
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(79, 70, 229, 0.05); border: 1px solid rgba(79, 70, 229, 0.2); border-radius: 16px; margin: 30px 0;">
+                            <tr>
+                                <td style="padding: 30px 20px; text-align: center;">
+                                    <h3 style="margin: 0 0 10px 0; font-size: 12px; color: #818cf8; text-transform: uppercase; letter-spacing: 1px;">Sumă transferată spre validare</h3>
+                                    <span style="font-size: 32px; font-weight: 900; color: #ffffff; font-style: italic;">
+                                        {{amount}} RON
+                                    </span>
+                                </td>
+                            </tr>
+                        </table>
+                        
+                        <h3 style="margin: 0 0 15px 0; font-size: 15px; color: #ffffff; border-bottom: 1px solid #1e293b; padding-bottom: 10px; text-transform: uppercase;">
+                            📌 CE URMEAZĂ ACUM?
+                        </h3>
+                        <ul style="margin: 0 0 30px 0; padding-left: 20px;">
+                            <li style="margin-bottom: 10px;"><strong>Timp de procesare:</strong> Transferul bancar durează în medie între <strong style="color: #ffffff;">1 și 3 zile lucrătoare</strong>.</li>
+                            <li style="margin-bottom: 10px;"><strong>Pentru Persoane Fizice:</strong> Suma care va intra în contul tău va fi cea <strong>netă</strong>, după ce reținem și virăm automat impozitul de 10% către ANAF. Scapi complet de birocrație!</li>
+                            <li style="margin-bottom: 10px;"><strong>Pentru PFA/SRL:</strong> Plata va rămâne în așteptare până la confirmarea și corelarea facturii fiscale trimise de tine.</li>
+                        </ul>
+
+                        <p style="margin: 40px 0 0 0; border-top: 1px solid #1e293b; padding-top: 20px; text-align: center;">
+                            Îți mulțumim pentru implicare și pentru că faci parte din comunitate!<br />
+                            <strong style="color: #ffffff; font-style: italic; letter-spacing: 1px; display: inline-block; margin-top: 10px;">Keep up the good work & high FPS! 🎮</strong>
+                        </p>
+                    </div>
+                </td>
+            </tr>
+            
+            <tr>
+                <td align="center" style="padding: 35px 30px; background-color: #0b1120; border-top: 1px solid #1e293b; color: #475569; font-size: 12px; line-height: 1.8;">
+                    <p style="margin: 0; margin-bottom: 8px;">Acesta este un mesaj automat generat de sistemul Karix Computers.</p>
+                    <p style="margin: 0; font-weight: bold; color: #64748b;">© 2026 Karix Computers. Built for Performance.</p>
+                    <div style="margin-top: 15px;">
+                        <a href="https://instagram.com/karixcomputers" style="color: #4f46e5; text-decoration: none; margin: 0 10px;">Instagram</a>
+                        <a href="https://www.tiktok.com/@karixcomputers.ro" style="color: #4f46e5; text-decoration: none; margin: 0 10px;">TikTok</a>
+                        <a href="https://discord.gg/mVumeNGjTQ" style="color: #4f46e5; text-decoration: none; margin: 0 10px;">Discord Community</a>
+                    </div>
+                </td>
+            </tr>
         </table>
-
-        <h4 style="margin: 0 0 10px 0; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #db2777;">
-          📌 CE URMEAZĂ ACUM?
-        </h4>
-        <ul style="margin: 0 0 25px 0; padding-left: 20px; font-size: 13px; line-height: 1.6; color: #9ca3af;">
-          <li style="margin-bottom: 8px;"><strong>Timp de procesare:</strong> Transferul bancar durează în medie între <span style="color: #ffffff; font-weight: bold;">1 și 3 zile lucrătoare</span>.</li>
-          <li style="margin-bottom: 8px;"><strong>Pentru Persoane Fizice:</strong> Suma care va intra în contul tău va fi cea <strong>netă</strong>, după ce reținem și virăm automat impozitul de 10% către ANAF. Scapi complet de birocrație!</li>
-          <li style="margin-bottom: 8px;"><strong>Pentru PFA/SRL:</strong> Plata va rămâne în așteptare până la confirmarea și corelarea facturii fiscale trimise de tine.</li>
-        </ul>
-
-        <p style="margin: 40px 0 0 0; font-size: 14px; line-height: 1.6; color: #9ca3af; border-top: 1px solid #1f2937; padding-top: 20px; text-align: center;">
-          Îți mulțumim pentru implicare și pentru că faci parte din comunitate!<br />
-          <strong style="color: #ffffff; font-style: italic; letter-spacing: 1px;">Keep up the good work & high FPS! 🎮</strong>
-        </p>
-      </td>
-    </tr>
-
-    <tr>
-      <td align="center" style="padding: 20px; background-color: #010103; border-top: 1px solid #1f2937; font-size: 11px; color: #4b5563;">
-        Acesta este un email automat. Te rugăm să nu răspunzi direct la el.
-      </td>
-    </tr>
-  </table>
+    </center>
 </body>
 </html>
