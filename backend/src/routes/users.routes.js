@@ -16,15 +16,17 @@ const requireAdmin = (req, res, next) => {
 
 /**
  * 1. GET: Profilul utilizatorului curent (Logat)
- * Această rută aduce datele tale, cuponul de afiliat ȘI starea parteneriatului
+ * Reparat conform numelui relației din schema.prisma
  */
 router.get("/me", requireAuth, async (req, res) => {
   try {
+    // req.user.sub sau req.user.id în funcție de cum e configurat middleware-ul tău requireAuth
+    const userId = req.user.sub || req.user.id; 
+
     const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
+      where: { id: userId },
       include: {
-        coupons: true, 
-        affiliate: true // 🚀 ADAUGĂ ACEASTĂ LINIE (sau 'partner', în funcție de cum ai numit-o în schema.prisma)
+        affiliateCoupon: true // 🚀 NUMELE CORECT DIN SCHEMA TA!
       }
     });
 
@@ -32,7 +34,22 @@ router.get("/me", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Utilizatorul nu a fost găsit." });
     }
 
-    res.json(user);
+    // Extragem hash-urile sensibile înainte de trimitere
+    const { passwordHash, refreshTokenHash, verificationCode, affiliateCoupon, ...userData } = user;
+
+    // Formatăm obiectul exact în stilul pe care îl așteaptă frontend-ul din getFullUser
+    const responseData = {
+      ...userData,
+      affiliate: affiliateCoupon ? {
+        code: affiliateCoupon.code,
+        timesUsed: affiliateCoupon.timesUsed,
+        earnings: (affiliateCoupon.earningsCents || 0) / 100, 
+        isActive: affiliateCoupon.isActive,
+        status: affiliateCoupon.status // 🚀 TRIMITEM ȘI STATUSUL ("PENDING" / "ACTIVE")
+      } : null
+    };
+
+    res.json({ user: responseData });
   } catch (error) {
     console.error("EROARE RUTA /ME:", error);
     res.status(500).json({ error: "Eroare la încărcarea datelor utilizatorului." });
