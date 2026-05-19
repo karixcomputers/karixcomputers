@@ -317,4 +317,30 @@ router.put("/withdraw/:id/finalize", requireAuth, requireAdmin, async (req, res)
   }
 });
 
+/**
+ * 👉 GET: Istoricul retragerilor pentru utilizatorul curent logat (Streamer)
+ * Calea completă va fi: /api/coupons/my-withdrawals
+ */
+router.get("/my-withdrawals", requireAuth, async (req, res) => {
+  try {
+    // Extragem ID-ul utilizatorului logat din token
+    const userId = req.user?.sub || req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: "Utilizator neautentificat." });
+    }
+
+    // Căutăm doar cererile care aparțin acestui utilizator
+    const myRequests = await prisma.withdrawalRequest.findMany({
+      where: { userId: userId },
+      orderBy: { createdAt: "desc" }
+    });
+    
+    res.json(myRequests);
+  } catch (error) {
+    console.error("EROARE GET MY WITHDRAWALS:", error);
+    res.status(500).json({ error: "Nu s-a putut încărca istoricul retragerilor." });
+  }
+});
+
 export default router;
