@@ -12,11 +12,11 @@ export default function WebDev() {
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-[#0a0a0a]">
         
-        {/* ANIMATED BACKGROUND - Același stil ca în pagina de Contact */}
-        <div className="absolute inset-0 z-0 pointer-events-none">
-            <div className="absolute top-[10%] left-[10%] w-[400px] h-[400px] bg-indigo-500/20 blur-[120px] rounded-full animate-pulse" />
-            <div className="absolute bottom-[10%] right-[10%] w-[400px] h-[400px] bg-purple-500/20 blur-[120px] rounded-full animate-pulse delay-1000" />
-            <div className="absolute top-[40%] right-[20%] w-[300px] h-[300px] bg-pink-500/10 blur-[100px] rounded-full" />
+        {/* ANIMATED BACKGROUND - Versiune dinamică */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+            <div className="absolute top-[10%] left-[10%] w-[400px] h-[400px] bg-indigo-500/20 blur-[120px] rounded-full animate-[spin_10s_linear_infinite]" />
+            <div className="absolute bottom-[10%] right-[10%] w-[400px] h-[400px] bg-purple-500/20 blur-[120px] rounded-full animate-[spin_15s_linear_infinite_reverse]" />
+            <div className="absolute top-[40%] right-[20%] w-[300px] h-[300px] bg-pink-500/10 blur-[100px] rounded-full animate-bounce" />
         </div>
 
         <div className="max-w-6xl mx-auto relative z-10">
@@ -31,7 +31,7 @@ export default function WebDev() {
             </p>
           </div>
 
-          {/* DETALII TEHNICE - GRILĂ */}
+          {/* DETALII TEHNICE */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-24">
             {[
               { title: "Frontend Modern", desc: "Interfețe ultra-rapide și responsive folosind React.js, Tailwind CSS și tehnologii de ultimă oră." },
