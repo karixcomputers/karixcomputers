@@ -6,57 +6,61 @@ export default function WebDev() {
   return (
     <>
       <SEO 
-        title="Dezvoltare Web Custom | Karix Computers"
-        description="Construim site-uri web de prezentare și platforme e-commerce performante în Oradea. Design modern, viteză maximă și conversie garantată."
+        title="Dezvoltare Web Custom & Backend | Karix Computers"
+        description="Dezvoltăm soluții web complexe: Frontend modern, Backend scalabil (Node.js), Baze de date și infrastructură virtuală în Oradea."
       />
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-[#0a0a0a]">
-        {/* BACKGROUND DECORATION */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none">
-            <div className="absolute top-0 left-0 w-[50%] h-[50%] bg-indigo-500/10 blur-[150px] rounded-full" />
-            <div className="absolute bottom-0 right-0 w-[50%] h-[50%] bg-purple-500/10 blur-[150px] rounded-full" />
+        
+        {/* ANIMATED BACKGROUND - Același stil ca în pagina de Contact */}
+        <div className="absolute inset-0 z-0 pointer-events-none">
+            <div className="absolute top-[10%] left-[10%] w-[400px] h-[400px] bg-indigo-500/20 blur-[120px] rounded-full animate-pulse" />
+            <div className="absolute bottom-[10%] right-[10%] w-[400px] h-[400px] bg-purple-500/20 blur-[120px] rounded-full animate-pulse delay-1000" />
+            <div className="absolute top-[40%] right-[20%] w-[300px] h-[300px] bg-pink-500/10 blur-[100px] rounded-full" />
         </div>
 
-        <div className="max-w-5xl mx-auto relative z-10">
+        <div className="max-w-6xl mx-auto relative z-10">
           {/* HEADER */}
-          <div className="text-center mb-20">
-            <span className="text-indigo-400 font-black tracking-[0.2em] uppercase italic mb-4 block">Web Development</span>
+          <div className="text-center mb-24">
+            <span className="text-indigo-400 font-black tracking-[0.2em] uppercase italic mb-4 block">Full-Stack Development</span>
             <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter mb-8 italic uppercase leading-none">
               Soluții Web <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Performante</span>
             </h1>
-            <p className="text-gray-400 text-xl max-w-2xl mx-auto font-medium italic">
-              Nu doar codăm, construim experiențe digitale care transformă vizitatorii în clienți fideli.
+            <p className="text-gray-400 text-xl max-w-3xl mx-auto font-medium italic">
+              De la arhitectură de baze de date la infrastructură virtuală (VPS). Construim tot stack-ul tehnologic necesar afacerii tale.
             </p>
           </div>
 
-          {/* BENEFICII */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-20">
+          {/* DETALII TEHNICE - GRILĂ */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-24">
             {[
-              { title: "Design Personalizat", desc: "Fără template-uri rigide. Design unic adaptat 100% identității brandului tău." },
-              { title: "Viteză și SEO", desc: "Optimizare avansată pentru Google și încărcare aproape instantanee a paginilor." },
-              { title: "Mobile First", desc: "Experiență impecabilă pe orice dispozitiv, de la telefoane mobile la ecrane desktop." },
-              { title: "Scalabilitate", desc: "Platforme robuste, construite să crească organic odată cu afacerea ta." }
+              { title: "Frontend Modern", desc: "Interfețe ultra-rapide și responsive folosind React.js, Tailwind CSS și tehnologii de ultimă oră." },
+              { title: "Backend Scalabil", desc: "API-uri robuste dezvoltate cu Node.js și Express, optimizate pentru sarcini complexe." },
+              { title: "Baze de Date", desc: "Arhitecturi SQL și NoSQL (PostgreSQL, MongoDB) sigure, rapide și ușor de interogat." },
+              { title: "Virtual Servers (VPS)", desc: "Configurăm și administrăm servere virtuale pentru găzduire stabilă și securizată." },
+              { title: "Integrare API", desc: "Conectăm aplicația ta cu servicii terțe (Plăți, CRM, Facturare) prin fluxuri automatizate." },
+              { title: "Mentenanță 24/7", desc: "Monitorizare proactivă a serverelor și actualizări constante pentru securitate maximă." }
             ].map((item, i) => (
-              <div key={i} className="p-8 rounded-[32px] bg-white/[0.03] border border-white/10 backdrop-blur-md hover:bg-white/[0.06] transition-all">
-                <h3 className="text-xl font-black text-white uppercase italic mb-3">{item.title}</h3>
-                <p className="text-gray-400 font-medium">{item.desc}</p>
+              <div key={i} className="p-8 rounded-[32px] bg-white/[0.03] border border-white/10 backdrop-blur-md hover:bg-white/[0.06] hover:border-indigo-500/50 transition-all group">
+                <h3 className="text-xl font-black text-white uppercase italic mb-3 group-hover:text-indigo-400 transition-colors">{item.title}</h3>
+                <p className="text-gray-400 font-medium leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
 
           {/* CTA SECTION */}
-          <div className="p-12 rounded-[40px] bg-gradient-to-br from-indigo-900/20 to-purple-900/20 border border-indigo-500/30 backdrop-blur-lg text-center">
-            <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-6">
-              Gata să începem proiectul tău?
+          <div className="p-16 rounded-[40px] bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 backdrop-blur-lg text-center shadow-2xl">
+            <h2 className="text-5xl font-black text-white uppercase italic tracking-tighter mb-6">
+              Ai nevoie de un sistem complex?
             </h2>
-            <p className="text-gray-400 mb-10 max-w-lg mx-auto">
-              Povestește-ne despre ideea ta. Suntem aici să o transformăm în realitate digitală chiar acum.
+            <p className="text-gray-300 mb-10 max-w-xl mx-auto text-lg">
+              Nu ne limităm la site-uri simple. Gestionăm proiecte software complexe, de la ideea inițială până la deployment pe servere dedicate.
             </p>
             <Link 
               to="/contact" 
-              className="inline-flex items-center gap-3 px-10 py-5 bg-white text-black font-black uppercase italic tracking-tighter rounded-full hover:bg-indigo-400 hover:text-white transition-all duration-300"
+              className="inline-flex items-center gap-3 px-12 py-6 bg-white text-black font-black uppercase italic tracking-tighter rounded-full hover:bg-indigo-400 hover:text-white transition-all duration-300 text-lg"
             >
-              Cere O Ofertă Gratuită
+              Consultă Echipa Tehnică
             </Link>
           </div>
         </div>
