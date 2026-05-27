@@ -63,6 +63,9 @@ import ServiceDetails from "./pages/ServiceDetails.jsx";
 import AdminCounts from "./pages/AdminCounts.jsx";
 import AdminGiveaway from "./pages/AdminGiveaway";
 import Software from "./pages/Software.jsx";
+import WebDev from "./pages/WebDev";
+import Automatizari from "./pages/Automatizari";
+import AnalizaDate from "./pages/AnalizaDate";
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
@@ -110,8 +113,11 @@ export default function App() {
                   <Route path="/service/:id" element={<ServiceDetails />} />
                   <Route path="/failed" element={<Failed />} />
                   <Route path="/software" element={<Software />} />
-                  
-                  
+                  <Route path="/servicii/web-dev" element={<WebDev />} />
+                  <Route path="/servicii/automatizari" element={<Automatizari />} />
+                  <Route path="/servicii/aplicatii" element={<Aplicatii />} />
+                  <Route path="/servicii/analiza-date" element={<AnalizaDate />} />
+
 
                   {/* Rute Legale */}
                   <Route path="/terms" element={<Terms />} />
