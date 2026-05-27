@@ -150,6 +150,8 @@ export default function Checkout() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const appliedCoupon = location.state?.coupon || null;
 
+  const [isOradeaLocal, setIsOradeaLocal] = useState(false);
+
   const cartAnalysis = useMemo(() => {
     const isServiceKeywords = ['mentenanta', 'service', 'diagnosticare', 'curatare', 'montaj', 'reparatie', 'drift', 'hall', 'stick', 'upgrade', 'instalare', 'reinstalare', 'windows', 'software', 'bios', 'recuperare', 'asamblare'];
     
@@ -188,8 +190,7 @@ export default function Checkout() {
     return { hasPC, hasService, hardwareSubtotal, totalServicesInCart, requiresLocalPickup, hasNationalService };
   }, [items]);
 
-  // Dacă necesită preluare locală (cum ar fi un serviciu doar pentru Oradea), forțăm afișarea variantei blocate pe Oradea.
-  const showLocalUI = cartAnalysis.requiresLocalPickup;
+  const showLocalUI = cartAnalysis.requiresLocalPickup || isOradeaLocal;
 
   useEffect(() => {
     if (showLocalUI) {
@@ -257,7 +258,7 @@ export default function Checkout() {
     }
     
     // Dacă este Logistică Service Național (50 RON fix = 25 dus + 25 întors)
-    if (cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup) {
+    if (cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && !isOradeaLocal) {
         sendCost = 2500;
         returnCost = 2500;
     }
@@ -265,7 +266,7 @@ export default function Checkout() {
     const finalShippingCost = baseShippingCost + sendCost + returnCost;
 
     return { finalShippingCost, sendCost, returnCost };
-  }, [cartAnalysis, showLocalUI]);
+  }, [cartAnalysis, isOradeaLocal, showLocalUI]);
 
   const finalTotalCents = Math.max(0, totalCents - discountCents + shippingBreakdown.finalShippingCost);
 
@@ -391,7 +392,11 @@ export default function Checkout() {
     let systemAddressDetails = shipping.addressDetails || "";
     
     if (cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup) {
-        invoiceAddressDetails = `Facturare: ${shipping.invoiceAddress} | [DUS-ÎNTORS CURIER]: ${shipping.addressDetails}`;
+        if (isOradeaLocal) {
+            invoiceAddressDetails = `Facturare: ${shipping.invoiceAddress} | Preluare/Predare F2F Oradea (${shipping.addressDetails})`;
+        } else {
+            invoiceAddressDetails = `Facturare: ${shipping.invoiceAddress} | [DUS-ÎNTORS CURIER]: ${shipping.addressDetails}`;
+        }
     } else {
         invoiceAddressDetails = `Facturare: ${shipping.invoiceAddress} | Livrare: ${shipping.addressDetails}`;
     }
@@ -663,12 +668,34 @@ export default function Checkout() {
                     </button>
                 </div>
 
+                {cartAnalysis.hasService && cartAnalysis.hasNationalService && !cartAnalysis.requiresLocalPickup && (
+                  <div className="flex flex-col sm:flex-row gap-4 mb-8">
+                     <button 
+                       type="button"
+                       onClick={() => setIsOradeaLocal(false)}
+                       className={`flex-1 p-4 rounded-xl border transition-all text-left ${!isOradeaLocal ? 'bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}
+                     >
+                       <div className="font-black text-sm text-white">🚚 Din țară (Național)</div>
+                       <div className="text-[10px] uppercase tracking-widest mt-1 opacity-70">Trimitem Curierul</div>
+                     </button>
+                     
+                     <button 
+                       type="button"
+                       onClick={() => setIsOradeaLocal(true)}
+                       className={`flex-1 p-4 rounded-xl border transition-all text-left ${isOradeaLocal ? 'bg-emerald-500/20 border-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'}`}
+                     >
+                       <div className="font-black text-sm text-white">📍 Sunt din Oradea</div>
+                       <div className="text-[10px] uppercase tracking-widest mt-1 opacity-70">Ne vedem personal (Gratuit)</div>
+                     </button>
+                  </div>
+                )}
+
                 {showLocalUI ? (
                   <div className="space-y-6 animate-in fade-in zoom-in duration-300">
                     <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-start gap-3">
                       <span className="text-indigo-400 mt-0.5">📍</span>
                       <p className="text-xs text-indigo-300 font-medium leading-relaxed">
-                        Ai optat pentru un serviciu care necesită <strong>Predare Personală în Oradea (Bihor)</strong>. Câmpurile de județ și oraș sunt blocate.
+                        Ai optat pentru <strong>Predare Personală în Oradea (Bihor)</strong>. Câmpurile de oraș sunt blocate. Vom prelua/preda echipamentul gratuit!
                       </p>
                     </div>
 

@@ -62,6 +62,7 @@ import AdminAnnouncements from "./pages/AdminAnnouncements";
 import ServiceDetails from "./pages/ServiceDetails.jsx";
 import AdminCounts from "./pages/AdminCounts.jsx";
 import AdminGiveaway from "./pages/AdminGiveaway";
+import Software from "./pages/Software.jsx";
 
 // IMPORT NOU PENTRU PAGINA 404
 import NotFound from "./pages/NotFound.jsx"; 
@@ -108,6 +109,7 @@ export default function App() {
                   <Route path="/product/:id" element={<ProductDetails />} />
                   <Route path="/service/:id" element={<ServiceDetails />} />
                   <Route path="/failed" element={<Failed />} />
+                  <Route path="/software" element={<Software />} />
                   
 
                   {/* Rute Legale */}
