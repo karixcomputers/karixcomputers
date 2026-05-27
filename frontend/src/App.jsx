@@ -65,6 +65,7 @@ import AdminGiveaway from "./pages/AdminGiveaway";
 import Software from "./pages/Software.jsx";
 import WebDev from "./pages/WebDev";
 import Automatizari from "./pages/Automatizari";
+import Aplicatii from "./pages/Aplicatii";
 import AnalizaDate from "./pages/AnalizaDate";
 
 // IMPORT NOU PENTRU PAGINA 404
