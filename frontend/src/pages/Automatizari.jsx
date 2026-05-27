@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import SEO from "../components/SEO";
+import NetworkBackground from "../components/NetworkBackground";
 
 export default function Automatizari() {
   return (
@@ -11,50 +12,50 @@ export default function Automatizari() {
       />
 
       <div className="min-h-screen pt-32 pb-24 px-4 relative overflow-hidden bg-[#0a0a0a]">
-        {/* BACKGROUND DECORATION */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none">
-            <div className="absolute top-0 left-0 w-[50%] h-[50%] bg-emerald-500/10 blur-[150px] rounded-full" />
-            <div className="absolute bottom-0 right-0 w-[50%] h-[50%] bg-teal-500/10 blur-[150px] rounded-full" />
-        </div>
+        
+        {/* Fundal Animat */}
+        <NetworkBackground />
 
-        <div className="max-w-5xl mx-auto relative z-10">
+        <div className="max-w-6xl mx-auto relative z-10">
           {/* HEADER */}
-          <div className="text-center mb-20">
+          <div className="text-center mb-24">
             <span className="text-emerald-400 font-black tracking-[0.2em] uppercase italic mb-4 block">Automatizări Smart</span>
             <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter mb-8 italic uppercase leading-none">
               Eficiență <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Automatizată</span>
             </h1>
-            <p className="text-gray-400 text-xl max-w-2xl mx-auto font-medium italic">
-              Eliberăm timpul echipei tale. Înlocuim sarcinile repetitive cu fluxuri de lucru inteligente și precise.
+            <p className="text-gray-400 text-xl max-w-3xl mx-auto font-medium italic">
+              Eliberăm timpul echipei tale prin integrarea inteligentă a fluxurilor de lucru. Înlocuim sarcinile manuale și repetitive cu sisteme digitale rapide și infailibile.
             </p>
           </div>
 
-          {/* BENEFICII */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-20">
+          {/* DETALII TEHNICE */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-24">
             {[
-              { title: "Reducerea Erorilor", desc: "Automatizarea elimină riscul de eroare umană în gestionarea datelor." },
-              { title: "Economie de Timp", desc: "Sarcini care durau ore întregi sunt acum executate în câteva secunde." },
-              { title: "Integrare Aplicații", desc: "Conectăm software-urile tale actuale pentru un flux de lucru unitar." },
-              { title: "Scalabilitate", desc: "Procesele tale vor gestiona volume mai mari fără a necesita resurse umane extra." }
+              { title: "Reducerea Erorilor", desc: "Algoritmi de validare automată care elimină complet erorile umane în procesarea datelor critice." },
+              { title: "Economie de Timp", desc: "Transformăm procese care durau zile întregi în execuții instantanee, rulând în fundal 24/7." },
+              { title: "Integrare Aplicații", desc: "Conectăm nativ CRM-ul, ERP-ul și uneltele tale de comunicare pentru un flux de lucru unitar (Workflow Automation)." },
+              { title: "Scalabilitate", desc: "Arhitecturi capabile să gestioneze creșteri bruște de volum fără a adăuga costuri cu personal suplimentar." },
+              { title: "Notificări Smart", desc: "Sisteme care te alertează doar când este necesară intervenția umană, filtrând zgomotul informațional." },
+              { title: "Mentenanță Proactivă", desc: "Monitorizăm și optimizăm constant fluxurile pentru a asigura o funcționare fără întreruperi." }
             ].map((item, i) => (
-              <div key={i} className="p-8 rounded-[32px] bg-white/[0.03] border border-white/10 backdrop-blur-md hover:bg-white/[0.06] transition-all">
-                <h3 className="text-xl font-black text-white uppercase italic mb-3">{item.title}</h3>
-                <p className="text-gray-400 font-medium">{item.desc}</p>
+              <div key={i} className="p-8 rounded-[32px] bg-white/[0.03] border border-white/10 backdrop-blur-md hover:bg-white/[0.06] hover:border-emerald-500/50 transition-all group">
+                <h3 className="text-xl font-black text-white uppercase italic mb-3 group-hover:text-emerald-400 transition-colors">{item.title}</h3>
+                <p className="text-gray-400 font-medium leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
 
           {/* CTA SECTION */}
-          <div className="p-12 rounded-[40px] bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border border-emerald-500/30 backdrop-blur-lg text-center">
-            <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-6">
+          <div className="p-16 rounded-[40px] bg-gradient-to-br from-emerald-900/40 to-teal-900/40 border border-emerald-500/30 backdrop-blur-lg text-center shadow-2xl">
+            <h2 className="text-5xl font-black text-white uppercase italic tracking-tighter mb-6">
               Ce procese vrei să automatizezi?
             </h2>
-            <p className="text-gray-400 mb-10 max-w-lg mx-auto">
-              Analizăm fluxul tău de lucru și îți propunem soluții de automatizare care să aducă valoare imediată.
+            <p className="text-gray-300 mb-10 max-w-xl mx-auto text-lg">
+              Analizăm minuțios fluxul tău operațional și propunem soluții personalizate care generează valoare imediată și reduc costurile.
             </p>
             <Link 
               to="/contact" 
-              className="inline-flex items-center gap-3 px-10 py-5 bg-white text-black font-black uppercase italic tracking-tighter rounded-full hover:bg-emerald-400 hover:text-white transition-all duration-300"
+              className="inline-flex items-center gap-3 px-12 py-6 bg-white text-black font-black uppercase italic tracking-tighter rounded-full hover:bg-emerald-400 hover:text-white transition-all duration-300 text-lg"
             >
               Cere O Consultanță
             </Link>
