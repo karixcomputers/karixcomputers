@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom"; // Am schimbat cu Link
 import { apiFetch } from "../api/client";
 
 const AnnouncementBanner = () => {
@@ -18,11 +18,9 @@ const AnnouncementBanner = () => {
         console.error("Eroare la încărcarea bannerelor:", err);
       }
     };
-
     fetchActiveAnnouncements();
   }, []);
 
-  // Filtram anunțurile: arătăm cele pentru "all" sau cele specifice paginii curente
   const activeBanners = announcements.filter(
     (a) => a.targetPage === "all" || a.targetPage === location.pathname
   );
@@ -30,13 +28,13 @@ const AnnouncementBanner = () => {
   if (activeBanners.length === 0) return null;
 
   return (
-    <div className="w-full flex flex-col gap-1 z-50 relative">
+    // Container principal pentru a poziționa bannerele (float deasupra)
+    <div className="w-full flex flex-col items-center gap-2 pt-6 pb-2 z-50 relative pointer-events-none">
       {activeBanners.map((banner) => {
-        // Determinăm culorile bazate pe tipul anunțului
         const styles = {
-          info: "bg-indigo-600/90 text-white",
-          promo: "bg-pink-600/90 text-white",
-          warning: "bg-amber-500/90 text-black"
+          info: "bg-indigo-500/10 border-indigo-500/20 text-indigo-300",
+          promo: "bg-pink-500/10 border-pink-500/20 text-pink-300",
+          warning: "bg-amber-500/10 border-amber-500/20 text-amber-300"
         };
 
         const bannerStyle = styles[banner.type] || styles.info;
@@ -44,14 +42,17 @@ const AnnouncementBanner = () => {
         return (
           <div 
             key={banner.id} 
-            className={`w-full px-4 py-3 text-center text-xs font-black uppercase tracking-[0.2em] backdrop-blur-md ${bannerStyle}`}
+            className={`pointer-events-auto px-6 py-2 rounded-full border backdrop-blur-md shadow-lg transition-all hover:scale-[1.02] ${bannerStyle}`}
           >
             {banner.link ? (
-              <a href={banner.link} className="hover:underline italic flex items-center justify-center gap-2">
-                {banner.text} ➔
-              </a>
+              <Link to={banner.link} className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest italic">
+                {banner.text} 
+                <span className="opacity-50">➔</span>
+              </Link>
             ) : (
-              <span className="italic">{banner.text}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest italic">
+                {banner.text}
+              </span>
             )}
           </div>
         );
