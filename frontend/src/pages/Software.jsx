@@ -6,6 +6,7 @@ import SEO from "../components/SEO";
 const SOFTWARE_SERVICES = [
   {
     title: "Dezvoltare Web Custom",
+    path: "/servicii/web-dev",
     description: "Site-uri de prezentare, landing page-uri și platforme e-commerce performante, optimizate pentru viteză și conversie.",
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -18,6 +19,7 @@ const SOFTWARE_SERVICES = [
   },
   {
     title: "Automatizări Business",
+    path: "/servicii/automatizari",
     description: "Optimizăm procesele interne ale firmei tale prin scripturi și unelte custom care reduc munca manuală și elimină erorile.",
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -30,6 +32,7 @@ const SOFTWARE_SERVICES = [
   },
   {
     title: "Aplicații Personalizate",
+    path: "/servicii/aplicatii",
     description: "Soluții software adaptate nevoilor tale: baze de date simple, scripturi de automatizare sau unelte specifice de business.",
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,6 +45,7 @@ const SOFTWARE_SERVICES = [
   },
   {
     title: "Analiză de Date & Raportare",
+    path: "/servicii/analiza-date",
     description: "Transformăm datele tale brute în informații clare. Dashboard-uri și rapoarte vizuale pentru a lua decizii de business bazate pe fapte.",
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,9 +85,10 @@ export default function Software() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {SOFTWARE_SERVICES.map((service, idx) => (
-              <div 
+              <Link 
+                to={service.path}
                 key={idx} 
-                className={`p-1 rounded-[32px] bg-gradient-to-br ${service.gradient} border ${service.border} backdrop-blur-xl group hover:scale-[1.01] transition-all duration-500`}
+                className={`p-1 rounded-[32px] bg-gradient-to-br ${service.gradient} border ${service.border} backdrop-blur-xl group hover:scale-[1.01] transition-all duration-500 block`}
               >
                 <div className="bg-[#0a0a0a]/80 rounded-[30px] p-8 h-full flex flex-col justify-between overflow-hidden relative">
                   <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -109,7 +114,7 @@ export default function Software() {
                     </svg>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
 
