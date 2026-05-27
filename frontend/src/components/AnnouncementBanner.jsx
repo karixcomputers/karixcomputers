@@ -42,7 +42,7 @@ const AnnouncementBanner = () => {
         return (
           <div 
             key={banner.id} 
-            className={`pointer-events-auto px-6 py-2 rounded-full border backdrop-blur-md shadow-lg transition-all hover:scale-[1.02] ${bannerStyle}`}
+            className={`pointer-events-auto px-10 py-4 rounded-full border backdrop-blur-md shadow-lg transition-all hover:scale-[1.02] ${bannerStyle}`}
           >
             {banner.link ? (
               <Link to={banner.link} className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest italic">
@@ -50,7 +50,7 @@ const AnnouncementBanner = () => {
                 <span className="opacity-50">➔</span>
               </Link>
             ) : (
-              <span className="text-[10px] font-black uppercase tracking-widest italic">
+              <span className="text-[12px] font-black uppercase tracking-widest italic">
                 {banner.text}
               </span>
             )}
