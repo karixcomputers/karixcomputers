@@ -149,6 +149,7 @@ export default function Header() {
               <Item to="/shop">Sisteme PC</Item>
               <Item to="/configurator">Configurator PC</Item>
               <Item to="/servicii">Servicii</Item>
+              <Item to="/software">Software</Item>
               <Item to="/suport">Suport</Item>
               <Item to="/contact">Contact</Item>
               
