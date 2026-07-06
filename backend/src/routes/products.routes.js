@@ -363,7 +363,7 @@ router.post("/update-pc-price", async (req, res, next) => {
     }
 
     // Manopera fixă
-    const manopera = 300;
+    const manopera = 400;
     
     // Calculul final
     let calculated = (rawPrice * adaosPercent) + manopera;
