@@ -354,23 +354,12 @@ router.post("/update-pc-price", async (req, res, next) => {
       return res.json({ success: true, message: "PC ascuns din cauza lipsei de stoc." });
     }
 
-    // Stabilirea adaosului comercial în funcție de prețul brut
-    let adaosPercent;
-    if (rawPrice <= 7500) {
-      adaosPercent = 1.05; // 5%
-    } else if (rawPrice <= 12500) {
-      adaosPercent = 1.04; // 4%
-    } else if (rawPrice <= 20000) {
-      adaosPercent = 1.03; // 3%
-    } else {
-      adaosPercent = 1.02; // 2% pentru peste 20000
-    }
-
     // Manopera fixă
-    const manopera = 400;
+    const manopera = 300;
     
-    // Calculul final
-    let calculated = (rawPrice * adaosPercent) + manopera;
+    // Calculul final (preț piese + manoperă fixă)
+    let calculated = rawPrice + manopera;
+    // Rotunjire pentru a se termina în 9 (ex: 5432 devine 5439)
     let finalPrice = Math.ceil(calculated / 10) * 10 - 1;
 
     // Actualizăm prețul ȘI ne asigurăm că produsul este din nou vizibil
@@ -382,7 +371,7 @@ router.post("/update-pc-price", async (req, res, next) => {
       } 
     });
 
-    console.log(`✅ [SYNC] Wishlist ${wishlistId} actualizat la ${finalPrice} RON (Adaos aplicat: ${((adaosPercent - 1) * 100).toFixed(0)}%) și marcat ca VIZIBIL.`);
+    console.log(`✅ [SYNC] Wishlist ${wishlistId} actualizat la ${finalPrice} RON (Manoperă aplicată: ${manopera} RON) și marcat ca VIZIBIL.`);
     res.json({ success: true, newPrice: finalPrice });
   } catch (e) {
     console.error("SYNC ERROR:", e);
